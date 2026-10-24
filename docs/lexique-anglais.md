@@ -134,7 +134,7 @@ type: doc
 | Créneau en cours | Time slot in progress |
 | Arrêt programmé à 22:00 | Scheduled stop at 10:00 PM (horloge selon Windows) |
 | Démarrage manqué | Missed start |
-| Une seule fois / Tous les jours / Certains jours de la semaine | Once / Every day / Certain days of the week |
+| Une seule fois / Tous les jours / Certains jours de la semaine | Once / Every day / Specific days of the week |
 | Du lundi au vendredi / Le week-end / Chaque lundi | Weekdays / Weekends / Every Monday |
 | aujourd'hui à… / demain à… | today at… / tomorrow at… |
 | Se termine le lendemain. | Ends the next day. |

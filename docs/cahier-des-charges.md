@@ -736,8 +736,8 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 
 > [!todo] Étape 3 quinquies - Version anglaise ([[#Langues et formats]]), écrite le 2026-10-24
 > - [x] Textes externalisés (interface et messages Rust, erreurs du moteur comprises), phrases recollées et pluriels réécrits, copy française au ton impersonnel
-> - [ ] Lexique anglais de référence, validé avant de traduire
-> - [ ] Catalogue anglais complet, écrit directement en anglais et relu sur captures du mode démonstration
+> - [x] Lexique anglais de référence, validé avant de traduire ([[lexique-anglais]])
+> - [x] Catalogue anglais complet, écrit directement en anglais et relu sur captures du mode démonstration ; le test refuse désormais tout texte sans anglais
 > - [ ] Réglages « Langue » et « Horloge », appliqués immédiatement ; sélecteur de date dans la programmation
 > - [ ] README anglais en tête (`README.md`) et français (`README.fr.md`), fichier d'accompagnement de la version portable, description de l'exécutable et du dépôt GitHub
 > - [ ] Validation sur la machine de référence, en français et en anglais

@@ -18,7 +18,7 @@ use std::sync::{Arc, OnceLock};
 use polyptyque_core::i18n::{Catalog, French};
 
 /// Contenu du catalogue anglais, lu à la compilation.
-const ENGLISH_PO: &[u8] = include_bytes!("../lang/en/LC_MESSAGES/polyptyque-app.po");
+const ENGLISH_PO: &str = include_str!("../lang/en/LC_MESSAGES/polyptyque-app.po");
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Language {
@@ -69,6 +69,10 @@ fn english_catalog() -> Option<Arc<Catalog>> {
     static CATALOG: OnceLock<Option<Arc<Catalog>>> = OnceLock::new();
     CATALOG
         .get_or_init(|| match Catalog::parse(ENGLISH_PO) {
+            Ok(catalog) if catalog.is_empty() => {
+                log::error!("catalogue anglais vide");
+                None
+            }
             Ok(catalog) => Some(Arc::new(catalog)),
             Err(e) => {
                 log::error!("{e:#}");

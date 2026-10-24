@@ -440,9 +440,11 @@ impl Source {
     /// Description courte : « Navigateur Firefox », « Application Discord ».
     pub fn kind_label(&self) -> String {
         match &self.kind {
-            SourceKind::Browser { browser, .. } => tr!("Navigateur {}", browser.name),
+            // Contexte : « Navigateur {} » sert aussi de nom par défaut d'une
+            // source (« Navigateur 3 »), traduit autrement.
+            SourceKind::Browser { browser, .. } => tr!("Type de source" => "Navigateur {}", browser.name),
             SourceKind::Application { exe_path, .. } => {
-                tr!("Application {}", program_name(exe_path).unwrap_or_default())
+                tr!("Type de source" => "Application {}", program_name(exe_path).unwrap_or_default())
             }
         }
     }

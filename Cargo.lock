@@ -3724,6 +3724,7 @@ dependencies = [
  "chrono-tz",
  "directories",
  "log",
+ "rspolib",
  "serde",
  "toml",
  "tr",
@@ -5043,9 +5044,6 @@ name = "tr"
 version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "79d30c7e79732253d80e9d619007002c8f3a362b0816e37340af648d4e2c6092"
-dependencies = [
- "rspolib",
-]
 
 [[package]]
 name = "tracing"

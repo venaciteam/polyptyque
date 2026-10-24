@@ -2274,7 +2274,12 @@ impl App {
             text.push(tr!("Sa programmation aussi." | "Ses {n} programmations aussi." % schedules));
         }
         text.push(tr!("Les profils de navigateur restent sur le disque."));
-        self.ask(Confirm::DeleteScene, &tr!("Supprimer la scène"), &text.join(" "), &tr!("Supprimer"));
+        self.ask(
+            Confirm::DeleteScene,
+            &tr!("Supprimer la scène"),
+            &text.join(" "),
+            &tr!("Bouton : supprimer une scène" => "Supprimer"),
+        );
     }
 
     // ----- Sources ---------------------------------------------------------
@@ -2473,7 +2478,12 @@ impl App {
                 format::join_list(&others)
             )
         };
-        self.ask(Confirm::RemoveSource(source.id.clone()), &tr!("Supprimer la source"), &text, &tr!("Supprimer"));
+        self.ask(
+            Confirm::RemoveSource(source.id.clone()),
+            &tr!("Supprimer la source"),
+            &text,
+            &tr!("Bouton : retirer une source" => "Supprimer"),
+        );
     }
 
     /// Mémorise la source sélectionnée, pour la coller dans une autre scène.

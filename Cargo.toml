@@ -24,7 +24,8 @@ log = "0.4"
 serde = { version = "1", features = ["derive"] }
 simplelog = "0.12"
 toml = "1"
-tr = { version = "0.1.11", default-features = false, features = ["po-translator"] }
+rspolib = "0.1"
+tr = { version = "0.1.11", default-features = false }
 wasapi = "0.26"
 windows = "0.62"
 

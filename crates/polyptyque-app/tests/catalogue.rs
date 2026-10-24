@@ -27,7 +27,7 @@ use std::path::{Path, PathBuf};
 
 /// Passe à `true` quand la version anglaise est écrite : dès lors, un texte
 /// sans traduction fait échouer le test.
-const ENGLISH_COMPLETE: bool = false;
+const ENGLISH_COMPLETE: bool = true;
 
 /// Crates dont les messages Rust passent par `tr!`. La console
 /// (`polyptyque-cli`) reste en français pour l'instant.
@@ -380,4 +380,44 @@ fn catalogues() {
         problems.len(),
         problems.join("\n")
     );
+}
+
+/// Le catalogue tel que Polyptyque le lit à l'exécution (texte intégré à
+/// l'exécutable) traduit bien chaque entrée : un fichier correct ne suffit
+/// pas si la lecture en mémoire échoue (cas de rspolib 0.1 avec des octets).
+#[test]
+fn runtime_catalog_translates_every_entry() {
+    use tr::Translator;
+    let text = fs::read_to_string(lang_file("en")).unwrap();
+    let catalog = polyptyque_core::i18n::Catalog::parse(&text).unwrap();
+    let (_, entries) = read_catalog("en");
+    let mut wrong = Vec::new();
+    for entry in &entries {
+        let context = entry.msgctxt.as_deref();
+        match &entry.msgid_plural {
+            Some(plural) => {
+                for (n, form) in [(1u64, 0usize), (2, 1)] {
+                    let expected = entry.msgstr_plural.get(form).cloned().unwrap_or_default();
+                    let got = catalog.ntranslate(n, &entry.msgid, plural, context);
+                    if !expected.is_empty() && got != expected {
+                        wrong.push(format!("{:?} (n = {n}) : {got:?} au lieu de {expected:?}", entry.msgid));
+                    }
+                }
+            }
+            None => {
+                let expected = entry.msgstr.clone().unwrap_or_default();
+                let got = catalog.translate(&entry.msgid, context);
+                if !expected.is_empty() && got != expected {
+                    wrong.push(format!("{:?} : {got:?} au lieu de {expected:?}", entry.msgid));
+                }
+            }
+        }
+    }
+    assert!(
+        !entries.is_empty() && catalog.len() == entries.len(),
+        "{} entrées lues sur {}",
+        catalog.len(),
+        entries.len()
+    );
+    assert!(wrong.is_empty(), "traductions perdues à la lecture :\n{}", wrong.join("\n"));
 }

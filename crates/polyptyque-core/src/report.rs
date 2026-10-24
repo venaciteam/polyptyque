@@ -161,7 +161,8 @@ pub const FILE_PREFIXES: [&str; 2] = ["rapport_", "report_"];
 /// Écrit le rapport dans `dir` : `<prefix><date>_<heure>.txt`.
 pub fn write(dir: &Path, prefix: &str, text: &str) -> Result<PathBuf> {
     fs::create_dir_all(dir).with_context(|| format!("création du dossier {}", dir.display()))?;
-    let (date, time) = naming::now_parts();
+    // Nom vu par la personne qui le joint : heure à la façon de sa langue.
+    let (date, time) = naming::file_name_parts();
     let path = naming::unique_path(dir, &format!("{prefix}{date}_{time}"), "txt", &Default::default());
     fs::write(&path, text).with_context(|| format!("écriture de {}", path.display()))?;
     Ok(path)

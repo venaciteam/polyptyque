@@ -34,4 +34,4 @@ slint-build = "1.18"
 
 [dev-dependencies]
 # Lecture des catalogues de traduction (test tests/catalogue.rs).
-rspolib = "0.1"
+rspolib.workspace = true
