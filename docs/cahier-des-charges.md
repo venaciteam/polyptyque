@@ -422,7 +422,7 @@ Inspirée d'[[OBS Studio]], volontairement allégée, thème sombre.
 **Ton**
 
 - Français : **ton impersonnel** ; l'interface donne l'information, sans tutoyer, sans genrer la personne, et ne vouvoie que lorsque c'est nécessaire.
-- Anglais : registre propre à l'anglais, fixé par le lexique de référence (pas un calque du français).
+- Anglais : registre propre à l'anglais, fixé par le [[lexique-anglais|lexique de référence]] (pas un calque du français).
 
 **Formats**
 

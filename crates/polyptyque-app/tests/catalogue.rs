@@ -260,22 +260,25 @@ fn translations(entry: &rspolib::POEntry) -> Vec<String> {
     }
 }
 
-/// Paramètres d'un texte : `{}` comptés, `{0}`, `{nom}` par leur nom.
-fn placeholders(text: &str) -> (usize, BTreeSet<String>) {
-    let mut positional = 0;
-    let mut named = BTreeSet::new();
+/// Paramètres d'un texte : `{}` numérotés dans l'ordre (`0`, `1`…), `{1}`
+/// par son numéro (une traduction peut changer l'ordre), `{nom}` par son
+/// nom.
+fn placeholders(text: &str) -> BTreeSet<String> {
+    let mut next = 0;
+    let mut found = BTreeSet::new();
     let mut rest = text;
     while let Some(start) = rest.find('{') {
         let Some(end) = rest[start..].find('}') else { break };
         let name = rest[start + 1..start + end].trim();
         if name.is_empty() {
-            positional += 1;
+            found.insert(next.to_string());
+            next += 1;
         } else {
-            named.insert(name.to_string());
+            found.insert(name.to_string());
         }
         rest = &rest[start + end + 1..];
     }
-    (positional, named)
+    found
 }
 
 #[test]
@@ -340,19 +343,17 @@ fn catalogues() {
             continue;
         }
         if message.has_arguments {
-            let (count, names) = placeholders(&message.key.msgid);
+            let mut expected = placeholders(&message.key.msgid);
+            if let Some(plural) = &message.key.plural {
+                expected.extend(placeholders(plural));
+            }
             for form in &forms {
-                let (form_count, form_names) = placeholders(form);
+                let found = placeholders(form);
                 // Au pluriel, le singulier anglais peut taire le nombre
-                // (« One file »).
-                let names_ok = if message.key.plural.is_some() {
-                    form_names.is_subset(
-                        &names.union(&placeholders(message.key.plural.as_ref().unwrap()).1).cloned().collect(),
-                    )
-                } else {
-                    form_names == names
-                };
-                if form_count != count || !names_ok {
+                // (« One file ») : chaque forme utilise une partie des
+                // paramètres. Sinon, exactement les mêmes.
+                let ok = if message.key.plural.is_some() { found.is_subset(&expected) } else { found == expected };
+                if !ok {
                     problems.push(format!(
                         "{} : paramètres différents entre {:?} et {:?}",
                         message.origins[0], message.key.msgid, form
