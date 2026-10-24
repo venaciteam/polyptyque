@@ -1,6 +1,6 @@
 // Fenêtres modales : ajout de sources, scènes, réglages, confirmations.
 
-import { ComboBox, LineEdit, CheckBox, ListView, Spinner } from "std-widgets.slint";
+import { ComboBox, LineEdit, CheckBox, ListView, ScrollView, Spinner } from "std-widgets.slint";
 import { Theme } from "theme.slint";
 import { Bridge, ScheduleItem } from "bridge.slint";
 import { ActionButton, Field, Footer, IconButton, LevelMeter, Note, Sheet, ListRow, Toggle } from "components.slint";
@@ -361,210 +361,222 @@ export component SettingsSheet inherits Sheet {
         Bridge.close-sheet();
     }
 
-    // Deux colonnes de même largeur, remplies de haut en bas.
-    HorizontalLayout {
-        spacing: 28px;
-        VerticalLayout {
-            spacing: 14px;
-            alignment: start;
-            horizontal-stretch: 1;
-            preferred-width: 0px;
-            Text {
-                text: @tr("Enregistrement");
-                color: Theme.text;
-                font-weight: 700;
-            }
-            Field {
-                label: @tr("Résolution");
-                ComboBox {
-                    model: Bridge.resolution-choices;
-                    current-index <=> Bridge.resolution-index;
-                }
-            }
-            Field {
-                label: @tr("Images par seconde");
-                ComboBox {
-                    model: Bridge.fps-choices;
-                    current-index <=> Bridge.fps-index;
-                }
-            }
-            Field {
-                label: @tr("Débit vidéo (kb/s)");
-                hint: @tr("En 1080p à 60 i/s : 6 000 léger, 12 000 bon, 20 000 très bon.");
-                LineEdit {
-                    text <=> Bridge.bitrate-text;
-                    input-type: number;
-                }
-            }
-            Field {
-                label: @tr("Format vidéo");
-                ComboBox {
-                    model: Bridge.codec-choices;
-                    current-index <=> Bridge.codec-index;
-                }
-            }
-            Field {
-                label: @tr("Matériel d'encodage");
-                ComboBox {
-                    model: Bridge.hardware-choices;
-                    current-index <=> Bridge.hardware-index;
-                }
-            }
-            Field {
-                label: @tr("Débit audio");
-                ComboBox {
-                    model: Bridge.audio-choices;
-                    current-index <=> Bridge.audio-index;
-                }
-            }
-            Field {
-                label: @tr("Micro");
-                Toggle {
-                    text: @tr("Enregistrer le micro dans un fichier séparé");
-                    checked: Bridge.settings-mic;
-                    toggled(value) => {
-                        Bridge.settings-mic = value;
-                    }
-                }
-            }
-            if Bridge.settings-mic: ComboBox {
-                model: Bridge.mic-choices;
-                current-index <=> Bridge.mic-index;
-            }
-            // Le micro choisi est écouté tant que les réglages sont ouverts.
-            if Bridge.settings-mic: HorizontalLayout {
-                spacing: 10px;
-                LevelMeter {
-                    width: 120px;
-                    y: (parent.height - self.height) / 2;
-                    level: Bridge.mic-test-level;
-                    active: Bridge.mic-test-sound;
-                }
-                Text {
-                    horizontal-stretch: 1;
-                    text: Bridge.mic-test-error != "" ? Bridge.mic-test-error
-                        : Bridge.mic-test-sound ? @tr("Son capté") : @tr("Aucun son capté : parler dans le micro pour vérifier");
-                    color: Bridge.mic-test-error != "" ? Theme.warning : Theme.text-faint;
-                    font-size: Theme.font-small;
-                    vertical-alignment: center;
-                    wrap: word-wrap;
-                }
-            }
-            if Bridge.settings-mic: Note {
-                text: @tr("Le son de ce micro sera enregistré pendant chaque enregistrement, dans son propre fichier (.mka), calé sur les vidéos. Windows doit autoriser l'accès au micro pour les applications de bureau.");
-            }
-            if Bridge.settings-mic && Bridge.can-browse: HorizontalLayout {
+    // Seules les deux colonnes défilent quand la fenêtre est petite : le bas
+    // (version, signalement, boutons) reste toujours visible.
+    scroller := ScrollView {
+        max-height: max(160px, root.available-height - footer-row.preferred-height - 16px
+            - (Bridge.settings-error != "" ? 64px : 0px));
+        preferred-height: columns.preferred-height;
+        content-width: self.visible-width;
+        content-height: columns.preferred-height;
+        // Deux colonnes de même largeur, remplies de haut en bas.
+        columns := HorizontalLayout {
+            width: scroller.visible-width;
+            // Place de la barre de défilement, hors des champs.
+            padding-right: 14px;
+            spacing: 28px;
+            VerticalLayout {
+                spacing: 14px;
                 alignment: start;
-                ActionButton {
-                    text: @tr("Autorisations du micro dans Windows");
-                    icon: @image-url("icons/launch.svg");
-                    has-icon: true;
-                    kind: "ghost";
-                    clicked => {
-                        Bridge.open-mic-privacy();
+                horizontal-stretch: 1;
+                preferred-width: 0px;
+                Text {
+                    text: @tr("Enregistrement");
+                    color: Theme.text;
+                    font-weight: 700;
+                }
+                Field {
+                    label: @tr("Résolution");
+                    ComboBox {
+                        model: Bridge.resolution-choices;
+                        current-index <=> Bridge.resolution-index;
                     }
                 }
-            }
-        }
-        VerticalLayout {
-            spacing: 14px;
-            alignment: start;
-            horizontal-stretch: 1;
-            preferred-width: 0px;
-            Text {
-                text: @tr("Fichiers et interface");
-                color: Theme.text;
-                font-weight: 700;
-            }
-            Field {
-                label: @tr("Dossier des enregistrements");
-                HorizontalLayout {
-                    spacing: 8px;
-                    LineEdit {
-                        text <=> Bridge.output-dir;
-                        horizontal-stretch: 1;
+                Field {
+                    label: @tr("Images par seconde");
+                    ComboBox {
+                        model: Bridge.fps-choices;
+                        current-index <=> Bridge.fps-index;
                     }
-                    if Bridge.can-browse: ActionButton {
-                        text: @tr("Parcourir…");
+                }
+                Field {
+                    label: @tr("Débit vidéo (kb/s)");
+                    hint: @tr("En 1080p à 60 i/s : 6 000 léger, 12 000 bon, 20 000 très bon.");
+                    LineEdit {
+                        text <=> Bridge.bitrate-text;
+                        input-type: number;
+                    }
+                }
+                Field {
+                    label: @tr("Format vidéo");
+                    ComboBox {
+                        model: Bridge.codec-choices;
+                        current-index <=> Bridge.codec-index;
+                    }
+                }
+                Field {
+                    label: @tr("Matériel d'encodage");
+                    ComboBox {
+                        model: Bridge.hardware-choices;
+                        current-index <=> Bridge.hardware-index;
+                    }
+                }
+                Field {
+                    label: @tr("Débit audio");
+                    ComboBox {
+                        model: Bridge.audio-choices;
+                        current-index <=> Bridge.audio-index;
+                    }
+                }
+                Field {
+                    label: @tr("Micro");
+                    Toggle {
+                        text: @tr("Enregistrer le micro dans un fichier séparé");
+                        checked: Bridge.settings-mic;
+                        toggled(value) => {
+                            Bridge.settings-mic = value;
+                        }
+                    }
+                }
+                if Bridge.settings-mic: ComboBox {
+                    model: Bridge.mic-choices;
+                    current-index <=> Bridge.mic-index;
+                }
+                // Le micro choisi est écouté tant que les réglages sont ouverts.
+                if Bridge.settings-mic: HorizontalLayout {
+                    spacing: 10px;
+                    LevelMeter {
+                        width: 120px;
+                        y: (parent.height - self.height) / 2;
+                        level: Bridge.mic-test-level;
+                        active: Bridge.mic-test-sound;
+                    }
+                    Text {
+                        horizontal-stretch: 1;
+                        text: Bridge.mic-test-error != "" ? Bridge.mic-test-error
+                            : Bridge.mic-test-sound ? @tr("Son capté") : @tr("Aucun son capté : parler dans le micro pour vérifier");
+                        color: Bridge.mic-test-error != "" ? Theme.warning : Theme.text-faint;
+                        font-size: Theme.font-small;
+                        vertical-alignment: center;
+                        wrap: word-wrap;
+                    }
+                }
+                if Bridge.settings-mic: Note {
+                    text: @tr("Le son de ce micro sera enregistré pendant chaque enregistrement, dans son propre fichier (.mka), calé sur les vidéos. Windows doit autoriser l'accès au micro pour les applications de bureau.");
+                }
+                if Bridge.settings-mic && Bridge.can-browse: HorizontalLayout {
+                    alignment: start;
+                    ActionButton {
+                        text: @tr("Autorisations du micro dans Windows");
+                        icon: @image-url("icons/launch.svg");
+                        has-icon: true;
+                        kind: "ghost";
                         clicked => {
-                            Bridge.browse-output();
+                            Bridge.open-mic-privacy();
                         }
                     }
                 }
             }
-            Field {
-                label: @tr("Modèle de nom de fichier");
-                hint: @tr("Variables : {{date}}, {{heure}}, {{scène}}, {{source}}.");
-                LineEdit {
-                    text <=> Bridge.template;
+            VerticalLayout {
+                spacing: 14px;
+                alignment: start;
+                horizontal-stretch: 1;
+                preferred-width: 0px;
+                Text {
+                    text: @tr("Fichiers et interface");
+                    color: Theme.text;
+                    font-weight: 700;
                 }
-            }
-            Toggle {
-                text: @tr("Aperçus en direct des sources");
-                checked: Bridge.settings-previews;
-                toggled(value) => {
-                    Bridge.settings-previews = value;
-                }
-            }
-            Toggle {
-                text: @tr("Ouvrir les fenêtres de la scène au lancement");
-                checked: Bridge.settings-open-windows;
-                toggled(value) => {
-                    Bridge.settings-open-windows = value;
-                }
-            }
-            Toggle {
-                text: @tr("Fermer les navigateurs des sources en quittant");
-                checked: Bridge.settings-close-browsers;
-                toggled(value) => {
-                    Bridge.settings-close-browsers = value;
-                }
-            }
-            Toggle {
-                text: @tr("Lancer Polyptyque au démarrage de Windows");
-                checked: Bridge.settings-startup;
-                toggled(value) => {
-                    Bridge.settings-startup = value;
-                }
-            }
-            Field {
-                label: @tr("Conversion pour le montage");
-                hint: @tr("Copie MP4 sans perte de qualité, créée à côté du MKV, qui est conservé. Prévoir le double d'espace disque.");
-                Toggle {
-                    text: @tr("Convertir en MP4 à la fin de l'enregistrement");
-                    checked: Bridge.settings-convert;
-                    toggled(value) => {
-                        Bridge.settings-convert = value;
+                Field {
+                    label: @tr("Dossier des enregistrements");
+                    HorizontalLayout {
+                        spacing: 8px;
+                        LineEdit {
+                            text <=> Bridge.output-dir;
+                            horizontal-stretch: 1;
+                        }
+                        if Bridge.can-browse: ActionButton {
+                            text: @tr("Parcourir…");
+                            clicked => {
+                                Bridge.browse-output();
+                            }
+                        }
                     }
                 }
-            }
-            Field {
-                label: @tr("Mises à jour");
-                hint: @tr("Revenir aux versions stables ne réinstalle pas une version plus ancienne : la bêta reste jusqu'à la prochaine version stable.");
-                ComboBox {
-                    model: [@tr("Versions stables"), @tr("Versions stables et bêta"), @tr("Ne pas rechercher")];
-                    current-index <=> Bridge.settings-update-index;
+                Field {
+                    label: @tr("Modèle de nom de fichier");
+                    hint: @tr("Variables : {{date}}, {{heure}}, {{scène}}, {{source}}.");
+                    LineEdit {
+                        text <=> Bridge.template;
+                    }
                 }
-            }
-            Field {
-                label: @tr("Raccourci : démarrer ou arrêter l'enregistrement");
-                ComboBox {
-                    model: Bridge.hotkey-choices;
-                    current-index <=> Bridge.hotkey-record-index;
+                Toggle {
+                    text: @tr("Aperçus en direct des sources");
+                    checked: Bridge.settings-previews;
+                    toggled(value) => {
+                        Bridge.settings-previews = value;
+                    }
                 }
-            }
-            Field {
-                label: @tr("Raccourci : afficher ou réduire Polyptyque");
-                ComboBox {
-                    model: Bridge.hotkey-choices;
-                    current-index <=> Bridge.hotkey-show-index;
+                Toggle {
+                    text: @tr("Ouvrir les fenêtres de la scène au lancement");
+                    checked: Bridge.settings-open-windows;
+                    toggled(value) => {
+                        Bridge.settings-open-windows = value;
+                    }
                 }
-            }
-            Field {
-                label: @tr("Raccourci : activer ou couper les aperçus");
-                ComboBox {
-                    model: Bridge.hotkey-choices;
-                    current-index <=> Bridge.hotkey-previews-index;
+                Toggle {
+                    text: @tr("Fermer les navigateurs des sources en quittant");
+                    checked: Bridge.settings-close-browsers;
+                    toggled(value) => {
+                        Bridge.settings-close-browsers = value;
+                    }
+                }
+                Toggle {
+                    text: @tr("Lancer Polyptyque au démarrage de Windows");
+                    checked: Bridge.settings-startup;
+                    toggled(value) => {
+                        Bridge.settings-startup = value;
+                    }
+                }
+                Field {
+                    label: @tr("Conversion pour le montage");
+                    hint: @tr("Copie MP4 sans perte de qualité, créée à côté du MKV, qui est conservé. Prévoir le double d'espace disque.");
+                    Toggle {
+                        text: @tr("Convertir en MP4 à la fin de l'enregistrement");
+                        checked: Bridge.settings-convert;
+                        toggled(value) => {
+                            Bridge.settings-convert = value;
+                        }
+                    }
+                }
+                Field {
+                    label: @tr("Mises à jour");
+                    hint: @tr("Revenir aux versions stables ne réinstalle pas une version plus ancienne : la bêta reste jusqu'à la prochaine version stable.");
+                    ComboBox {
+                        model: [@tr("Versions stables"), @tr("Versions stables et bêta"), @tr("Ne pas rechercher")];
+                        current-index <=> Bridge.settings-update-index;
+                    }
+                }
+                Field {
+                    label: @tr("Raccourci : démarrer ou arrêter l'enregistrement");
+                    ComboBox {
+                        model: Bridge.hotkey-choices;
+                        current-index <=> Bridge.hotkey-record-index;
+                    }
+                }
+                Field {
+                    label: @tr("Raccourci : afficher ou réduire Polyptyque");
+                    ComboBox {
+                        model: Bridge.hotkey-choices;
+                        current-index <=> Bridge.hotkey-show-index;
+                    }
+                }
+                Field {
+                    label: @tr("Raccourci : activer ou couper les aperçus");
+                    ComboBox {
+                        model: Bridge.hotkey-choices;
+                        current-index <=> Bridge.hotkey-previews-index;
+                    }
                 }
             }
         }
@@ -573,7 +585,7 @@ export component SettingsSheet inherits Sheet {
         tone: 3;
         text: Bridge.settings-error;
     }
-    HorizontalLayout {
+    footer-row := HorizontalLayout {
         spacing: 10px;
         Text {
             text: "Polyptyque \{Bridge.version}";

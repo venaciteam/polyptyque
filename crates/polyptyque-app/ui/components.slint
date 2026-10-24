@@ -609,6 +609,10 @@ export component Note inherits Rectangle {
 export component Sheet inherits Rectangle {
     in property <string> title;
     in property <length> sheet-width: 540px;
+    // Hauteur disponible pour le contenu quand la fenêtre est à sa taille
+    // maximale (marges, titre) : une fenêtre peut s'en servir pour ne faire
+    // défiler qu'une partie de son contenu.
+    out property <length> available-height: root.height - 40px - 2 * 22px - header.preferred-height - 16px;
     callback close();
 
     background: Theme.backdrop;

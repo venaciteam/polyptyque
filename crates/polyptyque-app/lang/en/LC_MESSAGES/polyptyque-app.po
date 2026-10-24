@@ -133,7 +133,7 @@ msgstr ""
 msgid "Aperçus en direct"
 msgstr ""
 
-#: polyptyque-app/ui/bridge.slint:87 polyptyque-app/ui/sheets.slint:421 polyptyque-app/src/controller.rs:1356 polyptyque-app/src/controller.rs:1948 polyptyque-app/src/controller.rs:1952 polyptyque-engine/src/session.rs:241
+#: polyptyque-app/ui/bridge.slint:87 polyptyque-app/ui/sheets.slint:432 polyptyque-app/src/controller.rs:1356 polyptyque-app/src/controller.rs:1948 polyptyque-app/src/controller.rs:1952 polyptyque-engine/src/session.rs:241
 msgid "Micro"
 msgstr ""
 
@@ -171,7 +171,7 @@ msgid_plural "{n} perdues"
 msgstr[0] ""
 msgstr[1] ""
 
-#: polyptyque-app/ui/components.slint:654 polyptyque-app/ui/sheets.slint:257 polyptyque-app/ui/sheets.slint:348 polyptyque-app/ui/sheets.slint:806
+#: polyptyque-app/ui/components.slint:658 polyptyque-app/ui/sheets.slint:257 polyptyque-app/ui/sheets.slint:348 polyptyque-app/ui/sheets.slint:818
 msgid "Fermer"
 msgstr ""
 
@@ -207,7 +207,7 @@ msgstr ""
 msgid "Cette source a son propre profil : connexions et onglets sont conservés. Tout son joué dans ce profil, quel que soit l'onglet, sera enregistré dans son fichier."
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:51 polyptyque-app/ui/sheets.slint:129 polyptyque-app/ui/sheets.slint:170 polyptyque-app/ui/sheets.slint:201 polyptyque-app/ui/sheets.slint:321 polyptyque-app/ui/sheets.slint:597 polyptyque-app/ui/sheets.slint:944
+#: polyptyque-app/ui/sheets.slint:51 polyptyque-app/ui/sheets.slint:129 polyptyque-app/ui/sheets.slint:170 polyptyque-app/ui/sheets.slint:201 polyptyque-app/ui/sheets.slint:321 polyptyque-app/ui/sheets.slint:609 polyptyque-app/ui/sheets.slint:956
 msgid "Annuler"
 msgstr ""
 
@@ -315,290 +315,290 @@ msgstr ""
 msgid "Rouvrir la page GitHub"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:373
+#: polyptyque-app/ui/sheets.slint:384
 msgid "Enregistrement"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:378
+#: polyptyque-app/ui/sheets.slint:389
 msgid "Résolution"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:385
+#: polyptyque-app/ui/sheets.slint:396
 msgid "Images par seconde"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:392
+#: polyptyque-app/ui/sheets.slint:403
 msgid "Débit vidéo (kb/s)"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:393
+#: polyptyque-app/ui/sheets.slint:404
 msgid "En 1080p à 60 i/s : 6 000 léger, 12 000 bon, 20 000 très bon."
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:400
+#: polyptyque-app/ui/sheets.slint:411
 msgid "Format vidéo"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:407
+#: polyptyque-app/ui/sheets.slint:418
 msgid "Matériel d'encodage"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:414
+#: polyptyque-app/ui/sheets.slint:425
 msgid "Débit audio"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:423
+#: polyptyque-app/ui/sheets.slint:434
 msgid "Enregistrer le micro dans un fichier séparé"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:446
+#: polyptyque-app/ui/sheets.slint:457
 msgid "Son capté"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:446
+#: polyptyque-app/ui/sheets.slint:457
 msgid "Aucun son capté : parler dans le micro pour vérifier"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:454
+#: polyptyque-app/ui/sheets.slint:465
 msgid "Le son de ce micro sera enregistré pendant chaque enregistrement, dans son propre fichier (.mka), calé sur les vidéos. Windows doit autoriser l'accès au micro pour les applications de bureau."
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:459
+#: polyptyque-app/ui/sheets.slint:470
 msgid "Autorisations du micro dans Windows"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:475
+#: polyptyque-app/ui/sheets.slint:486
 msgid "Fichiers et interface"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:480 polyptyque-app/src/controller.rs:2826
+#: polyptyque-app/ui/sheets.slint:491 polyptyque-app/src/controller.rs:2826
 msgid "Dossier des enregistrements"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:488
+#: polyptyque-app/ui/sheets.slint:499
 msgid "Parcourir…"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:496
+#: polyptyque-app/ui/sheets.slint:507
 msgid "Modèle de nom de fichier"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:497
+#: polyptyque-app/ui/sheets.slint:508
 msgid "Variables : {{date}}, {{heure}}, {{scène}}, {{source}}."
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:503
+#: polyptyque-app/ui/sheets.slint:514
 msgid "Aperçus en direct des sources"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:510
+#: polyptyque-app/ui/sheets.slint:521
 msgid "Ouvrir les fenêtres de la scène au lancement"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:517
+#: polyptyque-app/ui/sheets.slint:528
 msgid "Fermer les navigateurs des sources en quittant"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:524 polyptyque-app/ui/sheets.slint:793
+#: polyptyque-app/ui/sheets.slint:535 polyptyque-app/ui/sheets.slint:805
 msgid "Lancer Polyptyque au démarrage de Windows"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:531
+#: polyptyque-app/ui/sheets.slint:542
 msgid "Conversion pour le montage"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:532
+#: polyptyque-app/ui/sheets.slint:543
 msgid "Copie MP4 sans perte de qualité, créée à côté du MKV, qui est conservé. Prévoir le double d'espace disque."
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:534
+#: polyptyque-app/ui/sheets.slint:545
 msgid "Convertir en MP4 à la fin de l'enregistrement"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:542
+#: polyptyque-app/ui/sheets.slint:553
 msgid "Mises à jour"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:543
+#: polyptyque-app/ui/sheets.slint:554
 msgid "Revenir aux versions stables ne réinstalle pas une version plus ancienne : la bêta reste jusqu'à la prochaine version stable."
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:545
+#: polyptyque-app/ui/sheets.slint:556
 msgid "Versions stables"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:545
+#: polyptyque-app/ui/sheets.slint:556
 msgid "Versions stables et bêta"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:545
+#: polyptyque-app/ui/sheets.slint:556
 msgid "Ne pas rechercher"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:550
+#: polyptyque-app/ui/sheets.slint:561
 msgid "Raccourci : démarrer ou arrêter l'enregistrement"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:557
+#: polyptyque-app/ui/sheets.slint:568
 msgid "Raccourci : afficher ou réduire Polyptyque"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:564
+#: polyptyque-app/ui/sheets.slint:575
 msgid "Raccourci : activer ou couper les aperçus"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:588
+#: polyptyque-app/ui/sheets.slint:600
 msgid "Signaler un problème…"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:604 polyptyque-app/ui/sheets.slint:951
+#: polyptyque-app/ui/sheets.slint:616 polyptyque-app/ui/sheets.slint:963
 msgid "Enregistrer"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:708
+#: polyptyque-app/ui/sheets.slint:720
 msgid "Désactiver la programmation"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:708
+#: polyptyque-app/ui/sheets.slint:720
 msgid "Activer la programmation"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:736 polyptyque-app/ui/sheets.slint:862
+#: polyptyque-app/ui/sheets.slint:748 polyptyque-app/ui/sheets.slint:874
 msgid "Modifier la programmation"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:745
+#: polyptyque-app/ui/sheets.slint:757
 msgid "Supprimer la programmation"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:756
+#: polyptyque-app/ui/sheets.slint:768
 msgid "Programmations"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:763
+#: polyptyque-app/ui/sheets.slint:775
 msgid "Polyptyque lance et arrête lui-même l'enregistrement d'une scène aux heures prévues. Il doit rester ouvert pour cela ; tant qu'une programmation est active, l'ordinateur et l'écran ne se mettent pas en veille d'eux-mêmes."
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:768
+#: polyptyque-app/ui/sheets.slint:780
 msgid "Aucune programmation pour l'instant."
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:780 polyptyque-app/ui/sheets.slint:862
+#: polyptyque-app/ui/sheets.slint:792 polyptyque-app/ui/sheets.slint:874
 msgid "Nouvelle programmation"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:790
+#: polyptyque-app/ui/sheets.slint:802
 msgid "Démarrage de Windows"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:791
+#: polyptyque-app/ui/sheets.slint:803
 msgid "Sans cela, après un redémarrage de Windows (une mise à jour, par exemple), les programmations attendent la réouverture de Polyptyque. Lancé par Windows, il démarre réduit, sans ouvrir les fenêtres de la scène."
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:852
+#: polyptyque-app/ui/sheets.slint:864
 msgctxt "Initiale du lundi"
 msgid "L"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:853
+#: polyptyque-app/ui/sheets.slint:865
 msgctxt "Initiale du mardi"
 msgid "M"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:854
+#: polyptyque-app/ui/sheets.slint:866
 msgctxt "Initiale du mercredi"
 msgid "M"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:855
+#: polyptyque-app/ui/sheets.slint:867
 msgctxt "Initiale du jeudi"
 msgid "J"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:856
+#: polyptyque-app/ui/sheets.slint:868
 msgctxt "Initiale du vendredi"
 msgid "V"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:857
+#: polyptyque-app/ui/sheets.slint:869
 msgctxt "Initiale du samedi"
 msgid "S"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:858
+#: polyptyque-app/ui/sheets.slint:870
 msgctxt "Initiale du dimanche"
 msgid "D"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:860 polyptyque-core/src/schedule.rs:139
+#: polyptyque-app/ui/sheets.slint:872 polyptyque-core/src/schedule.rs:139
 msgid "lundi"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:860 polyptyque-core/src/schedule.rs:140
+#: polyptyque-app/ui/sheets.slint:872 polyptyque-core/src/schedule.rs:140
 msgid "mardi"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:860 polyptyque-core/src/schedule.rs:141
+#: polyptyque-app/ui/sheets.slint:872 polyptyque-core/src/schedule.rs:141
 msgid "mercredi"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:860 polyptyque-core/src/schedule.rs:142
+#: polyptyque-app/ui/sheets.slint:872 polyptyque-core/src/schedule.rs:142
 msgid "jeudi"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:860 polyptyque-core/src/schedule.rs:143
+#: polyptyque-app/ui/sheets.slint:872 polyptyque-core/src/schedule.rs:143
 msgid "vendredi"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:860 polyptyque-core/src/schedule.rs:144
+#: polyptyque-app/ui/sheets.slint:872 polyptyque-core/src/schedule.rs:144
 msgid "samedi"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:860 polyptyque-core/src/schedule.rs:145
+#: polyptyque-app/ui/sheets.slint:872 polyptyque-core/src/schedule.rs:145
 msgid "dimanche"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:869
+#: polyptyque-app/ui/sheets.slint:881
 msgid "Scène à enregistrer"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:878
+#: polyptyque-app/ui/sheets.slint:890
 msgid "Début"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:889
+#: polyptyque-app/ui/sheets.slint:901
 msgid "Fin"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:906
+#: polyptyque-app/ui/sheets.slint:918
 msgid "Répétition"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:908
+#: polyptyque-app/ui/sheets.slint:920
 msgid "Une seule fois"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:908 polyptyque-core/src/schedule.rs:355
+#: polyptyque-app/ui/sheets.slint:920 polyptyque-core/src/schedule.rs:355
 msgid "Tous les jours"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:908
+#: polyptyque-app/ui/sheets.slint:920
 msgid "Certains jours de la semaine"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:913
+#: polyptyque-app/ui/sheets.slint:925
 msgid "Date"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:914
+#: polyptyque-app/ui/sheets.slint:926
 msgid "Jour où le créneau commence."
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:921
+#: polyptyque-app/ui/sheets.slint:933
 msgid "Jours où le créneau commence"
 msgstr ""
 
-#: polyptyque-app/ui/sheets.slint:936
+#: polyptyque-app/ui/sheets.slint:948
 msgid "Polyptyque doit être ouvert à l'heure prévue. S'il était fermé, ou l'ordinateur en veille, il demande à son retour s'il faut lancer l'enregistrement : sans réponse au bout de deux minutes, il le lance."
 msgstr ""
 

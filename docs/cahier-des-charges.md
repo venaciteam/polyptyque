@@ -393,7 +393,7 @@ Inspirée d'[[OBS Studio]], volontairement allégée, thème sombre.
 - Niveau sonore affiché **en permanence**, pas seulement pendant l'enregistrement : chaque source écoute le son de son programme (même capture que l'enregistrement, seule la crête est gardée). Dès que le moteur écoute la source (enregistrement, préparation, finalisation), cette écoute s'arrête et la carte affiche le niveau du moteur. Indépendant du réglage des aperçus.
 - Barre du haut : pastille de la programmation (voir [[#Programmation des enregistrements]]), pastille du micro (avec son niveau pendant l'enregistrement) et pastille de la conversion MP4 en cours.
 - **Barre d'état** : espace disque libre, autonomie estimée, charge processeur et carte graphique, images perdues.
-- **Fenêtre de paramètres** : Sortie, Encodage, Audio, Raccourcis, Général.
+- **Fenêtre de paramètres** : Sortie, Encodage, Audio, Raccourcis, Général. Dans une fenêtre trop petite, seul son contenu défile : le bas (version, « Signaler un problème… », boutons) reste toujours visible.
 - Langues : français et anglais, voir [[#Langues et formats]].
 - Accessibilité : navigation complète au clavier, compatibilité lecteur d'écran selon la technologie d'interface retenue.
 
