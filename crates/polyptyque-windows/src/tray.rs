@@ -1,6 +1,9 @@
 //! Icône de Polyptyque dans la zone de notification (près de l'horloge),
 //! tant que sa fenêtre est cachée : un clic la fait revenir, un clic droit
-//! propose « Afficher Polyptyque » et « Quitter Polyptyque ».
+//! propose « Afficher Polyptyque » et « Quitter Polyptyque ». Pendant un
+//! enregistrement, l'icône porte un point rouge (ressource 2 de
+//! l'exécutable), et un enregistrement qui démarre s'annonce par une
+//! notification de Windows : il doit toujours se voir.
 //!
 //! Les messages de l'icône arrivent sur la fenêtre principale, par le même
 //! procédé que [`crate::session_end`] : la fenêtre cachée existe toujours.
@@ -16,8 +19,9 @@ use windows::core::{w, HSTRING, PCWSTR};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, POINT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Shell::{
-    DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass, Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_SHOWTIP,
-    NIF_TIP, NIM_ADD, NIM_DELETE, NIM_MODIFY, NIM_SETVERSION, NIN_SELECT, NOTIFYICONDATAW, NOTIFYICON_VERSION_4,
+    DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass, Shell_NotifyIconW, NIF_ICON, NIF_INFO, NIF_MESSAGE,
+    NIF_SHOWTIP, NIF_TIP, NIIF_INFO, NIM_ADD, NIM_DELETE, NIM_MODIFY, NIM_SETVERSION, NIN_SELECT, NOTIFYICONDATAW,
+    NOTIFYICON_VERSION_4,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreatePopupMenu, DestroyMenu, GetCursorPos, GetSystemMetrics, IsIconic, LoadIconW, LoadImageW,
@@ -60,6 +64,9 @@ thread_local! {
     static SHOWN: Cell<bool> = const { Cell::new(false) };
     static TIP: RefCell<String> = const { RefCell::new(String::new()) };
     static ICON: Cell<Option<HICON>> = const { Cell::new(None) };
+    /// Enregistrement en cours : icône au point rouge.
+    static RECORDING: Cell<bool> = const { Cell::new(false) };
+    static RECORDING_ICON: Cell<Option<HICON>> = const { Cell::new(None) };
 }
 
 /// Message par lequel une autre copie de Polyptyque demande à celle-ci de
@@ -107,6 +114,36 @@ pub fn set_tip(window: isize, tip: &str) {
     }
 }
 
+/// Enregistrement en cours ou non : l'icône porte un point rouge pendant
+/// tout enregistrement.
+pub fn set_recording(window: isize, recording: bool) {
+    if RECORDING.replace(recording) == recording || !SHOWN.get() {
+        return;
+    }
+    let mut data = icon_data(window);
+    data.uFlags = NIF_ICON;
+    if !unsafe { Shell_NotifyIconW(NIM_MODIFY, &data) }.as_bool() {
+        log::warn!("icône de la zone de notification non modifiée");
+    }
+}
+
+/// Notification de Windows, depuis l'icône affichée (sans effet sinon).
+pub fn notify_user(window: isize, title: &str, text: &str) {
+    if !SHOWN.get() {
+        return;
+    }
+    let mut data = icon_data(window);
+    data.uFlags = NIF_INFO;
+    data.dwInfoFlags = NIIF_INFO;
+    let title: Vec<u16> = title.encode_utf16().take(data.szInfoTitle.len() - 1).collect();
+    data.szInfoTitle[..title.len()].copy_from_slice(&title);
+    let text: Vec<u16> = text.encode_utf16().take(data.szInfo.len() - 1).collect();
+    data.szInfo[..text.len()].copy_from_slice(&text);
+    if !unsafe { Shell_NotifyIconW(NIM_MODIFY, &data) }.as_bool() {
+        log::warn!("notification de Windows non affichée");
+    }
+}
+
 /// Retire l'icône.
 pub fn hide(window: isize) {
     if !SHOWN.replace(false) {
@@ -151,7 +188,7 @@ fn icon_data(window: isize) -> NOTIFYICONDATAW {
         hWnd: hwnd(window),
         uID: ICON_ID,
         uCallbackMessage: CALLBACK_MESSAGE,
-        hIcon: icon(),
+        hIcon: if RECORDING.get() { recording_icon() } else { icon() },
         ..Default::default()
     };
     TIP.with(|tip| {
@@ -161,34 +198,52 @@ fn icon_data(window: isize) -> NOTIFYICONDATAW {
     data
 }
 
-/// Icône de l'exécutable (ressource 1, voir `packaging/ressources_windows.rs`),
-/// à la taille des petites icônes, chargée une fois (partagée : gérée par
-/// Windows, jamais détruite).
-fn icon() -> HICON {
-    if let Some(icon) = ICON.get() {
-        return icon;
-    }
-    let loaded = unsafe {
+/// Icône de l'exécutable numéro `id` (voir `packaging/ressources_windows.rs`),
+/// à la taille des petites icônes (partagée : gérée par Windows, jamais
+/// détruite).
+fn load_icon(id: u16) -> Option<HICON> {
+    // Numéro de ressource passé à la place d'un nom (MAKEINTRESOURCE).
+    let resource = PCWSTR(usize::from(id) as *const u16);
+    unsafe {
         GetModuleHandleW(None).ok().and_then(|module| {
             LoadImageW(
                 Some(module.into()),
-                PCWSTR(1 as *const u16),
+                resource,
                 IMAGE_ICON,
                 GetSystemMetrics(SM_CXSMICON),
                 GetSystemMetrics(SM_CYSMICON),
                 LR_DEFAULTCOLOR | LR_SHARED,
             )
             .ok()
+            .map(|handle| HICON(handle.0))
         })
-    };
-    let icon = match loaded {
-        Some(handle) => HICON(handle.0),
-        None => {
-            log::warn!("icône de Polyptyque introuvable dans l'exécutable : icône générique");
-            unsafe { LoadIconW(None, IDI_APPLICATION) }.unwrap_or_default()
-        }
-    };
+    }
+}
+
+/// Icône de Polyptyque (ressource 1), chargée une fois.
+fn icon() -> HICON {
+    if let Some(icon) = ICON.get() {
+        return icon;
+    }
+    let icon = load_icon(1).unwrap_or_else(|| {
+        log::warn!("icône de Polyptyque introuvable dans l'exécutable : icône générique");
+        unsafe { LoadIconW(None, IDI_APPLICATION) }.unwrap_or_default()
+    });
     ICON.set(Some(icon));
+    icon
+}
+
+/// Icône de l'enregistrement en cours (ressource 2 : point rouge), ou celle
+/// de Polyptyque à défaut.
+fn recording_icon() -> HICON {
+    if let Some(icon) = RECORDING_ICON.get() {
+        return icon;
+    }
+    let icon = load_icon(2).unwrap_or_else(|| {
+        log::warn!("icône d'enregistrement introuvable dans l'exécutable");
+        icon()
+    });
+    RECORDING_ICON.set(Some(icon));
     icon
 }
 

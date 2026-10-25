@@ -50,12 +50,15 @@ fn main() {
         })
         .run();
     let at_startup = std::env::args().skip(1).any(|arg| arg == STARTUP_ARG);
+    // Lancé par le mode commande : en arrière-plan aussi.
+    let in_background =
+        at_startup || std::env::args().skip(1).any(|arg| arg == polyptyque_core::control::BACKGROUND_ARG);
     // Une seule copie : vérifié avant d'ouvrir le journal, qui écraserait
     // celui de la copie déjà ouverte s'il porte la même minute.
     #[cfg(windows)]
     let _instance = {
         use polyptyque_windows::single_instance::{self, Instance};
-        match single_instance::acquire(!at_startup) {
+        match single_instance::acquire(!in_background) {
             Instance::First(lock) => lock,
             Instance::AlreadyOpen => return,
         }
@@ -65,11 +68,13 @@ fn main() {
     i18n::set_language(i18n::Language::system());
     if at_startup {
         log::info!("lancé par Windows à l'ouverture de session");
+    } else if in_background {
+        log::info!("lancé en arrière-plan par le mode commande");
     }
     if let Some(root) = paths::portable_root() {
         log::info!("version portable : données dans {}", root.join(paths::PORTABLE_DATA_DIR).display());
     }
-    if let Err(e) = launch(at_startup) {
+    if let Err(e) = launch(in_background) {
         log::error!("{e:#}");
         let log = log.map(|p| p.display().to_string()).unwrap_or_default();
         show_fatal(&tr::tr!("{}\n\nJournal : {}", format!("{e:#}"), log));

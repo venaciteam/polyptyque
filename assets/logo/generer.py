@@ -62,6 +62,27 @@ def icone(taille, allumees=(False, True, False)):
     return image.resize((taille, taille), Image.LANCZOS)
 
 
+# Point rouge de l'enregistrement en cours (thème : Theme.recording).
+ENREGISTREMENT = (255, 77, 90)
+
+
+def icone_enregistrement(taille):
+    """Icône de la zone de notification pendant un enregistrement : le logo
+    avec un point rouge en bas à droite, cerclé de sombre pour rester
+    visible sur une barre des tâches claire comme foncée."""
+    s = SURECHANTILLONNAGE
+    grand = taille * s
+    image = icone(taille).resize((grand, grand), Image.LANCZOS)
+    diametre = max(7, round(taille * 0.5)) * s
+    bord = max(1, round(taille * 0.07)) * s
+    x0 = grand - diametre
+    y0 = grand - diametre
+    dessin = ImageDraw.Draw(image)
+    dessin.ellipse([x0, y0, grand - 1, grand - 1], fill=FOND_SOMBRE + (255,))
+    dessin.ellipse([x0 + bord, y0 + bord, grand - 1 - bord, grand - 1 - bord], fill=ENREGISTREMENT + (255,))
+    return image.resize((taille, taille), Image.LANCZOS)
+
+
 def police(nom, taille):
     for dossier in ("/usr/share/fonts/opentype/inter", "C:/Windows/Fonts"):
         chemin = Path(dossier) / nom
@@ -103,10 +124,18 @@ def main():
     tailles = [16, 20, 24, 32, 40, 48, 64, 128, 256]
     icones = [icone(t) for t in tailles]
     icones[-1].save(ICI / "polyptyque.ico", sizes=[(t, t) for t in tailles], append_images=icones[:-1])
+    icone_enregistrement_fichier()
     icone(512).save(ICI / "polyptyque-512.png")
     icone(256).save(RACINE / "crates" / "polyptyque-app" / "ui" / "icons" / "polyptyque.png")
     animation_installation(ICI / "installation.gif")
     print("images générées dans", ICI)
+
+
+def icone_enregistrement_fichier():
+    """Icône d'enregistrement (ressource 2 des exécutables)."""
+    tailles = [16, 20, 24, 32, 40, 48, 64, 256]
+    icones = [icone_enregistrement(t) for t in tailles]
+    icones[-1].save(ICI / "polyptyque-enregistrement.ico", sizes=[(t, t) for t in tailles], append_images=icones[:-1])
 
 
 if __name__ == "__main__":

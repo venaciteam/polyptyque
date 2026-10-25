@@ -41,6 +41,7 @@ impl App {
         log::info!("Polyptyque continue en arrière-plan (zone de notification)");
         self.in_background.set(true);
         *self.tray_tip.borrow_mut() = self.tray_tip_text();
+        polyptyque_windows::tray::set_recording(window, self.recording());
         polyptyque_windows::tray::show(window, &self.tray_tip.borrow());
         if let Some(ui) = self.ui.upgrade() {
             let _ = ui.hide();
@@ -125,10 +126,15 @@ impl App {
         tip
     }
 
-    /// Deux fois par seconde : info-bulle tenue à jour.
+    /// Deux fois par seconde : icône (point rouge pendant un
+    /// enregistrement) et info-bulle tenues à jour.
     pub(super) fn tick_background(&self) {
         if !self.in_background.get() {
             return;
+        }
+        #[cfg(windows)]
+        if let Some(window) = self.main_window() {
+            polyptyque_windows::tray::set_recording(window, self.recording());
         }
         let tip = self.tray_tip_text();
         if *self.tray_tip.borrow() == tip {
@@ -139,6 +145,23 @@ impl App {
             polyptyque_windows::tray::set_tip(window, &tip);
         }
         *self.tray_tip.borrow_mut() = tip;
+    }
+
+    /// Un enregistrement vient de démarrer : en arrière-plan, Windows
+    /// l'annonce par une notification (l'icône peut être rangée sous « ^ »)
+    /// et l'icône prend son point rouge. Programmé ou demandé par un
+    /// programme, il ne doit jamais passer inaperçu.
+    pub(super) fn notify_recording_started(&self, message: &str) {
+        if !self.in_background.get() {
+            return;
+        }
+        #[cfg(windows)]
+        if let Some(window) = self.main_window() {
+            polyptyque_windows::tray::set_recording(window, true);
+            polyptyque_windows::tray::notify_user(window, &tr!("Enregistrement en cours"), message);
+        }
+        #[cfg(not(windows))]
+        let _ = message;
     }
 
     // ----- Fermeture avec une programmation prévue ----------------------------

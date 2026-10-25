@@ -29,9 +29,10 @@ use std::path::{Path, PathBuf};
 /// sans traduction fait échouer le test.
 const ENGLISH_COMPLETE: bool = true;
 
-/// Crates dont les messages Rust passent par `tr!`. La console
-/// (`polyptyque-cli`) reste en français pour l'instant.
-const RUST_CRATES: [&str; 4] = ["polyptyque-app", "polyptyque-core", "polyptyque-engine", "polyptyque-windows"];
+/// Crates dont les messages Rust passent par `tr!`. Le mode commande
+/// (`polyptyque-cli`) partage le catalogue de l'interface.
+const RUST_CRATES: [&str; 5] =
+    ["polyptyque-app", "polyptyque-cli", "polyptyque-core", "polyptyque-engine", "polyptyque-windows"];
 
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct Key {

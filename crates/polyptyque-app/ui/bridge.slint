@@ -94,6 +94,10 @@ export global Bridge {
     in property <string> update-text;
     in property <float> update-progress;
 
+    // Pilotage : programmes connectés (« Pilotage · Claude »), vide si
+    // aucun.
+    in property <string> control-text;
+
     // Conversion MP4 en cours.
     in property <bool> converting;
     in property <string> conversion-text;
@@ -217,6 +221,8 @@ export global Bridge {
     in-out property <bool> settings-open-windows;
     in-out property <bool> settings-close-browsers;
     in-out property <bool> settings-startup;
+    // Pilotage par d'autres programmes (assistant IA, Stream Deck).
+    in-out property <bool> settings-remote-control;
     // Fermeture avec une programmation prévue : 0 demander, 1 arrière-plan,
     // 2 quitter.
     in-out property <int> settings-close-index;
@@ -287,6 +293,8 @@ export global Bridge {
     callback convert-files();
     callback install-update();
     callback open-mic-privacy();
+    // Mode d'emploi du pilotage par un assistant IA (page du dépôt).
+    callback open-control-help();
     callback request-cancel-conversion();
     callback close-sheet();
     callback confirm-accepted();

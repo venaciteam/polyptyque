@@ -149,6 +149,48 @@ component SchedulePill inherits Rectangle {
     }
 }
 
+// Pilotage : programmes connectés (assistant IA, Stream Deck). Clic : les
+// réglages, où il se désactive.
+component ControlPill inherits Rectangle {
+    height: 30px;
+    width: row.preferred-width;
+    border-radius: 15px;
+    background: touch.has-hover && !Bridge.recording ? Theme.surface-hover : Theme.surface-raised;
+    border-width: 1px;
+    border-color: Theme.accent.with-alpha(0.5);
+    accessible-role: button;
+    accessible-label: Bridge.control-text;
+
+    row := HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 14px;
+        spacing: 8px;
+        Image {
+            source: @image-url("icons/remote.svg");
+            width: 14px;
+            height: 14px;
+            y: (parent.height - self.height) / 2;
+            colorize: Theme.accent;
+        }
+        Text {
+            text: Bridge.control-text;
+            color: Theme.text;
+            font-size: Theme.font-small;
+            font-weight: 600;
+            vertical-alignment: center;
+        }
+    }
+    touch := TouchArea {
+        mouse-cursor: Bridge.recording ? MouseCursor.default : MouseCursor.pointer;
+        clicked => {
+            // Réglages fermés pendant un enregistrement, comme leur bouton.
+            if !Bridge.recording {
+                Bridge.open-settings();
+            }
+        }
+    }
+}
+
 // Micro activé : son état et son niveau pendant l'enregistrement.
 component MicPill inherits Rectangle {
     height: 30px;
@@ -273,6 +315,9 @@ component TopBar inherits HorizontalLayout {
         min-width: 0;
     }
     if Bridge.update-state != "": UpdatePill {
+        y: (parent.height - self.height) / 2;
+    }
+    if Bridge.control-text != "": ControlPill {
         y: (parent.height - self.height) / 2;
     }
     SchedulePill {

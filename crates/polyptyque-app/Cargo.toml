@@ -19,7 +19,8 @@ polyptyque-core.workspace = true
 polyptyque-engine.workspace = true
 simplelog.workspace = true
 slint = { version = "1.18", features = ["raw-window-handle-06"] }
-sys-locale = "0.3"
+serde_json.workspace = true
+sys-locale.workspace = true
 tr.workspace = true
 
 [target.'cfg(windows)'.dependencies]

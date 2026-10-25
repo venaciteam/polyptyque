@@ -790,18 +790,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "console"
-version = "0.16.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e96a4956774c13c126a8b5af4daa79384f4d826534c95a02d76afb39e2ab64e3"
-dependencies = [
- "encode_unicode",
- "libc",
- "unicode-width",
- "windows-sys 0.61.2",
-]
-
-[[package]]
 name = "const-field-offset"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -975,17 +963,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ctrlc"
-version = "3.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0b1fab2ae45819af2d0731d60f2afe17227ebb1a1538a236da84c93e9a60162"
-dependencies = [
- "dispatch2",
- "nix",
- "windows-sys 0.61.2",
-]
-
-[[package]]
 name = "cursor-icon"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1035,18 +1012,6 @@ dependencies = [
  "rustc_version",
  "syn 2.0.119",
  "unicode-xid",
-]
-
-[[package]]
-name = "dialoguer"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25f104b501bf2364e78d0d3974cbc774f738f5865306ed128e1e0d7499c0ad96"
-dependencies = [
- "console",
- "shell-words",
- "tempfile",
- "zeroize",
 ]
 
 [[package]]
@@ -1205,12 +1170,6 @@ dependencies = [
  "vswhom",
  "winreg",
 ]
-
-[[package]]
-name = "encode_unicode"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34aa73646ffb006b8f5147f3dc182bd4bcb190227ce861fc4a4844bf8e3cb2c0"
 
 [[package]]
 name = "endi"
@@ -3691,6 +3650,7 @@ dependencies = [
  "raw-window-handle",
  "rfd",
  "rspolib",
+ "serde_json",
  "simplelog",
  "slint",
  "slint-build",
@@ -3703,16 +3663,12 @@ dependencies = [
 name = "polyptyque-cli"
 version = "1.0.0-beta.6"
 dependencies = [
- "anyhow",
- "console",
- "ctrlc",
- "dialoguer",
  "embed-resource",
- "log",
  "polyptyque-core",
- "polyptyque-engine",
  "polyptyque-windows",
- "simplelog",
+ "serde_json",
+ "sys-locale",
+ "tr",
 ]
 
 [[package]]
@@ -3726,6 +3682,7 @@ dependencies = [
  "log",
  "rspolib",
  "serde",
+ "serde_json",
  "toml",
  "tr",
 ]
@@ -4342,12 +4299,6 @@ dependencies = [
  "cpufeatures",
  "digest",
 ]
-
-[[package]]
-name = "shell-words"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc6fe69c597f9c37bfeeeeeb33da3530379845f10be461a66d16d03eca2ded77"
 
 [[package]]
 name = "shlex"

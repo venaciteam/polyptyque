@@ -1,24 +1,20 @@
 [package]
 name = "polyptyque-cli"
-description = "Prototype en console de Polyptyque (étape 0)"
+description = "Mode commande de Polyptyque : pilotage par d'autres programmes (sorties JSON, serveur MCP)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
 [[bin]]
-name = "polyptyque-console"
+name = "polyptyque-cli"
 path = "src/main.rs"
 
 [dependencies]
-anyhow.workspace = true
-console.workspace = true
-ctrlc.workspace = true
-dialoguer.workspace = true
-log.workspace = true
 polyptyque-core.workspace = true
-polyptyque-engine.workspace = true
-simplelog.workspace = true
+serde_json.workspace = true
+sys-locale.workspace = true
+tr.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 polyptyque-windows.workspace = true

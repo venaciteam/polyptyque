@@ -127,8 +127,9 @@ impl App {
 
     /// Un enregistrement vient de démarrer (`message` : celui du démarrage).
     /// Programmé, il est confié à la programmation ; lancé à la main pendant
-    /// un créneau, on propose de garder l'arrêt automatique.
-    pub(super) fn recording_started(&self, message: &str, tone: i32) {
+    /// un créneau, on propose de garder l'arrêt automatique, sauf si le
+    /// programme qui l'a demandé l'a déjà choisi (`auto_stop`).
+    pub(super) fn recording_started(&self, message: &str, tone: i32, auto_stop: Option<bool>) {
         let now = Utc::now();
         if let Some(slot) = self.scheduled_start.borrow_mut().take() {
             self.toast(
@@ -141,14 +142,29 @@ impl App {
             self.planner.borrow_mut().started(slot);
             return;
         }
-        self.toast(message, tone);
         let slot = {
             let config = self.config.borrow();
             self.planner.borrow().manual_slot(&config.schedules, now, &Local)
         };
         let Some(slot) = slot else {
+            self.toast(message, tone);
             return;
         };
+        if let Some(auto_stop) = auto_stop {
+            // Choisi par la commande : pas de question.
+            self.planner.borrow_mut().claim(&slot, auto_stop);
+            self.save_planner();
+            let end = clock_label(slot.end, &Local);
+            log::info!("pilotage : arrêt automatique à la fin du créneau ({end}) : {auto_stop}");
+            let note = if auto_stop {
+                tr!("L'enregistrement s'arrêtera à {}.", end)
+            } else {
+                tr!("L'enregistrement continuera après {}.", end)
+            };
+            self.toast(&format!("{message} {note}"), tone);
+            return;
+        }
+        self.toast(message, tone);
         // Plus rien à lancer dans ce créneau, quelle que soit la réponse.
         self.planner.borrow_mut().claim(&slot, false);
         let deadline = (now + PROMPT_COUNTDOWN).min(slot.end);
@@ -346,15 +362,21 @@ impl App {
             Some(slot) => self.ask(
                 Confirm::StopScheduled,
                 &tr!("Créneau d'enregistrement en cours"),
-                &tr!(
-                    "Un créneau d'enregistrement programmé est en cours (« {} », jusqu'à {}). L'arrêter quand même ? Il ne sera pas relancé avant le prochain créneau.",
-                    self.slot_scene(&slot),
-                    clock_label(slot.end, &Local)
-                ),
+                &self.stop_scheduled_text(&slot),
                 &tr!("Arrêter"),
             ),
             None => self.stop_recording(None),
         }
+    }
+
+    /// Question avant d'arrêter un enregistrement dont la programmation a
+    /// la charge.
+    pub(super) fn stop_scheduled_text(&self, slot: &Slot) -> String {
+        tr!(
+            "Un créneau d'enregistrement programmé est en cours (« {} », jusqu'à {}). L'arrêter quand même ? Il ne sera pas relancé avant le prochain créneau.",
+            self.slot_scene(slot),
+            clock_label(slot.end, &Local)
+        )
     }
 
     /// Une programmation a encore besoin de Polyptyque : un enregistrement à
@@ -744,7 +766,6 @@ impl App {
             fail(&tr!("Heure de fin invalide (exemple : {}).", example(22, 30)));
             return;
         };
-        let now = Utc::now();
         let repeat = match b.get_schedule_repeat_index() {
             REPEAT_ONCE => Repeat::Once { date: self.schedule_date() },
             REPEAT_DAILY => Repeat::Weekly { days: (1..=7).collect() },
@@ -757,9 +778,20 @@ impl App {
             schedule.id = id.clone();
             schedule.enabled = self.config.borrow().schedules.iter().find(|s| s.id == *id).is_none_or(|s| s.enabled);
         }
-        if let Err(e) = schedule.validate(&self.config.borrow().schedules, now, &Local) {
-            fail(&format::capitalize(&self.schedule_error_text(&e)));
+        if let Err(message) = self.store_schedule(schedule) {
+            fail(&message);
             return;
+        }
+        self.editing_schedule.borrow_mut().take();
+        self.open_schedules();
+    }
+
+    /// Vérifie puis enregistre une programmation, nouvelle ou modifiée
+    /// (formulaire, pilotage). L'erreur est le message à afficher.
+    pub(super) fn store_schedule(&self, schedule: Schedule) -> Result<(), String> {
+        let now = Utc::now();
+        if let Err(e) = schedule.validate(&self.config.borrow().schedules, now, &Local) {
+            return Err(format::capitalize(&self.schedule_error_text(&e)));
         }
         {
             let mut config = self.config.borrow_mut();
@@ -777,31 +809,38 @@ impl App {
             schedule.times_label(),
             schedule.repeat_label()
         );
-        self.editing_schedule.borrow_mut().take();
         let next = schedule.next_slot(now, &Local).or_else(|| schedule.slot_at(now, &Local));
         let message = match next {
             Some(slot) if slot.contains(now) => tr!("Programmation enregistrée : son créneau a déjà commencé."),
             Some(slot) => tr!("Programmation enregistrée : prochain créneau {}.", when_label(slot.start, now, &Local)),
             None => tr!("Programmation enregistrée."),
         };
-        self.open_schedules();
+        self.refresh_schedule_list(now);
         self.toast(&message, 1);
+        Ok(())
     }
 
     pub(super) fn toggle_schedule(&self, id: &str, enabled: bool) {
         if self.is_locked_schedule(id) {
             return;
         }
+        if let Err(message) = self.set_schedule_enabled(id, enabled) {
+            self.toast(&message, 2);
+        }
+    }
+
+    /// Active ou désactive une programmation (interface, pilotage).
+    /// L'erreur est le message à afficher.
+    pub(super) fn set_schedule_enabled(&self, id: &str, enabled: bool) -> Result<(), String> {
         let now = Utc::now();
         let Some(mut schedule) = self.config.borrow().schedules.iter().find(|s| s.id == id).cloned() else {
-            return;
+            return Ok(());
         };
         schedule.enabled = enabled;
         if enabled {
             if let Err(e) = schedule.validate(&self.config.borrow().schedules, now, &Local) {
-                self.toast(&tr!("Impossible de l'activer : {}", self.schedule_error_text(&e)), 2);
                 self.refresh_schedule_list(now);
-                return;
+                return Err(tr!("Impossible de l'activer : {}", self.schedule_error_text(&e)));
             }
         }
         if let Some(existing) = self.config.borrow_mut().schedules.iter_mut().find(|s| s.id == id) {
@@ -811,6 +850,7 @@ impl App {
         self.save();
         self.save_planner();
         self.refresh_schedule_list(now);
+        Ok(())
     }
 
     pub(super) fn delete_schedule(&self, id: &str) {
@@ -831,7 +871,7 @@ impl App {
 
     /// Programmation dont l'enregistrement est en cours : ni modifiable ni
     /// supprimable avant la fin de son créneau.
-    fn is_locked_schedule(&self, id: &str) -> bool {
+    pub(super) fn is_locked_schedule(&self, id: &str) -> bool {
         self.recording() && self.planner.borrow().owned().is_some_and(|slot| slot.schedule_id == id)
     }
 

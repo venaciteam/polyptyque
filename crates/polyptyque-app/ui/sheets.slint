@@ -629,6 +629,29 @@ export component SettingsSheet inherits Sheet {
                     }
                 }
                 Field {
+                    label: @tr("Pilotage");
+                    hint: @tr("Un assistant IA, un script ou un Stream Deck peut alors tout régler et lancer un enregistrement. Seuls les programmes de ce compte Windows, sur cet ordinateur, y ont accès, jamais une page web ; un enregistrement reste toujours signalé.");
+                    Toggle {
+                        text: @tr("Autoriser le pilotage par d'autres programmes");
+                        checked: Bridge.settings-remote-control;
+                        toggled(value) => {
+                            Bridge.settings-remote-control = value;
+                        }
+                    }
+                }
+                if Bridge.settings-remote-control: HorizontalLayout {
+                    alignment: start;
+                    ActionButton {
+                        text: @tr("Connecter un assistant IA…");
+                        icon: @image-url("icons/launch.svg");
+                        has-icon: true;
+                        kind: "ghost";
+                        clicked => {
+                            Bridge.open-control-help();
+                        }
+                    }
+                }
+                Field {
                     label: @tr("Raccourci : démarrer ou arrêter l'enregistrement");
                     ComboBox {
                         model: Bridge.hotkey-choices;

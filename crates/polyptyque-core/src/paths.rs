@@ -72,6 +72,13 @@ pub fn schedule_state_file() -> PathBuf {
     local_data_dir().join("programmations-etat.toml")
 }
 
+/// Hors Windows : dossier du mode démonstration (fausses fenêtres), où
+/// l'interface range sa configuration ; le mode commande l'y lit aussi.
+#[cfg(not(windows))]
+pub fn demo_dir() -> PathBuf {
+    std::env::temp_dir().join("polyptyque-demo")
+}
+
 pub fn default_output_dir() -> PathBuf {
     UserDirs::new()
         .and_then(|u| u.video_dir().map(|p| p.join(APP_DIR)))
