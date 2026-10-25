@@ -835,6 +835,7 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 | 2026-10-24 | Signalement d'un problème : bouton dans les réglages et dans le bilan d'incident ; rapport texte masqué (dossier personnel, nom du compte) dans le dossier des journaux, page « nouvelle issue » pré-remplie, deux formulaires GitHub (anglais, français). Rien n'est envoyé par Polyptyque |
 | 2026-10-25 | Date d'une programmation saisie dans **trois listes** jour, mois (en toutes lettres), année, dans l'ordre de la langue (« 25 octobre 2026 », « October 25, 2026 »), à la place du sélecteur de date de Slint : sa semaine commence le dimanche, sans réglage, et il écrit les mois en anglais même en français. Liste des jours ajustée au mois choisi ; années proposées : l'année en cours et la suivante ; jour de la semaine rappelé sous les listes |
 | 2026-10-25 | Publication bilingue : `README.md` en anglais (en tête) et `README.fr.md`, captures du mode démonstration dans les deux langues (données d'exemple dans la langue du système) ; `README.txt` anglais livré avec `LISEZMOI.txt` ; description des exécutables réduite au nom (« Polyptyque », affichée par le Gestionnaire des tâches) et ressources Windows en langue neutre ; titre des pages de version en anglais (« Polyptyque 1.0 beta 5 »), notes en anglais puis en français |
+| 2026-10-25 | Publication de la 1.0.0-beta.5 (préversion) : version anglaise complète (réglages « Langue » et « Horloge »), signalement d'un problème, date des programmations en trois listes |
 
 ---
 
