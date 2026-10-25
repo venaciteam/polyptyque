@@ -747,7 +747,8 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 > - [x] Détails d'erreur d'autres logiciels renvoyés au journal
 > - [x] Rapport masqué, fenêtre de signalement, boutons des réglages et du bilan d'incident (vérifié en mode démonstration)
 > - [x] Formulaires d'issue anglais et français (`bug-report.yml`, `signalement.yml`)
-> - [ ] Pré-remplissage de la page vérifié, une fois les formulaires sur `main`
+> - [x] Formulaires reconnus par GitHub sur `main` (2026-10-25) : valides, sans erreur, identifiants `version`, `windows`, `gpu` conformes à l'adresse construite par Polyptyque
+> - [ ] Page pré-remplie vue une fois, connecté à GitHub (la page « nouvelle issue » exige une connexion)
 > - [ ] Validation sur la machine de référence
 
 > [!todo] Étape 4 - Publication
