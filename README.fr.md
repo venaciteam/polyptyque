@@ -80,7 +80,7 @@ Polyptyque fait l'inverse : **chaque fenêtre est enregistrée à part**, dans s
 
 **Enregistrements programmés**
 - Début et fin à heure fixe, une seule fois ou certains jours de la semaine : chaque programmation lance une scène, y compris la nuit (créneaux qui passent minuit) et aux changements d'heure.
-- Tant qu'une programmation est active, l'ordinateur et l'écran ne se mettent pas en veille d'eux-mêmes. Polyptyque peut se lancer au démarrage de Windows (réduit), pour que les programmations survivent à un redémarrage.
+- Tant qu'une programmation est active, l'ordinateur et l'écran ne se mettent pas en veille d'eux-mêmes. Fermer la fenêtre propose de continuer en arrière-plan, avec l'icône de Polyptyque près de l'horloge, et Polyptyque peut se lancer au démarrage de Windows directement en arrière-plan, pour que les programmations survivent à un redémarrage.
 - Démarrage manqué (Polyptyque fermé ou ordinateur en veille à l'heure prévue) : à son retour pendant le créneau, Polyptyque demande s'il faut lancer l'enregistrement, et le lance seul au bout de deux minutes sans réponse.
 - La programmation n'arrête que ce qu'elle a lancé : un enregistrement lancé à la main pendant un créneau n'est arrêté à l'heure de fin que si on l'accepte. Arrêter à la main un enregistrement programmé demande confirmation.
 

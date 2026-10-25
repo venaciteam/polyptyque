@@ -857,6 +857,7 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 | 2026-10-25 | Publication de la 1.0.0-beta.5 (préversion) : version anglaise complète (réglages « Langue » et « Horloge »), signalement d'un problème, date des programmations en trois listes |
 | 2026-10-25 | Démarrage à l'heure prévue confirmé sans question : la fenêtre au compte à rebours de deux minutes ne concerne que le démarrage manqué (rien à anticiper, Polyptyque n'était pas ouvert ou l'ordinateur dormait) |
 | 2026-10-25 | **Arrière-plan dans la zone de notification** (pas une fenêtre réduite) : sinon, le choix « arrière-plan » retenu ne laisserait plus aucun moyen de quitter par la croix ; l'icône donne « Quitter Polyptyque ». Lancement au démarrage de Windows directement en arrière-plan. Fermer avec une programmation prévue : question avec « Continuer en arrière-plan », « Se souvenir de mon choix » et réglage (Demander / Continuer en arrière-plan / Quitter). Le choix ne joue que si une programmation attend ; « Quitter » retenu ne saute que l'avertissement des programmations, jamais celui d'un enregistrement ou d'une conversion ; « arrière-plan » retenu s'applique aussi pendant un enregistrement |
+| 2026-10-25 | Publication de la 1.0.0-beta.6 (préversion) : arrière-plan dans la zone de notification (icône près de l'horloge), choix à la fermeture avec une programmation prévue et réglage, lancement au démarrage de Windows en arrière-plan |
 
 ---
 

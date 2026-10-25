@@ -1,4 +1,4 @@
-POLYPTYQUE 1.0 BÊTA 5
+POLYPTYQUE 1.0 BÊTA 6
 =====================
 
 Polyptyque enregistre plusieurs fenêtres en même temps, chacune dans son
@@ -104,8 +104,11 @@ La pastille « Programmer », en haut, ouvre les programmations : une scène,
 une heure de début et de fin (le lendemain si la fin est avant le début),
 une seule fois ou certains jours de la semaine. Polyptyque doit rester
 ouvert : tant qu'une programmation est active, l'ordinateur et l'écran ne
-se mettent pas en veille d'eux-mêmes. L'option « Lancer Polyptyque au
-démarrage de Windows » le relance (réduit) après un redémarrage.
+se mettent pas en veille d'eux-mêmes. Fermer la fenêtre propose alors de
+continuer en arrière-plan : l'icône de Polyptyque reste près de l'horloge
+(un clic l'affiche, un clic droit permet de le quitter). L'option
+« Lancer Polyptyque au démarrage de Windows » le relance en arrière-plan
+après un redémarrage.
 - Polyptyque fermé ou ordinateur en veille à l'heure prévue : à son retour
   pendant le créneau, il demande s'il faut lancer l'enregistrement, et le
   lance seul au bout de deux minutes sans réponse.

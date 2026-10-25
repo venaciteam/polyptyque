@@ -1,4 +1,4 @@
-POLYPTYQUE 1.0 BETA 5
+POLYPTYQUE 1.0 BETA 6
 =====================
 
 Polyptyque records several windows at once, each in its own file, with
@@ -97,8 +97,10 @@ The "Schedule" button at the top opens scheduled recordings: a scene, a
 start and end time (the next day if the end is before the start), once or
 on specific days of the week. Polyptyque has to stay open: while a
 scheduled recording is active, the computer and screen don't go to sleep
-on their own. The "Start Polyptyque when Windows starts" option brings it
-back (minimized) after a restart.
+on their own. Closing the window then offers to keep running in the
+background: Polyptyque's icon stays next to the clock (click it to show
+Polyptyque, right-click it to quit). The "Start Polyptyque when Windows
+starts" option brings it back in the background after a restart.
 - Polyptyque closed or computer asleep at the set time: when it's back
   during the time slot, it asks whether to start recording, and starts on
   its own after two minutes without an answer.

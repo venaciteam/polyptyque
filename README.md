@@ -79,7 +79,7 @@ Polyptyque works the other way around: **each window is recorded on its own**, i
 
 **Scheduled recordings**
 - Start and end at set times, once or on specific days of the week: each scheduled recording starts a scene, including overnight (time slots that cross midnight) and across daylight saving time changes.
-- While a scheduled recording is active, the computer and screen don’t go to sleep on their own. Polyptyque can start with Windows (minimized), so scheduled recordings survive a restart.
+- While a scheduled recording is active, the computer and screen don’t go to sleep on their own. Closing the window offers to keep running in the background, with Polyptyque’s icon next to the clock, and Polyptyque can start with Windows straight into the background, so scheduled recordings survive a restart.
 - Missed start (Polyptyque closed or computer asleep at the set time): when it’s back during the time slot, Polyptyque asks whether to start recording, and starts on its own after two minutes without an answer.
 - A scheduled recording only stops what it started: a recording started by hand during a time slot is only stopped at the end time if you agree. Stopping a scheduled recording by hand asks for confirmation.
 
