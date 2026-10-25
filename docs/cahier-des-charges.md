@@ -39,8 +39,9 @@ type: projet
 	12. [[#Langues et formats]]
 	13. [[#Signalement d'un problème]]
 	14. [[#Raccourcis clavier]]
-	15. [[#Préparation de la diffusion en direct]]
-	16. [[#Installation]]
+	15. [[#Pilotage par d'autres programmes]]
+	16. [[#Préparation de la diffusion en direct]]
+	17. [[#Installation]]
 5. [[#Exigences non fonctionnelles]]
 	1. [[#Fiabilité]]
 	2. [[#Performance]]
@@ -287,7 +288,6 @@ Au lancement de Polyptyque (réglage « Ouvrir les fenêtres de la scène au lan
 > [!info] Plus tard
 > - Lancement par Windows à l'heure prévue, même logiciel fermé (Planificateur de tâches).
 > - Sortie de veille automatique à l'heure prévue (minuteries de réveil).
-> - Programmations exposées au pilotage par un modèle de langage : la logique est déjà séparée de l'interface (`polyptyque-core`, module `schedule`).
 
 ### Microphone
 
@@ -400,7 +400,7 @@ Inspirée d'[[OBS Studio]], volontairement allégée, thème sombre.
 	- par **glisser-déposer**, dans la liste comme dans la grille. Le glisser démarre après 8 px de déplacement bouton enfoncé : un simple clic reste un clic, et un appui sur un bouton d'une carte (enregistrement, ouvrir ou rétablir la fenêtre) ne déplace jamais la carte. Pendant le glisser, la source reste atténuée à sa place ; un trait (liste) ou un cadre (grille) montre où elle arrivera, et dans la grille une version réduite de la carte suit le pointeur. Relâcher hors de la liste ou de la grille annule. La source déplacée devient la source sélectionnée.
 	- Bloqué pendant un enregistrement, comme les flèches. La liste ne défile pas seule pendant un glisser : pour un grand déplacement, la grille montre toutes les sources.
 - Niveau sonore affiché **en permanence**, pas seulement pendant l'enregistrement : chaque source écoute le son de son programme (même capture que l'enregistrement, seule la crête est gardée). Dès que le moteur écoute la source (enregistrement, préparation, finalisation), cette écoute s'arrête et la carte affiche le niveau du moteur. Indépendant du réglage des aperçus.
-- Barre du haut : pastille de la programmation (voir [[#Programmation des enregistrements]]), pastille du micro (avec son niveau pendant l'enregistrement) et pastille de la conversion MP4 en cours.
+- Barre du haut : pastille de la programmation (voir [[#Programmation des enregistrements]]), pastille du micro (avec son niveau pendant l'enregistrement), pastille de la conversion MP4 en cours et pastille « Pilotage » tant qu'un programme est connecté (voir [[#Pilotage par d'autres programmes]]).
 - **Barre d'état** : espace disque libre, autonomie estimée, charge processeur et carte graphique, images perdues.
 - **Fenêtre de paramètres** : Sortie, Encodage, Audio, Raccourcis, Général. Dans une fenêtre trop petite, seul son contenu défile : le bas (version, « Signaler un problème… », boutons) reste toujours visible.
 - Langues : français et anglais, voir [[#Langues et formats]].
@@ -454,7 +454,7 @@ Inspirée d'[[OBS Studio]], volontairement allégée, thème sombre.
 - **Journaux** : en français, non traduits (diagnostic : une seule langue reste cherchable).
 - **Détails techniques venus d'autres logiciels** (messages de FFmpeg, de Velopack, du lecteur de réglages…) : jamais affichés, puisqu'ils sont en anglais quelle que soit la langue ; le message affiché, dans la langue de l'interface, se termine par « (détail dans le journal) », et le détail est écrit au journal. Les messages d'erreur de Windows lui-même, dans la langue du système, restent affichés.
 - **Dossiers sur disque** (`données` de la version portable, `profils`, `journaux`) et clés du fichier de réglages : jamais renommés, sinon les installations existantes perdraient leurs données.
-- **Version console** (`polyptyque-console.exe`) : française pour l'instant ; elle sera traduite (ou remplacée) lors du chantier du pilotage par un modèle de langage, qui définit un mode commande non interactif.
+- **Mode commande** (`polyptyque-cli.exe`) : messages traduits comme l'interface, par le même catalogue, dans la langue de Polyptyque. Noms de commandes, de paramètres et clés JSON : en anglais, jamais traduits. Le serveur MCP et le catalogue JSON donnent les descriptions en anglais (lues par un modèle).
 - Documents de travail (`docs/`) : en français. Le README existe dans les deux langues, l'anglais en tête.
 
 **Technique**
@@ -498,6 +498,72 @@ Rendre facile la transmission d'un problème sur GitHub, sans exposer de donnée
 
 > [!tip] Pourquoi pas Ctrl + Alt
 > Sur un clavier AZERTY, <kbd>Ctrl</kbd> + <kbd>Alt</kbd> équivaut à <kbd>AltGr</kbd> : ces combinaisons entreraient en conflit avec la saisie de caractères (€, @, #…).
+
+### Pilotage par d'autres programmes
+
+> [!abstract] But
+> Un assistant IA (modèle de langage), un script ou le futur plugin Stream Deck peuvent faire tout ce que fait l'interface : régler Polyptyque à la place de la personne, préparer les scènes, lancer et suivre un enregistrement. Pour qui ne veut pas s'embêter avec les réglages, l'assistant s'en charge.
+
+**Canal de commande**
+
+- Tenu par Polyptyque ouvert (fenêtre affichée ou en arrière-plan). Polyptyque fermé : `polyptyque-cli app launch` le démarre en arrière-plan.
+- Windows : tube nommé `\\.\pipe\polyptyque-<SID du compte>`.
+	- Réservé au compte Windows qui a lancé Polyptyque : les autorisations du tube ne donnent accès qu'à ce compte (celles que Windows donne par défaut ouvrent la lecture à tous les comptes, anonyme compris).
+	- Connexions depuis une autre machine refusées par le système (`PIPE_REJECT_REMOTE_CLIENTS`).
+	- Polyptyque exige d'être le premier à créer le tube, et chaque client vérifie que le tube appartient à son propre compte : un autre programme ne peut pas se faire passer pour Polyptyque.
+- **Pas de serveur web local** : une page web ne peut pas ouvrir un tube nommé (un port local, lui, serait joignable par n'importe quelle page).
+- Hors Windows (mode démonstration, futur portage) : socket Unix dans le dossier temporaire du compte, accessible à ce seul compte.
+- Protocole : JSON-RPC 2.0, un message JSON par ligne (UTF-8), version du protocole annoncée (`protocol: 1`). Référence complète, en anglais : [[control|docs/control.md]].
+- **État en direct** : après `subscribe`, Polyptyque envoie l'état à chaque changement (au plus deux fois par seconde) et chaque message qu'il affiche.
+- Plusieurs programmes peuvent être connectés en même temps.
+
+**Commandes** : tout ce que fait l'interface.
+
+- État ; informations système (cartes graphiques, FFmpeg, disque) et essai des encodeurs ; scènes ; sources (navigateurs installés, fenêtres ouvertes, ajout, retrait, ordre, partage entre scènes, ouverture et rétablissement des fenêtres) ; enregistrement, de toutes les sources ou d'une seule ; réglages (lecture et modification, raccourcis compris) ; micros ; programmations et réponse à leurs questions ; conversion MP4 ; liste des enregistrements ; aperçus ; mise à jour ; afficher la fenêtre ; quitter.
+- Restent dans la fenêtre : le bilan d'un enregistrement interrompu et le signalement d'un problème. Un dossier se donne par son chemin, sans Explorateur.
+- Une scène, une source ou une programmation se désigne par son identifiant ou par son nom.
+- Les commandes longues (démarrer, arrêter, ouvrir les fenêtres de la scène) répondent une fois l'opération terminée, avec son résultat et les messages affichés entre-temps.
+- **Confirmations** : ce que l'interface fait confirmer (supprimer une scène ou une source, arrêter un enregistrement programmé, annuler une conversion, installer une mise à jour, quitter pendant un enregistrement ou avec une programmation prévue) est refusé sans `confirm: true`, avec le texte que l'interface aurait affiché (`confirmation_required`). L'assistant pose la question à la personne, puis recommence.
+- **Mêmes verrous que l'interface** : pendant un enregistrement, rien ne change dans les scènes, les sources et les réglages (`locked`). Les réglages sont aussi refusés tant que leur fenêtre est ouverte dans Polyptyque (elle les écraserait en se fermant), de même que les programmations pendant que leur formulaire est ouvert.
+- Démarrage pendant un créneau programmé : l'arrêt automatique se choisit dans la commande (`auto_stop`, non par défaut comme dans l'interface) ; aucune question n'est affichée.
+
+**Garde-fous**
+
+- **Désactivé par défaut.** Réglage « Autoriser le pilotage par d'autres programmes » (Fichiers et interface), seul moyen de l'activer ou de le désactiver : aucune commande ne le peut. Désactivé, le tube n'existe pas ; désactivé en cours de route, les programmes connectés sont déconnectés.
+- Sous ce réglage, le bouton « Connecter un assistant IA… » ouvre la section du README qui explique comment brancher Claude Desktop, Claude Code ou un script (README anglais ou français selon la langue de l'interface).
+- **Micro** : l'activer par une commande ouvre une fenêtre de confirmation dans Polyptyque (fenêtre ramenée au premier plan) ; seule la personne devant l'écran peut accepter. Sans réponse en deux minutes, c'est un refus.
+- **Enregistrement toujours visible** :
+	- en arrière-plan, l'icône de la zone de notification porte un point rouge pendant tout enregistrement, et un enregistrement qui démarre affiche une notification de Windows (l'icône peut être rangée sous « ^ ») ;
+	- le message de démarrage nomme le programme qui l'a demandé (« Demandé par « Claude ». ») ;
+	- aucune commande ne cache la fenêtre.
+- **Pastille « Pilotage »** dans la barre du haut tant qu'un programme est connecté, avec son nom ; un clic ouvre les réglages.
+- **Titres des fenêtres** : la liste des fenêtres ouvertes ne donne que le programme de chaque fenêtre, et son titre seulement quand plusieurs fenêtres du même programme sont ouvertes (un titre peut être privé : objet d'un courriel, nom d'une conversation ; un assistant en ligne l'envoie à son fournisseur).
+- **Journal** : chaque commande reçue, avec le programme qui l'envoie (nom annoncé et exécutable) ; jamais les titres des fenêtres.
+
+**Mode commande** (`polyptyque-cli.exe`, qui remplace la console interactive du prototype)
+
+- `polyptyque-cli <commande> [--paramètre valeur…]`, par exemple `polyptyque-cli recording start --scene Podcast` ; `polyptyque-cli call <méthode> '<json>'` pour n'importe quel appel.
+- `polyptyque-cli help` : aide lisible ; `polyptyque-cli commands` : catalogue JSON (paramètres, types, descriptions) ; `polyptyque-cli events` : état en direct, une ligne JSON par changement ; `polyptyque-cli app launch` : lance Polyptyque en arrière-plan s'il est fermé et attend que le canal réponde.
+- Sortie : JSON sur la sortie standard, y compris les erreurs (`{"error": {"reason": …, "message": …}}`) ; `--pretty` pour l'indenter.
+- Codes de retour stables :
+
+| Code | Raison | Sens |
+|---|---|---|
+| 0 | | Réussi |
+| 1 | `internal` | Erreur interne ou inattendue |
+| 2 | `invalid_request` | Commande ou paramètres invalides |
+| 3 | `not_running` | Polyptyque n'est pas ouvert |
+| 4 | `control_disabled` | Pilotage désactivé dans les réglages |
+| 5 | `locked`, `busy` | Impossible pour l'instant : enregistrement ou opération en cours, fenêtre ouverte dans Polyptyque |
+| 6 | `not_found`, `ambiguous` | Scène, source, programmation, fenêtre ou fichier introuvable, ou nom qui en désigne plusieurs |
+| 7 | `confirmation_required` | À confirmer par la personne, puis à relancer avec `--confirm` |
+| 8 | `refused`, `declined`, `timeout` | Valeur invalide ou conflit, refus de la personne, délai dépassé |
+| 9 | `unavailable` | Impossible sur ce système ou dans cet état (FFmpeg absent, aucune mise à jour…) |
+
+- Messages dans la langue de Polyptyque (réglage « Langue », sinon celle de Windows), tirés du même catalogue que l'interface. Noms de commandes, de paramètres et clés JSON : en anglais, stables.
+- **Serveur MCP** : `polyptyque-cli mcp` (entrée et sortie standard), pour les assistants sans terminal (Claude Desktop…). Ses outils sont les commandes du catalogue (`recording_start`…), plus `app_launch` ; leurs descriptions sont en anglais, lues par le modèle.
+
+**Documentation pour les modèles de langage** : [[control|docs/control.md]] (référence), `llms.txt` (point d'entrée), `AGENTS.md` (agents qui travaillent sur le code), skill `skills/polyptyque/SKILL.md`. Un test échoue si une commande du catalogue manque dans la référence.
 
 ### Préparation de la diffusion en direct
 
@@ -579,6 +645,7 @@ Solution retenue : **[[Velopack]]** (outil d'installation et de mise à jour éc
 
 - Les profils de navigateur contiennent des **sessions connectées** : stockés uniquement en local, jamais transmis.
 - Microphone désactivé par défaut, activation explicite.
+- Pilotage par d'autres programmes : désactivé par défaut, local au compte Windows, jamais joignable depuis une page web ou un autre ordinateur ; micro seulement avec l'accord de la personne dans la fenêtre (voir [[#Pilotage par d'autres programmes]]). Un assistant en ligne envoie ce qu'il lit (noms des scènes et des sources) à son fournisseur : c'est pourquoi les titres des fenêtres ne lui sont donnés qu'en cas de besoin.
 - Aucune donnée envoyée sur Internet par Polyptyque (proposition, voir [[#Questions ouvertes]]). Seule exception : la recherche de mises à jour interroge GitHub (adresse IP visible de GitHub, rien d'autre), désactivable dans les réglages.
 
 ### Distribution et licence
@@ -614,9 +681,9 @@ Solution retenue : **[[Velopack]]** (outil d'installation et de mise à jour éc
 | AV1 indisponible sur RTX 30 | Matériel | Codecs proposés selon la carte détectée |
 | Plantage de l'encodeur : environ une seconde perdue | Données encore en mémoire dans FFmpeg | La suite est dans `…_partie2.mkv`, à placer au montage à la suite de la première partie |
 | Arrêt forcé de Windows sans délai | Windows peut fermer Polyptyque sans attendre | Fichiers MKV lisibles quand même ; au plus une seconde perdue |
-| Pas de protection contre l'arrêt de Windows dans la console | Seule l'interface graphique a une fenêtre pour la recevoir | Utiliser l'interface graphique |
 | Programmation : Polyptyque doit être ouvert, l'ordinateur éveillé | Pas encore de lancement par Windows à l'heure prévue, ni de sortie de veille | Option « Lancer Polyptyque au démarrage de Windows », anti-veille, question au retour (démarrage manqué) |
-| Pas de programmation dans la console | Fonction de l'interface graphique | Utiliser l'interface graphique |
+| Pilotage : Polyptyque doit être ouvert | Le canal de commande est tenu par Polyptyque | `polyptyque-cli app launch` (outil MCP `app_launch`) le lance en arrière-plan |
+| Pilotage : bilan d'un enregistrement interrompu et signalement d'un problème hors d'atteinte | Fenêtres réservées à la personne | À faire dans la fenêtre |
 
 > [!bug] Point à surveiller
 > Des utilisateurs d'OBS signalent que la capture audio d'un navigateur échoue selon qu'il a été ouvert avant ou après le logiciel de capture. Comme Polyptyque lance lui-même les navigateurs, le risque est réduit, mais il sera testé explicitement.
@@ -648,11 +715,11 @@ Le code est organisé en modules indépendants (« crates » Rust) :
 
 | Module | Rôle | Dépend du système |
 |---|---|---|
-| `polyptyque-core` | Scènes, sources, réglages, sauvegarde, nommage, calculs de synchronisation, commandes FFmpeg, programmations (créneaux et décisions), et le contrat `Platform` que chaque système doit remplir | Non |
-| `polyptyque-windows` | Implémentation Windows de `Platform` : capture d'image et de son, fenêtres, processus, navigateurs installés, tubes | **Oui** |
+| `polyptyque-core` | Scènes, sources, réglages, sauvegarde, nommage, calculs de synchronisation, commandes FFmpeg, programmations (créneaux et décisions), protocole du canal de commande et catalogue des commandes (`control`), et le contrat `Platform` que chaque système doit remplir | Non |
+| `polyptyque-windows` | Implémentation Windows de `Platform` : capture d'image et de son, fenêtres, processus, navigateurs installés, tubes (dont celui du canal de commande) | **Oui** |
 | `polyptyque-engine` | Sessions d'enregistrement : fils de capture, horloge commune, encodeurs, arrêt propre | Non |
 | `polyptyque-app` | Interface graphique [[Slint]] : apparence dans `ui/` (thème dans `ui/theme.slint`), logique dans `src/` ; mode démonstration hors Windows | Non (raccourcis et arrêt de Windows : oui) |
-| `polyptyque-cli` | Prototype en console (étape 0), livré à côté de l'interface pour le diagnostic | Non |
+| `polyptyque-cli` | Mode commande (`polyptyque-cli.exe`) et serveur MCP : clients du canal de commande (remplace le prototype en console de l'étape 0) | Non (tube nommé sous Windows) |
 
 La session simulée (`polyptyque-engine/tests`) rejoue des enregistrements complets avec de fausses fenêtres, un faux micro et un vrai FFmpeg, sur n'importe quel système. Elle vérifie à chaque modification les durées et la synchronisation des fichiers produits, la conversion MP4, l'enregistrement individuel et la reprise après un **plantage réel de FFmpeg** en cours d'enregistrement.
 
@@ -667,6 +734,8 @@ La session simulée (`polyptyque-engine/tests`) rejoue des enregistrements compl
 | Encodage et MKV | [[FFmpeg]] 8.1 (version GPL) : un processus par source, alimenté par deux tubes nommés (image NV12, son flottant), surveillé et relancé si besoin | NVENC, AMF, Quick Sync, x264 ; une panne d'encodeur n'affecte qu'une source |
 | Conversion MP4 | [[FFmpeg]] en recopie sans réencodage (`-c copy`) | Vérification des pistes et de la durée |
 | Fermeture de session | `ShutdownBlockReasonCreate`, messages `WM_QUERYENDSESSION` et `WM_ENDSESSION` sur la fenêtre principale | |
+| Pilotage | Tube nommé Windows en entrées-sorties asynchrones, autorisations SDDL réservées au compte (`O:<SID>D:P(A;;GA;;;<SID>)`), `PIPE_REJECT_REMOTE_CLIENTS`, `FILE_FLAG_FIRST_PIPE_INSTANCE` ; JSON-RPC 2.0, une ligne par message ; socket Unix hors Windows | Commandes exécutées sur le fil de l'interface (`invoke_from_event_loop`), comme un clic |
+| Serveur MCP | Entrée et sortie standard ; spécification 2026-07-28 (requêtes sans état, `_meta`, `server/discover`) et poignée de main `initialize` des versions précédentes | Écrit sans bibliothèque MCP : quelques centaines de lignes |
 | Arrière-plan | `Shell_NotifyIconW` (version 4), messages reçus par la fenêtre principale cachée ; menu `TrackPopupMenu` ; message `TaskbarCreated` ; second lancement : message enregistré `Polyptyque.Afficher` | Boucle de l'interface maintenue fenêtre cachée (`run_event_loop_until_quit` de Slint) |
 | Programmation | Heure locale du système par `chrono` (changements d'heure compris) ; anti-veille `SetThreadExecutionState` sur un fil dédié ; lancement au démarrage par la clé `Run` de l'utilisateur | Vérifiée par des tests avec le vrai fuseau Europe/Paris (`chrono-tz`) |
 | Conversion d'image | Processeur vidéo Direct3D 11 de la carte graphique | Mise à l'échelle et conversion NV12 BT.709 sans passer par le processeur |
@@ -769,6 +838,16 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 > - [x] Vérifié en mode démonstration (question, choix retenu, réglage, français et anglais) ; icône et menu non vérifiables hors Windows
 > - [ ] Validation sur la machine de référence ([[protocole-test-programmation#G - Arrière-plan]])
 
+> [!todo] Étape 3 octies - Pilotage par d'autres programmes ([[#Pilotage par d'autres programmes]]), écrite le 2026-10-25
+> - [x] Canal de commande : tube nommé réservé au compte (socket Unix hors Windows), JSON-RPC 2.0, état en direct, plusieurs programmes à la fois
+> - [x] 42 commandes décrites une seule fois (catalogue), exécutées par les mêmes actions que l'interface ; confirmations et verrous identiques
+> - [x] Garde-fous : réglage désactivé par défaut, micro accepté seulement dans la fenêtre, point rouge et notification en arrière-plan, demandeur cité, pastille « Pilotage », titres des fenêtres retenus
+> - [x] Mode commande `polyptyque-cli.exe` (remplace la console de l'étape 0), JSON, codes de retour stables, traduit ; lancement en arrière-plan
+> - [x] Serveur MCP (spécification 2026-07-28 et précédentes)
+> - [x] Documentation : [[control|docs/control.md]] (liste des commandes générée et vérifiée par un test), `AGENTS.md`, `llms.txt`, skill `skills/polyptyque`, README
+> - [x] Vérifié en mode démonstration de bout en bout (toutes les commandes, erreurs, confirmations, enregistrement et conversion réels, question du micro acceptée, refusée et sans réponse, MCP des deux époques)
+> - [ ] Validation sur la machine de référence ([[protocole-test-pilotage]])
+
 > [!todo] Étape 4 - Publication
 > - [ ] Dépôt public, première version publiée
 > - [ ] FFmpeg compilé par le projet (plus léger, signable)
@@ -776,7 +855,8 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 > - [ ] Tests d'endurance de 12 h complets (un premier test de 14 h 15 réussi le 2026-10-21 en 1280×720, 30 i/s ; à refaire avec les réglages par défaut, 1920×1080 et 60 i/s)
 
 > [!info] Plus tard
-> - Programmation : lancement par Windows à l'heure prévue même logiciel fermé, sortie de veille automatique, pilotage par un modèle de langage
+> - Programmation : lancement par Windows à l'heure prévue même logiciel fermé, sortie de veille automatique
+> - Plugin Stream Deck, par le canal de commande
 > - Diffusion en direct (gratuite)
 > - Portage macOS, puis Linux
 > - Réglages d'encodage par source
@@ -858,6 +938,9 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 | 2026-10-25 | Démarrage à l'heure prévue confirmé sans question : la fenêtre au compte à rebours de deux minutes ne concerne que le démarrage manqué (rien à anticiper, Polyptyque n'était pas ouvert ou l'ordinateur dormait) |
 | 2026-10-25 | **Arrière-plan dans la zone de notification** (pas une fenêtre réduite) : sinon, le choix « arrière-plan » retenu ne laisserait plus aucun moyen de quitter par la croix ; l'icône donne « Quitter Polyptyque ». Lancement au démarrage de Windows directement en arrière-plan. Fermer avec une programmation prévue : question avec « Continuer en arrière-plan », « Se souvenir de mon choix » et réglage (Demander / Continuer en arrière-plan / Quitter). Le choix ne joue que si une programmation attend ; « Quitter » retenu ne saute que l'avertissement des programmations, jamais celui d'un enregistrement ou d'une conversion ; « arrière-plan » retenu s'applique aussi pendant un enregistrement |
 | 2026-10-25 | Publication de la 1.0.0-beta.6 (préversion) : arrière-plan dans la zone de notification (icône près de l'horloge), choix à la fermeture avec une programmation prévue et réglage, lancement au démarrage de Windows en arrière-plan |
+| 2026-10-25 | **Pilotage par d'autres programmes** (assistant IA, script, futur plugin Stream Deck) par un canal de commande local : tube nommé réservé au compte Windows, pas de serveur web local ; JSON-RPC 2.0 ; tout ce que fait l'interface, avec les mêmes verrous, et `confirm` pour ce qu'elle fait confirmer. Garde-fous : désactivé par défaut et activable dans la fenêtre seulement, enregistrement toujours visible (point rouge, notification, demandeur cité), pastille « Pilotage » |
+| 2026-10-25 | Console interactive du prototype **remplacée** par le mode commande `polyptyque-cli.exe` (JSON, codes de retour 0 à 9, traduit) plutôt que traduite : elle enregistrait en dehors de Polyptyque, sans prendre le verrou d'instance unique |
+| 2026-10-25 | Micro activé par un programme : confirmation affichée dans Polyptyque, seule la personne devant l'écran peut accepter (deux minutes, sinon refus) ; titres des fenêtres donnés seulement si plusieurs fenêtres du même programme sont ouvertes ; serveur MCP livré dans ce chantier (`polyptyque-cli mcp`) |
 
 ---
 

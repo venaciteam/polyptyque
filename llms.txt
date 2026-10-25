@@ -1,0 +1,20 @@
+# Polyptyque
+
+> Windows app that records several windows at once, each into its own MKV file with only its own sound, on a shared clock, for multi-angle editing and archiving. Free and open source (GPL-3.0), in English and French. Once the user allows it in its Settings, AI assistants can drive it through an MCP server (`polyptyque-cli mcp`) or a JSON command line (`polyptyque-cli`).
+
+## Use
+
+- [README](https://github.com/venaciteam/Polyptyque/blob/main/README.md): features, installation, getting started, connecting an AI assistant
+- [Control reference](https://github.com/venaciteam/Polyptyque/blob/main/docs/control.md): command channel, command line, MCP server, every command with its parameters, error reasons and exit codes, status object
+- [Skill for AI assistants](https://github.com/venaciteam/Polyptyque/blob/main/skills/polyptyque/SKILL.md): how to set up and run Polyptyque for a user, and the rules to follow
+
+## Develop
+
+- [AGENTS.md](https://github.com/venaciteam/Polyptyque/blob/main/AGENTS.md): layout, build, tests and conventions for coding agents
+- [Specification](https://github.com/venaciteam/Polyptyque/blob/main/docs/cahier-des-charges.md): requirements, architecture and decision log (in French)
+
+## Optional
+
+- [README in French](https://github.com/venaciteam/Polyptyque/blob/main/README.fr.md)
+- [English glossary](https://github.com/venaciteam/Polyptyque/blob/main/docs/lexique-anglais.md): reference terms of the English version (in French)
+- [Releases](https://github.com/venaciteam/Polyptyque/releases): installer and portable version

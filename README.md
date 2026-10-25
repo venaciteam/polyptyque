@@ -46,6 +46,7 @@ Requirements and the Windows warning on first launch: see [Installation](#instal
 - [Lightweight by design](#lightweight-by-design)
 - [Installation](#installation)
 - [Getting started](#getting-started)
+- [Control Polyptyque with an AI assistant](#control-polyptyque-with-an-ai-assistant)
 - [For editing](#for-editing)
 - [Known limitations](#known-limitations)
 - [Reporting a problem](#reporting-a-problem)
@@ -103,6 +104,7 @@ Polyptyque works the other way around: **each window is recorded on its own**, i
 - Each source’s sound level is always shown, even when not recording: a silent source stands out before you start.
 - One button to record everything, or one button per source to record a single source.
 - Encoding on the graphics card (NVIDIA, AMD, Intel) when available, or on the CPU. If the card refuses one more encode (a GeForce limit, other software included), that source alone switches to the CPU.
+- Controllable by an AI assistant, a script or a Stream Deck, if you allow it: see [Control Polyptyque with an AI assistant](#control-polyptyque-with-an-ai-assistant).
 - In English and French: Polyptyque follows the Windows display language (French if Windows is in French, English otherwise), and its clock follows the Windows regional format (12-hour or 24-hour). Both can be changed in Settings.
 
 ## Lightweight by design
@@ -178,6 +180,39 @@ Polyptyque is in English and French, in a single version. It uses French if Wind
 
 In the Polyptyque window, <kbd>Ctrl</kbd> + <kbd>C</kbd> copies the selected source and <kbd>Ctrl</kbd> + <kbd>V</kbd> pastes it into the current scene.
 
+## Control Polyptyque with an AI assistant
+
+An AI assistant (Claude, or any assistant that supports MCP), a script or a Stream Deck can do everything the window does: add sources, pick the right settings for your computer, start, schedule and stop recordings. For example: “Set up Polyptyque to record my Firefox and Discord windows, then record tonight from 9 to 11 PM.”
+
+**1. Allow it**: in Polyptyque, Settings › “Allow control by other programs” (off by default). The “Connect an AI assistant…” button there leads to this section.
+
+**2. Connect your assistant**
+
+- **Claude Desktop**: Settings › Developer › Edit Config, add the lines below, then restart Claude Desktop. Replace `<you>` with your Windows user name; for the portable version, give the path to `current\polyptyque-cli.exe` in its folder.
+
+  ```json
+  {
+    "mcpServers": {
+      "polyptyque": {
+        "command": "C:\\Users\\<you>\\AppData\\Local\\PolyptyqueApp\\current\\polyptyque-cli.exe",
+        "args": ["mcp"]
+      }
+    }
+  }
+  ```
+
+- **Claude Code**: `claude mcp add polyptyque -- "$env:LOCALAPPDATA\PolyptyqueApp\current\polyptyque-cli.exe" mcp` in PowerShell.
+- **Other assistants and scripts**: `polyptyque-cli.exe`, next to `polyptyque.exe`, answers every command in JSON (`polyptyque-cli help`).
+
+**What stays in your hands**
+- Only programs running on this computer, under your Windows account, can control Polyptyque: never a web page, never another computer.
+- Turning the mic on needs your approval, in Polyptyque’s own window.
+- A recording always shows: in the background, a red dot on the icon next to the clock and a Windows notification when it starts; the start message names the program that asked for it. A “Remote control” pill at the top shows which program is connected.
+- Anything the window would ask you to confirm (deleting a scene, stopping a scheduled recording, quitting…), the assistant has to ask you first.
+- Window titles can be private: the assistant only sees them when two windows of the same program need telling apart. An online assistant sends what it reads (scene and source names, for example) to its provider.
+
+Full reference for developers and assistants: [docs/control.md](docs/control.md); skill for assistants: [skills/polyptyque](skills/polyptyque/SKILL.md).
+
 ## For editing
 
 - **MKV or MP4**: while recording, Polyptyque writes MKV, a format that stays readable even after a power cut. “Convert to MP4…” creates an MP4 copy alongside, losslessly, and conversion can run automatically when a recording ends. The MKV is kept: plan for twice the disk space.
@@ -192,9 +227,9 @@ In the Polyptyque window, <kbd>Ctrl</kbd> + <kbd>C</kbd> copies the selected sou
 - Windows stops drawing a window minimized to the taskbar: its picture freezes, and its card shows “Minimized”. The card’s “Restore window” button brings it back, even during a recording. A window hidden behind others records normally.
 - Protected content (Netflix, Disney+…) often shows up black.
 - Some games in exclusive fullscreen give a black picture: use “borderless windowed” mode instead.
-- Scheduled recordings only start if Polyptyque is open and the computer is on: Windows doesn’t launch Polyptyque at the set time yet, or wake the computer from sleep. The console version has no scheduling.
+- Scheduled recordings only start if Polyptyque is open and the computer is on: Windows doesn’t launch Polyptyque at the set time yet, or wake the computer from sleep.
 - If a source’s browser has several windows, only the source’s window comes back at the next launch when Polyptyque closes them: Firefox and Chrome only reopen the last window closed. The others stay under “Recently closed windows” in the browser’s history.
-- The console version (`polyptyque-console.exe`, shipped for diagnostics) is in French only for now.
+- Control by other programs needs Polyptyque to be running (`polyptyque-cli app launch` starts it in the background). The interrupted-recording summary and problem reports stay in the window.
 
 The full list, technical choices and roadmap are in the [specification](docs/cahier-des-charges.md) (in French).
 
@@ -210,15 +245,16 @@ The report and logs are written in French, so that diagnostics stay searchable i
 
 | Folder | Role |
 |---|---|
-| `crates/polyptyque-core` | Scenes, sources, settings and their backups, naming, sync calculations, FFmpeg commands, portable version, current session log, scheduled recordings (time slots and decisions), reading the translation catalog; the `Platform` contract each system has to fulfill |
-| `crates/polyptyque-windows` | Windows implementation: picture capture (Windows.Graphics.Capture) and sound capture (WASAPI), windows, browsers, pipes, single instance, sleep and session end, start with Windows, regional clock format |
+| `crates/polyptyque-core` | Scenes, sources, settings and their backups, naming, sync calculations, FFmpeg commands, portable version, current session log, scheduled recordings (time slots and decisions), reading the translation catalog, command channel protocol and command catalog; the `Platform` contract each system has to fulfill |
+| `crates/polyptyque-windows` | Windows implementation: picture capture (Windows.Graphics.Capture) and sound capture (WASAPI), windows, browsers, pipes (including the command channel’s), single instance, sleep and session end, start with Windows, regional clock format |
 | `crates/polyptyque-engine` | Recording sessions: shared clock, capture, monitored and restarted FFmpeg encoders, fallback folder, MP4 conversion and repair of files cut off abruptly |
 | `crates/polyptyque-app` | Graphical interface: look in `ui/` (theme in `ui/theme.slint`), logic in `src/` (including the post-incident summary), updates, translations in `lang/` |
-| `crates/polyptyque-cli` | Console version, shipped for diagnostics |
+| `crates/polyptyque-cli` | Command line (`polyptyque-cli.exe`) and MCP server: control by other programs, through the command channel |
 | `assets/logo` | Logo and icons, generated by `generer.py` |
-| `docs` | Specification, risk analysis, test sheets and screenshots |
+| `docs` | Specification, risk analysis, test sheets, screenshots, and the [control reference](docs/control.md) |
+| `skills/polyptyque` | Skill that teaches an AI assistant how to use Polyptyque |
 
-Only `polyptyque-windows` depends on the operating system: a port to macOS or Linux would mean writing its equivalent. Code comments and working documents are in French.
+Only `polyptyque-windows` depends on the operating system: a port to macOS or Linux would mean writing its equivalent. Code comments and working documents are in French. Coding agents: see [AGENTS.md](AGENTS.md).
 
 **Build and test**
 

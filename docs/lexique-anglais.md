@@ -26,6 +26,7 @@ type: doc
 	4. [[#Réglages et encodage]]
 	5. [[#Fichiers, conversion, réparation]]
 	6. [[#Mises à jour et signalement]]
+	7. [[#Pilotage par d'autres programmes]]
 4. [[#Jamais traduits]]
 5. [[#Règles pour le catalogue]]
 
@@ -189,6 +190,25 @@ type: doc
 | Préparer le signalement | Prepare the report |
 | rapport (fichier) | report ; fichier `report_….txt` |
 | (détail dans le journal) | (details in the log) |
+
+### Pilotage par d'autres programmes
+
+Ajouté le 2026-10-25 (chantier du pilotage par un assistant IA).
+
+| Français | Anglais |
+|---|---|
+| pilotage (titre du réglage, pastille) | remote control (*Remote control*, *Remote control · Claude*) |
+| Autoriser le pilotage par d'autres programmes | Allow control by other programs |
+| Connecter un assistant IA… | Connect an AI assistant… |
+| assistant IA | AI assistant |
+| canal de commande | command channel |
+| mode commande (`polyptyque-cli`) | command line |
+| Demandé par « Claude ». (message de démarrage) | Requested by “Claude”. |
+| Activer le micro (demande d'un programme) | Turn on the mic |
+| confirmation requise | confirmation required |
+| identifiant (d'une scène, d'une source) | id |
+
+Les noms de commandes, de paramètres et les clés JSON ne se traduisent jamais (`recording.start`, `confirm`, `scene`) : ce sont des identifiants stables. Les descriptions des commandes sont des textes du catalogue comme les autres ; le serveur MCP et `polyptyque-cli commands` les donnent toujours en anglais, la langue la plus sûre pour un modèle.
 
 ---
 

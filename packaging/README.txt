@@ -27,8 +27,10 @@ on this PC). Settings show "portable" next to the version number.
 Contents
 --------
 - polyptyque.exe         : Polyptyque, with its interface
-- polyptyque-console.exe : the console version, for diagnostics (same
-                           settings, same scenes; in French only for now)
+- polyptyque-cli.exe     : the command line, to control Polyptyque from an
+                           AI assistant (MCP server), a script or a Stream
+                           Deck. Allow it in Settings: "Allow control by
+                           other programs". Help: polyptyque-cli help
 - ffmpeg.exe             : the video encoder Polyptyque uses (must stay
                            next to it)
 - README.txt             : this file (LISEZMOI.txt: in French)

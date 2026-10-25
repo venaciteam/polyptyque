@@ -29,8 +29,11 @@ affichent « portable » à côté du numéro de version.
 Contenu
 -------
 - polyptyque.exe         : Polyptyque, avec son interface
-- polyptyque-console.exe : la version en console de l'étape 0 (mêmes
-                           réglages, mêmes scènes)
+- polyptyque-cli.exe     : le mode commande, pour piloter Polyptyque
+                           depuis un assistant IA (serveur MCP), un script
+                           ou un Stream Deck. À autoriser dans les réglages :
+                           « Autoriser le pilotage par d'autres programmes ».
+                           Aide : polyptyque-cli help
 - ffmpeg.exe             : l'encodeur vidéo utilisé par Polyptyque (doit
                            rester à côté)
 - LISEZMOI.txt           : ce fichier (README.txt : en anglais)
