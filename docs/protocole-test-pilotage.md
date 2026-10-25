@@ -31,7 +31,7 @@ type: guide
 
 ## Récupérer la fabrication
 
-1. GitHub > dépôt Polyptyque > onglet **Actions** > la dernière exécution verte de la branche `pilotage`.
+1. GitHub > dépôt Polyptyque > onglet **Actions** > la dernière exécution verte de la branche `pilotage`. Fabrication vérifiée : [exécution du 2026-10-25](https://github.com/venaciteam/polyptyque/actions/runs/40242057197), [artefact `Polyptyque-windows`](https://github.com/venaciteam/polyptyque/actions/runs/40242057197/artifacts/12617124672) (commit `738150e`).
 2. En bas de la page, artefact **`Polyptyque-windows`** : il contient `Polyptyque-Setup.exe` et `Polyptyque-portable.zip`. La version portable évite de toucher à la version installée.
 3. Vérifier que le dossier contient `polyptyque-cli.exe` (et plus `polyptyque-console.exe`).
 
