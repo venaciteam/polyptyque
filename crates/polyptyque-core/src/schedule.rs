@@ -115,33 +115,6 @@ impl From<TimeOfDay> for String {
     }
 }
 
-/// Lit une date saisie à la main : « 25/10/2026 », « 25/10 » (année de
-/// `today`, ou la suivante si la date est passée), « 2026-10-25 ».
-pub fn parse_date(text: &str, today: NaiveDate) -> Option<NaiveDate> {
-    let text = text.trim();
-    if let Ok(date) = NaiveDate::parse_from_str(text, "%Y-%m-%d") {
-        return Some(date);
-    }
-    let parts: Vec<&str> = text.split(['/', '.', '-']).map(str::trim).collect();
-    match parts.as_slice() {
-        [day, month, year] => {
-            let year: i32 = year.parse().ok()?;
-            let year = if year < 100 { 2000 + year } else { year };
-            NaiveDate::from_ymd_opt(year, month.parse().ok()?, day.parse().ok()?)
-        }
-        [day, month] => {
-            let (day, month) = (day.parse().ok()?, month.parse().ok()?);
-            let date = NaiveDate::from_ymd_opt(today.year(), month, day)?;
-            if date < today {
-                NaiveDate::from_ymd_opt(today.year() + 1, month, day)
-            } else {
-                Some(date)
-            }
-        }
-        _ => None,
-    }
-}
-
 // ----- Programmation -------------------------------------------------------
 
 /// Nom d'un jour, du lundi (1) au dimanche (7), tel qu'il s'écrit au
@@ -708,19 +681,6 @@ mod tests {
         for bad in ["", "24:00", "12:60", "abc", "123:00", "12:000", "h30"] {
             assert_eq!(TimeOfDay::parse(bad), None, "{bad}");
         }
-    }
-
-    #[test]
-    fn dates_are_read_leniently() {
-        let today = date(2026, 10, 23);
-        assert_eq!(parse_date("25/10/2026", today), Some(date(2026, 10, 25)));
-        assert_eq!(parse_date("25/10/26", today), Some(date(2026, 10, 25)));
-        assert_eq!(parse_date("2026-10-25", today), Some(date(2026, 10, 25)));
-        assert_eq!(parse_date("25/10", today), Some(date(2026, 10, 25)));
-        // Date déjà passée cette année : l'an prochain.
-        assert_eq!(parse_date("01/01", today), Some(date(2027, 1, 1)));
-        assert_eq!(parse_date("31/02/2026", today), None);
-        assert_eq!(parse_date("demain", today), None);
     }
 
     #[test]

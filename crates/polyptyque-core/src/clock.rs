@@ -122,6 +122,13 @@ pub fn month_name(month: u32) -> String {
     }
 }
 
+/// Nombre de jours d'un mois (1 à 12) : 28 à 31.
+pub fn days_in_month(year: i32, month: u32) -> u32 {
+    let next =
+        if month == 12 { NaiveDate::from_ymd_opt(year + 1, 1, 1) } else { NaiveDate::from_ymd_opt(year, month + 1, 1) };
+    next.and_then(|d| d.pred_opt()).map_or(31, |d| d.day())
+}
+
 /// « dim. 25 oct. » (« Sun, Oct 25 »), avec l'année si ce n'est pas celle
 /// de `today` : « dim. 25 oct. 2027 » (« Sun, Oct 25, 2027 »).
 pub fn date(date: NaiveDate, today: NaiveDate) -> String {
@@ -159,6 +166,15 @@ mod tests {
         assert_eq!(time_with(true, 21, 5), "9:05 PM");
         assert_eq!(time_with(true, 0, 0), "12:00 AM");
         assert_eq!(time_with(true, 12, 0), "12:00 PM");
+    }
+
+    #[test]
+    fn counts_days_in_month() {
+        assert_eq!(days_in_month(2026, 10), 31);
+        assert_eq!(days_in_month(2026, 11), 30);
+        assert_eq!(days_in_month(2026, 12), 31);
+        assert_eq!(days_in_month(2026, 2), 28);
+        assert_eq!(days_in_month(2028, 2), 29);
     }
 
     #[test]

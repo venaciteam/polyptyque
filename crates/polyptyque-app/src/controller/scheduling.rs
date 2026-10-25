@@ -2,10 +2,9 @@
 //! du planificateur (`polyptyque_core::schedule`), pose les questions,
 //! affiche les programmations et les modifie.
 
-use chrono::{DateTime, Duration as Span, Local, Timelike, Utc};
+use chrono::{DateTime, Datelike, Duration as Span, Local, NaiveDate, Timelike, Utc};
 use polyptyque_core::schedule::{
-    self, clock_label, parse_date, when_label, Action, Repeat, Schedule, ScheduleError, Slot, TimeOfDay,
-    PROMPT_COUNTDOWN,
+    self, clock_label, day_name, when_label, Action, Repeat, Schedule, ScheduleError, Slot, TimeOfDay, PROMPT_COUNTDOWN,
 };
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use tr::tr;
@@ -630,11 +629,63 @@ impl App {
             b.set_schedule_start(start.label().into());
             b.set_schedule_end(end.label().into());
             b.set_schedule_repeat_index(repeat_index);
-            b.set_schedule_date(date.format("%d/%m/%Y").to_string().into());
             b.set_schedule_error(SharedString::new());
             b.set_sheet(if id.is_empty() { "schedule-new" } else { "schedule-edit" }.into());
         });
+        self.set_schedule_date(date, now.date_naive());
         self.schedule_times_edited();
+    }
+
+    /// Listes de la date (« une seule fois ») : années proposées, l'année en
+    /// cours et la suivante, plus celle de la date si elle n'en fait pas
+    /// partie (programmation passée qu'on modifie).
+    fn set_schedule_date(&self, date: NaiveDate, today: NaiveDate) {
+        let mut years = vec![today.year(), today.year() + 1];
+        if !years.contains(&date.year()) {
+            years.push(date.year());
+            years.sort_unstable();
+        }
+        let year_index = years.iter().position(|y| *y == date.year()).unwrap_or(0) as i32;
+        let year_names: Vec<SharedString> = years.iter().map(|y| y.to_string().into()).collect();
+        let month_names: Vec<SharedString> = (1..=12).map(|m| polyptyque_core::clock::month_name(m).into()).collect();
+        *self.schedule_years.borrow_mut() = years;
+        self.with_bridge(|b| {
+            b.set_schedule_year_choices(ModelRc::new(VecModel::from(year_names)));
+            b.set_schedule_year_index(year_index);
+            b.set_schedule_month_choices(ModelRc::new(VecModel::from(month_names)));
+            b.set_schedule_month_index(date.month0() as i32);
+            b.set_schedule_day_index(date.day0() as i32);
+        });
+        self.schedule_date_edited();
+    }
+
+    /// Date choisie : liste des jours du mois (le jour se cale sur le
+    /// dernier si le mois est plus court : 31 octobre → 30 novembre), et
+    /// jour de la semaine rappelé sous les listes.
+    pub(super) fn schedule_date_edited(&self) {
+        let date = self.schedule_date();
+        let days: Vec<SharedString> = (1..=polyptyque_core::clock::days_in_month(date.year(), date.month()))
+            .map(|d| d.to_string().into())
+            .collect();
+        let note = tr!("Le créneau commence un {}.", day_name(date.weekday().number_from_monday() as u8));
+        self.with_bridge(|b| {
+            b.set_schedule_day_choices(ModelRc::new(VecModel::from(days)));
+            b.set_schedule_day_index(date.day0() as i32);
+            b.set_schedule_date_note(note.into());
+        });
+    }
+
+    /// Date des trois listes, toujours valide (jour ramené au dernier du
+    /// mois).
+    fn schedule_date(&self) -> NaiveDate {
+        let (day, month, year_index) = self.with_bridge_value(|b| {
+            (b.get_schedule_day_index(), b.get_schedule_month_index(), b.get_schedule_year_index())
+        });
+        let today = Local::now().date_naive();
+        let year = self.schedule_years.borrow().get(year_index.max(0) as usize).copied().unwrap_or(today.year());
+        let month = (month.clamp(0, 11) + 1) as u32;
+        let day = ((day.max(0) + 1) as u32).min(polyptyque_core::clock::days_in_month(year, month));
+        NaiveDate::from_ymd_opt(year, month, day).unwrap_or(today)
     }
 
     /// Heures saisies : signale une fin le lendemain.
@@ -687,15 +738,8 @@ impl App {
             return;
         };
         let now = Utc::now();
-        let today = now.with_timezone(&Local).date_naive();
         let repeat = match b.get_schedule_repeat_index() {
-            REPEAT_ONCE => match parse_date(&b.get_schedule_date(), today) {
-                Some(date) => Repeat::Once { date },
-                None => {
-                    fail(&tr!("Date invalide (exemple : 25/10/2026)."));
-                    return;
-                }
-            },
+            REPEAT_ONCE => Repeat::Once { date: self.schedule_date() },
             REPEAT_DAILY => Repeat::Weekly { days: (1..=7).collect() },
             _ => Repeat::Weekly {
                 days: (1..=7u8).filter(|d| self.schedule_days.row_data(usize::from(d - 1)).unwrap_or(false)).collect(),

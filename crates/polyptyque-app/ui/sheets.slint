@@ -874,6 +874,18 @@ component DayChip inherits Rectangle {
 }
 
 // Formulaire d'une programmation.
+// Jour d'une date, dans le formulaire d'une programmation.
+component DayList inherits ComboBox {
+    model: Bridge.schedule-day-choices;
+    current-index <=> Bridge.schedule-day-index;
+    accessible-label: @tr("Jour");
+    min-width: 76px;
+    horizontal-stretch: 0;
+    selected => {
+        Bridge.schedule-date-edited();
+    }
+}
+
 export component ScheduleEditorSheet inherits Sheet {
     property <[string]> day-letters: [
         @tr("Initiale du lundi" => "L"),
@@ -936,12 +948,36 @@ export component ScheduleEditorSheet inherits Sheet {
             current-index <=> Bridge.schedule-repeat-index;
         }
     }
+    // Trois listes plutôt qu'un sélecteur de date : celui de Slint commence
+    // la semaine le dimanche et écrit les mois en anglais. Ordre de la
+    // langue : « 25 octobre 2026 », « October 25, 2026 ».
     if Bridge.schedule-repeat-index == 0: Field {
         label: @tr("Date");
-        hint: @tr("Jour où le créneau commence.");
-        LineEdit {
-            text <=> Bridge.schedule-date;
-            placeholder-text: "25/10/2026";
+        hint: Bridge.schedule-date-note;
+        HorizontalLayout {
+            spacing: 8px;
+            if !Bridge.month-first: DayList { }
+            ComboBox {
+                model: Bridge.schedule-month-choices;
+                current-index <=> Bridge.schedule-month-index;
+                accessible-label: @tr("Mois");
+                min-width: 140px;
+                horizontal-stretch: 1;
+                selected => {
+                    Bridge.schedule-date-edited();
+                }
+            }
+            if Bridge.month-first: DayList { }
+            ComboBox {
+                model: Bridge.schedule-year-choices;
+                current-index <=> Bridge.schedule-year-index;
+                accessible-label: @tr("Année");
+                min-width: 96px;
+                horizontal-stretch: 0;
+                selected => {
+                    Bridge.schedule-date-edited();
+                }
+            }
         }
     }
     if Bridge.schedule-repeat-index == 2: Field {

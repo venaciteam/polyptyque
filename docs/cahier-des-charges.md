@@ -237,7 +237,7 @@ Au lancement de Polyptyque (réglage « Ouvrir les fenêtres de la scène au lan
 - **Programmation** : lance une scène (toutes ses sources) de l'heure de début à l'heure de fin, à la minute près.
 	- Répétition : **une seule fois** (une date), ou **chaque semaine certains jours** (les sept : tous les jours). Les jours désignent le jour où le créneau commence.
 	- Une heure de fin antérieure ou égale à l'heure de début désigne **le lendemain** : un créneau 22:00 → 02:00 passe minuit. Un début égal à la fin est refusé (pas de créneau de 24 h).
-	- Heures et dates affichées et saisies selon [[#Langues et formats]] : réglage « Horloge » (24 h ou 12 h), date choisie dans un sélecteur.
+	- Heures et dates affichées et saisies selon [[#Langues et formats]] : réglage « Horloge » (24 h ou 12 h), date choisie dans trois listes jour, mois, année.
 	- Activer, désactiver, modifier, supprimer. Supprimer une scène supprime ses programmations (la confirmation le dit).
 	- Une programmation dont l'enregistrement est en cours ne peut être ni modifiée ni supprimée avant la fin de son créneau.
 - **Un seul enregistrement à la fois** : deux programmations activées qui se chevauchent sont refusées, avec le nom de l'autre. Des créneaux bout à bout (l'un finit à 22:00, l'autre commence à 22:00) sont acceptés : le second démarre dès que les fichiers du premier sont finalisés.
@@ -430,7 +430,7 @@ Inspirée d'[[OBS Studio]], volontairement allégée, thème sombre.
 |---|---|---|
 | Heure affichée et saisie | Réglage « Horloge » : **Automatique (comme Windows)** par défaut, 24 h, ou 12 h | idem (`10:00 PM` en 12 h) |
 | Date dans l'interface | Avec le nom du mois : « dim. 25 oct. » | « Sun, Oct 25 » |
-| Saisie d'une date (programmation) | Sélecteur de date, pas de champ texte | idem |
+| Saisie d'une date (programmation) | Trois listes, pas de champ texte : « 25 \| octobre \| 2026 » ; jour de la semaine rappelé dessous | « October \| 25 \| 2026 » |
 | Premier jour de la semaine | Lundi | Lundi aussi |
 | Tailles | `1,2 Go`, `850 Mo` | `1.2 GB`, `850 MB` |
 | Cadence | `60 i/s` | `60 fps` |
@@ -739,7 +739,7 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 > - [x] Lexique anglais de référence, validé avant de traduire ([[lexique-anglais]])
 > - [x] Catalogue anglais complet, écrit directement en anglais et relu sur captures du mode démonstration ; le test refuse désormais tout texte sans anglais
 > - [x] Réglages « Langue » et « Horloge » (Fichiers et interface), appliqués immédiatement ; heures, dates (nom du mois) et nombres (milliers) selon la langue et l'horloge ; saisie « 9:00 PM » acceptée
-> - [ ] Saisie de la date d'une programmation sans ambiguïté (le sélecteur de Slint commence la semaine le dimanche et écrit les mois en anglais : à trancher)
+> - [x] Saisie de la date d'une programmation sans ambiguïté : trois listes jour, mois, année dans l'ordre de la langue
 > - [ ] README anglais en tête (`README.md`) et français (`README.fr.md`), fichier d'accompagnement de la version portable, description de l'exécutable et du dépôt GitHub
 > - [ ] Validation sur la machine de référence, en français et en anglais
 
@@ -829,10 +829,11 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 | 2026-10-23 | Publication de la 1.0.0-beta.4 (préversion) : sources partagées entre scènes (copier-coller par référence, duplication de scène), glisser-déposer des sources |
 | 2026-10-24 | Version anglaise complète, écrite directement en anglais : une seule version du logiciel, langue automatique (Windows en français → français, toute autre langue → anglais), modifiable dans les réglages, sans question à l'installation ni au premier lancement |
 | 2026-10-24 | Textes externalisés en gettext (`.po`), français comme texte source : `@tr` de Slint et crate `tr` côté Rust, catalogues intégrés à l'exécutable ; test de complétude lancé en local avant chaque publication. Journaux non traduits. Console traduite lors du chantier du pilotage par un modèle de langage |
-| 2026-10-24 | Formats : réglage « Horloge » (automatique comme Windows par défaut, 24 h ou 12 h) ; dates de l'interface écrites avec le nom du mois, saisie par sélecteur de date ; semaine commençant le lundi ; noms de fichiers en date ISO et heure 24 h dans les deux langues (`14h32` / `14-32`) |
+| 2026-10-24 | Formats : réglage « Horloge » (automatique comme Windows par défaut, 24 h ou 12 h) ; dates de l'interface écrites avec le nom du mois, saisie par sélecteur de date (remplacé le 2026-10-25, voir plus bas) ; semaine commençant le lundi ; noms de fichiers en date ISO et heure 24 h dans les deux langues (`14h32` / `14-32`) |
 | 2026-10-24 | Copy française au ton impersonnel (fin du tutoiement, laissé passer jusqu'à la bêta 4) : pas de « tu », pas de genre, vouvoiement seulement si nécessaire |
 | 2026-10-24 | Détails d'erreur venus d'autres logiciels (FFmpeg, Velopack…) jamais affichés : message dans la langue de l'interface, « (détail dans le journal) » |
 | 2026-10-24 | Signalement d'un problème : bouton dans les réglages et dans le bilan d'incident ; rapport texte masqué (dossier personnel, nom du compte) dans le dossier des journaux, page « nouvelle issue » pré-remplie, deux formulaires GitHub (anglais, français). Rien n'est envoyé par Polyptyque |
+| 2026-10-25 | Date d'une programmation saisie dans **trois listes** jour, mois (en toutes lettres), année, dans l'ordre de la langue (« 25 octobre 2026 », « October 25, 2026 »), à la place du sélecteur de date de Slint : sa semaine commence le dimanche, sans réglage, et il écrit les mois en anglais même en français. Liste des jours ajustée au mois choisi ; années proposées : l'année en cours et la suivante ; jour de la semaine rappelé sous les listes |
 
 ---
 

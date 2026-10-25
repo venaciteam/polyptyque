@@ -247,6 +247,8 @@ pub struct App {
     editing_schedule: RefCell<Option<String>>,
     schedule_scene_ids: RefCell<Vec<String>>,
     schedule_days: Rc<VecModel<bool>>,
+    /// Années de la liste « Année » du formulaire.
+    schedule_years: RefCell<Vec<i32>>,
     /// Lancé par Windows à l'ouverture de session : la fenêtre est réduite
     /// dès qu'elle existe.
     minimize_pending: Cell<bool>,
@@ -385,6 +387,7 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
         editing_schedule: RefCell::new(None),
         schedule_scene_ids: RefCell::new(Vec::new()),
         schedule_days: Rc::new(VecModel::from(vec![false; 7])),
+        schedule_years: RefCell::new(Vec::new()),
         minimize_pending: Cell::new(at_startup),
     });
     APP.with(|a| *a.borrow_mut() = Some(app.clone()));
@@ -610,6 +613,9 @@ fn install_callbacks(ui: &AppWindow) {
     });
     b.on_schedule_times_edited(|| {
         with_app(|a| a.schedule_times_edited());
+    });
+    b.on_schedule_date_edited(|| {
+        with_app(|a| a.schedule_date_edited());
     });
     b.on_toggle_schedule_day(|index| {
         with_app(|a| a.toggle_schedule_day(index));
@@ -3014,7 +3020,10 @@ impl App {
             ClockChoice::H12 => true,
         };
         polyptyque_core::clock::set_twelve_hour(twelve_hour);
-        self.with_bridge(|b| b.set_twelve_hour(twelve_hour));
+        self.with_bridge(|b| {
+            b.set_twelve_hour(twelve_hour);
+            b.set_month_first(language == crate::i18n::Language::English);
+        });
     }
 
     /// Après un changement de langue ou d'horloge : textes calculés en Rust
