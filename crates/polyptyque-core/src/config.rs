@@ -9,9 +9,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use tr::tr;
 
 use crate::browsers::program_name;
-use crate::naming::{self, DEFAULT_TEMPLATE};
+use crate::naming;
 use crate::paths;
 use crate::platform::{BrowserInstall, WindowInfo};
 use crate::schedule::Schedule;
@@ -43,7 +44,7 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        let scene = Scene::new("Scène principale");
+        let scene = Scene::new(&tr!("Scène principale"));
         Self {
             version: CONFIG_VERSION,
             active_scene: scene.id.clone(),
@@ -68,11 +69,13 @@ impl Config {
                 Err(e) => {
                     let damaged = storage::sibling(path, ".invalide");
                     let _ = fs::copy(path, &damaged);
-                    format!("Réglages abîmés ({e:#}). Une copie a été gardée dans {}.", damaged.display())
+                    // Erreur du lecteur de réglages, en anglais : au journal.
+                    log::warn!("réglages abîmés : {e:#}");
+                    tr!("Réglages abîmés (détail dans le journal). Une copie a été gardée dans {}.", damaged.display())
                 }
             },
             Err(e) if e.kind() == ErrorKind::NotFound => return (Config::default(), None),
-            Err(e) => format!("Réglages illisibles ({e})."),
+            Err(e) => tr!("Réglages illisibles ({}).", e),
         };
         for backup in backups(path) {
             let Ok(config) = fs::read_to_string(&backup).map_err(anyhow::Error::from).and_then(|t| parse(&t)) else {
@@ -80,9 +83,9 @@ impl Config {
             };
             let name = backup.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
             let _ = config.save(path);
-            return (config, Some(format!("{problem} La sauvegarde « {name} » a été restaurée.")));
+            return (config, Some(format!("{problem} {}", tr!("La sauvegarde « {} » a été restaurée.", name))));
         }
-        (Config::default(), Some(format!("{problem} Aucune sauvegarde valide : réglages par défaut.")))
+        (Config::default(), Some(format!("{problem} {}", tr!("Aucune sauvegarde valide : réglages par défaut."))))
     }
 
     /// Enregistre la configuration sans jamais laisser un fichier à moitié
@@ -90,7 +93,7 @@ impl Config {
     /// ainsi qu'une copie par jour dans `sauvegardes` (les cinq derniers
     /// jours).
     pub fn save(&self, path: &Path) -> Result<()> {
-        let text = toml::to_string_pretty(self).context("sérialisation de la configuration")?;
+        let text = toml::to_string_pretty(self).context(tr!("sérialisation de la configuration"))?;
         if let Ok(current) = fs::read_to_string(path) {
             // Une version abîmée ne remplace jamais une bonne sauvegarde.
             if parse(&current).is_ok() && current != text {
@@ -109,7 +112,7 @@ impl Config {
     pub fn normalize(&mut self) {
         self.version = CONFIG_VERSION;
         if self.scenes.is_empty() {
-            self.scenes.push(Scene::new("Scène principale"));
+            self.scenes.push(Scene::new(&tr!("Scène principale")));
         }
         if !self.scenes.iter().any(|s| s.id == self.active_scene) {
             self.active_scene = self.scenes[0].id.clone();
@@ -131,7 +134,7 @@ impl Config {
         self.settings.video.normalize();
         self.settings.audio.normalize();
         if self.settings.filename_template.trim().is_empty() {
-            self.settings.filename_template = DEFAULT_TEMPLATE.to_string();
+            self.settings.filename_template = naming::default_template();
         }
     }
 
@@ -288,7 +291,7 @@ fn parse(text: &str) -> Result<Config> {
     // Un fichier vide serait lu comme une configuration par défaut : toutes
     // les scènes disparaîtraient sans un mot.
     if text.trim().is_empty() {
-        anyhow::bail!("fichier vide");
+        anyhow::bail!(tr!("fichier vide"));
     }
     let mut table: toml::Table = toml::from_str(text)?;
     lift_scene_sources(&mut table);
@@ -437,9 +440,11 @@ impl Source {
     /// Description courte : « Navigateur Firefox », « Application Discord ».
     pub fn kind_label(&self) -> String {
         match &self.kind {
-            SourceKind::Browser { browser, .. } => format!("Navigateur {}", browser.name),
+            // Contexte : « Navigateur {} » sert aussi de nom par défaut d'une
+            // source (« Navigateur 3 »), traduit autrement.
+            SourceKind::Browser { browser, .. } => tr!("Type de source" => "Navigateur {}", browser.name),
             SourceKind::Application { exe_path, .. } => {
-                format!("Application {}", program_name(exe_path).unwrap_or_default())
+                tr!("Type de source" => "Application {}", program_name(exe_path).unwrap_or_default())
             }
         }
     }
@@ -511,6 +516,10 @@ pub struct Settings {
     /// Lancer Polyptyque à l'ouverture de la session Windows (réduit), pour
     /// que les programmations survivent à un redémarrage.
     pub launch_at_startup: bool,
+    /// Langue de l'interface (voir « Langues et formats »).
+    pub language: LanguageChoice,
+    /// Heures affichées et saisies sur 24 h ou 12 h.
+    pub clock: ClockChoice,
     pub video: VideoSettings,
     pub audio: AudioSettings,
     pub microphone: MicrophoneSettings,
@@ -521,7 +530,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             output_dir: paths::default_output_dir(),
-            filename_template: DEFAULT_TEMPLATE.to_string(),
+            filename_template: naming::default_template(),
             previews: true,
             convert_to_mp4: false,
             check_updates: true,
@@ -529,6 +538,8 @@ impl Default for Settings {
             open_windows_at_launch: true,
             close_browsers_at_exit: true,
             launch_at_startup: false,
+            language: LanguageChoice::Auto,
+            clock: ClockChoice::Auto,
             video: VideoSettings::default(),
             audio: AudioSettings::default(),
             microphone: MicrophoneSettings::default(),
@@ -543,6 +554,29 @@ impl Settings {
     pub fn update_channel(&self, version: &str) -> UpdateChannel {
         self.update_channel.unwrap_or_else(|| UpdateChannel::of_version(version))
     }
+}
+
+/// Langue de l'interface : celle de Windows (le français si Windows est en
+/// français, l'anglais sinon), ou imposée.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum LanguageChoice {
+    #[default]
+    Auto,
+    French,
+    English,
+}
+
+/// Horloge : celle du format régional de Windows, ou imposée.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ClockChoice {
+    #[default]
+    #[serde(rename = "auto")]
+    Auto,
+    #[serde(rename = "24h")]
+    H24,
+    #[serde(rename = "12h")]
+    H12,
 }
 
 /// Versions proposées par la recherche de mises à jour.
@@ -651,11 +685,11 @@ pub enum HardwarePreference {
 }
 
 impl HardwarePreference {
-    pub fn label(self) -> &'static str {
+    pub fn label(self) -> String {
         match self {
-            HardwarePreference::Auto => "Automatique (carte graphique si disponible)",
-            HardwarePreference::Gpu => "Carte graphique",
-            HardwarePreference::Cpu => "Processeur",
+            HardwarePreference::Auto => tr!("Automatique (carte graphique si disponible)"),
+            HardwarePreference::Gpu => tr!("Carte graphique"),
+            HardwarePreference::Cpu => tr!("Processeur"),
         }
     }
 }

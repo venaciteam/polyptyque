@@ -19,6 +19,8 @@ polyptyque-core.workspace = true
 polyptyque-engine.workspace = true
 simplelog.workspace = true
 slint = { version = "1.18", features = ["raw-window-handle-06"] }
+sys-locale = "0.3"
+tr.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 polyptyque-windows.workspace = true
@@ -29,3 +31,7 @@ velopack = "1.2"
 [build-dependencies]
 embed-resource = "3.0"
 slint-build = "1.18"
+
+[dev-dependencies]
+# Lecture des catalogues de traduction (test tests/catalogue.rs).
+rspolib.workspace = true

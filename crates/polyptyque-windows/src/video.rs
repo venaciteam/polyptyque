@@ -89,7 +89,7 @@ impl WgcCapture {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
         }
         if !GraphicsCaptureSession::IsSupported().unwrap_or(false) {
-            bail!("la capture de fenêtre (Windows.Graphics.Capture) n'est pas disponible sur ce système");
+            bail!(tr::tr!("la capture de fenêtre (Windows.Graphics.Capture) n'est pas disponible sur ce système"));
         }
         let (device, context) = create_device()?;
         // La capture Windows écrit dans les surfaces depuis ses propres fils
@@ -102,7 +102,7 @@ impl WgcCapture {
 
         let interop = windows::core::factory::<GraphicsCaptureItem, IGraphicsCaptureItemInterop>()?;
         let item: GraphicsCaptureItem =
-            unsafe { interop.CreateForWindow(hwnd(handle)) }.context("capture de la fenêtre refusée")?;
+            unsafe { interop.CreateForWindow(hwnd(handle)) }.context(tr::tr!("capture de la fenêtre refusée"))?;
         let size = item.Size()?;
         let pool_size = SizeInt32 { Width: size.Width.max(16), Height: size.Height.max(16) };
         let pool =
@@ -118,7 +118,7 @@ impl WgcCapture {
         }
 
         let video_device: ID3D11VideoDevice =
-            device.cast().context("le pilote graphique ne fournit pas le traitement vidéo D3D11")?;
+            device.cast().context(tr::tr!("le pilote graphique ne fournit pas le traitement vidéo D3D11"))?;
         let video_context: ID3D11VideoContext = context.cast()?;
         let output = create_texture(
             &device,
@@ -189,13 +189,13 @@ impl WgcCapture {
             for stream in streams {
                 drop(ManuallyDrop::into_inner(stream.pInputSurface));
             }
-            blit.context("conversion de l'image par la carte graphique")?;
+            blit.context(tr::tr!("conversion de l'image par la carte graphique"))?;
 
             self.context.CopyResource(&self.staging, &self.output);
             let mut mapped = D3D11_MAPPED_SUBRESOURCE::default();
             self.context
                 .Map(&self.staging, 0, D3D11_MAP_READ, 0, Some(&mut mapped))
-                .context("lecture de l'image convertie")?;
+                .context(tr::tr!("lecture de l'image convertie"))?;
             let data = copy_nv12(&mapped, self.out_w as usize, self.out_h as usize);
             self.context.Unmap(&self.staging, 0);
             Ok(Arc::new(data))
@@ -227,7 +227,7 @@ impl WgcCapture {
             if input_support & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_INPUT.0 as u32 == 0
                 || output_support & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_OUTPUT.0 as u32 == 0
             {
-                bail!("la carte graphique ne sait pas convertir BGRA vers NV12");
+                bail!(tr::tr!("la carte graphique ne sait pas convertir BGRA vers NV12"));
             }
             let processor = self.video_device.CreateVideoProcessor(&enumerator, 0)?;
             let input = create_texture(
@@ -284,8 +284,8 @@ impl WgcCapture {
                 in_h,
                 processor,
                 input,
-                input_view: input_view.context("vue d'entrée du processeur vidéo")?,
-                output_view: output_view.context("vue de sortie du processeur vidéo")?,
+                input_view: input_view.context(tr::tr!("vue d'entrée du processeur vidéo"))?,
+                output_view: output_view.context(tr::tr!("vue de sortie du processeur vidéo"))?,
                 _enumerator: enumerator,
             });
         }
@@ -306,7 +306,7 @@ impl VideoCapture for WgcCapture {
                 }
                 // Pointeur nul : aucune nouvelle image.
                 Err(e) if e.code().is_ok() => break,
-                Err(e) => return Err(e).context("lecture d'une image capturée"),
+                Err(e) => return Err(e).context(tr::tr!("lecture d'une image capturée")),
             }
         }
         let Some(frame) = latest else {
@@ -374,9 +374,12 @@ fn create_device() -> Result<(ID3D11Device, ID3D11DeviceContext)> {
             None,
             Some(&mut context),
         )
-        .context("création du périphérique Direct3D 11")?;
+        .context(tr::tr!("création du périphérique Direct3D 11"))?;
     }
-    Ok((device.context("périphérique Direct3D absent")?, context.context("contexte Direct3D absent")?))
+    Ok((
+        device.context(tr::tr!("périphérique Direct3D absent"))?,
+        context.context(tr::tr!("contexte Direct3D absent"))?,
+    ))
 }
 
 fn create_texture(
@@ -402,7 +405,7 @@ fn create_texture(
     };
     let mut texture = None;
     unsafe { device.CreateTexture2D(&desc, None, Some(&mut texture))? };
-    texture.context("texture Direct3D absente")
+    texture.context(tr::tr!("texture Direct3D absente"))
 }
 
 /// Recopie une image NV12 relue depuis la carte graphique en un tampon

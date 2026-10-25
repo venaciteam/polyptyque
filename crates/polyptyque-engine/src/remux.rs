@@ -19,6 +19,7 @@ use anyhow::{bail, Context, Result};
 use polyptyque_core::naming;
 use polyptyque_core::platform::Platform;
 use polyptyque_core::storage;
+use tr::tr;
 
 /// Ce que FFmpeg annonce d'un fichier.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -53,11 +54,12 @@ pub fn inspect(platform: &dyn Platform, ffmpeg: &Path, path: &Path) -> Result<Me
     platform.prepare_encoder_process(&mut command);
     // Sans fichier de sortie, FFmpeg décrit l'entrée puis s'arrête en erreur :
     // c'est attendu.
-    let output = command.output().with_context(|| format!("lancement de {}", ffmpeg.display()))?;
+    let output = command.output().with_context(|| tr!("lancement de {}", ffmpeg.display()))?;
     let text = String::from_utf8_lossy(&output.stderr);
     let info = parse_media_info(&text);
     if info.video_streams == 0 && info.audio_streams == 0 {
-        bail!("fichier illisible : {}", last_line(&text));
+        log::warn!("FFmpeg ne lit pas {} : {}", path.display(), last_line(&text));
+        bail!(tr!("FFmpeg ne peut pas le lire (détail dans le journal)"));
     }
     Ok(info)
 }
@@ -80,7 +82,7 @@ pub fn convert(
     cancel: &AtomicBool,
 ) -> Result<PathBuf> {
     if !is_convertible(input) {
-        bail!("seuls les fichiers .mkv et .mka peuvent être convertis");
+        bail!(tr!("seuls les fichiers .mkv et .mka peuvent être convertis"));
     }
     let output = converted_path(input);
     log::info!("conversion : {} -> {}", input.display(), output.display());
@@ -108,7 +110,7 @@ pub fn repair(
     cancel: &AtomicBool,
 ) -> Result<PathBuf> {
     if !is_convertible(input) {
-        bail!("seuls les fichiers .mkv et .mka peuvent être réparés");
+        bail!(tr!("seuls les fichiers .mkv et .mka peuvent être réparés"));
     }
     log::info!("réparation : {}", input.display());
     let repaired = storage::sibling(input, ".reparation");
@@ -136,7 +138,7 @@ fn check_repaired_size(original: &Path, repaired: &Path) -> Result<()> {
     let before = fs::metadata(original).map(|m| m.len()).unwrap_or(0);
     let after = fs::metadata(repaired).map(|m| m.len()).unwrap_or(0);
     if after < before / 100 * MIN_REPAIRED_PERCENT {
-        bail!("copie réparée incomplète ({after} octets sur {before}) : l'original est conservé tel quel");
+        bail!(tr!("copie réparée incomplète ({} octets sur {}) : l'original est conservé tel quel", after, before));
     }
     Ok(())
 }
@@ -148,10 +150,10 @@ const MIN_REPAIRED_PERCENT: u64 = 95;
 /// si le second renommage échoue.
 fn replace_with(original: &Path, replacement: &Path) -> Result<()> {
     let backup = storage::sibling(original, ".avant-reparation");
-    fs::rename(original, &backup).context("le fichier d'origine est utilisé par un autre programme")?;
+    fs::rename(original, &backup).context(tr!("le fichier d'origine est utilisé par un autre programme"))?;
     if let Err(e) = fs::rename(replacement, original) {
         let _ = fs::rename(&backup, original);
-        return Err(e).context("remplacement du fichier d'origine");
+        return Err(e).context(tr!("remplacement du fichier d'origine"));
     }
     let _ = fs::remove_file(&backup);
     Ok(())
@@ -179,7 +181,7 @@ fn remux_file(
     let mut command = Command::new(ffmpeg);
     command.args(&args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     platform.prepare_encoder_process(&mut command);
-    let mut child = command.spawn().with_context(|| format!("lancement de {}", ffmpeg.display()))?;
+    let mut child = command.spawn().with_context(|| tr!("lancement de {}", ffmpeg.display()))?;
 
     // Les erreurs sont lues à part pour que FFmpeg ne bloque jamais dessus.
     let stderr = child.stderr.take().map(|mut pipe| {
@@ -212,17 +214,18 @@ fn remux_file(
             }
         }
     }
-    let status = child.wait().context("attente de FFmpeg")?;
+    let status = child.wait().context(tr!("attente de FFmpeg"))?;
     let errors = stderr.and_then(|h| h.join().ok()).unwrap_or_default();
 
     let result = if cancelled || cancel.load(Ordering::Relaxed) {
-        Err(anyhow::anyhow!("annulé"))
+        Err(anyhow::anyhow!(tr!("annulé")))
     } else if !status.success() {
-        Err(anyhow::anyhow!("échec de FFmpeg ({status}) : {}", last_line(&errors)))
+        log::warn!("échec de FFmpeg ({status}) : {}", last_line(&errors));
+        Err(anyhow::anyhow!(tr!("échec de FFmpeg (détail dans le journal)")))
     } else {
         inspect(platform, ffmpeg, &partial)
             .and_then(|copy| verify(&source, &copy))
-            .and_then(|()| fs::rename(&partial, output).context("renommage du fichier terminé"))
+            .and_then(|()| fs::rename(&partial, output).context(tr!("renommage du fichier terminé")))
     };
     if result.is_err() {
         let _ = fs::remove_file(&partial);
@@ -257,19 +260,23 @@ fn remux_args(input: &Path, output: &Path, container: Container, hevc: bool) -> 
 /// Le fichier converti doit avoir les mêmes pistes et la même durée.
 fn verify(source: &MediaInfo, converted: &MediaInfo) -> Result<()> {
     if (converted.video_streams, converted.audio_streams) != (source.video_streams, source.audio_streams) {
-        bail!(
+        bail!(tr!(
             "pistes manquantes après conversion ({} vidéo et {} son au lieu de {} et {})",
             converted.video_streams,
             converted.audio_streams,
             source.video_streams,
             source.audio_streams
-        );
+        ));
     }
     match (source.duration, converted.duration) {
         (Some(expected), Some(actual)) if (expected - actual).abs() > 1.0 + expected * 0.001 => {
-            bail!("durée différente après conversion ({actual:.1} s au lieu de {expected:.1} s)")
+            bail!(tr!(
+                "durée différente après conversion ({} s au lieu de {} s)",
+                format!("{actual:.1}"),
+                format!("{expected:.1}")
+            ))
         }
-        (_, None) => bail!("durée illisible après conversion"),
+        (_, None) => bail!(tr!("durée illisible après conversion")),
         _ => Ok(()),
     }
 }

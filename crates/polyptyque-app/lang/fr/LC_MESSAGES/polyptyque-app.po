@@ -1,0 +1,155 @@
+# Polyptyque : catalogue français (voir src/i18n.rs).
+# Le français est la langue du code : ce catalogue ne contient que les
+# textes anglais des composants de Slint (en tête, tenus à la main) et les
+# pluriels de l'interface (en fin, recopiés par l'outil de mise à jour).
+msgid ""
+msgstr ""
+"Project-Id-Version: Polyptyque\n"
+"Language: fr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2;plural=(n > 1);\n"
+
+# Composant Slint : menu clic droit des champs de texte.
+msgid "Undo"
+msgstr "Annuler"
+
+# Composant Slint : menu clic droit des champs de texte.
+msgid "Redo"
+msgstr "Rétablir"
+
+# Composant Slint : menu clic droit des champs de texte.
+msgid "Cut"
+msgstr "Couper"
+
+# Composant Slint : menu clic droit des champs de texte.
+msgid "Copy"
+msgstr "Copier"
+
+# Composant Slint : menu clic droit des champs de texte.
+msgid "Paste"
+msgstr "Coller"
+
+# Composant Slint : menu clic droit des champs de texte.
+msgid "Select All"
+msgstr "Sélectionner tout"
+
+# Composant Slint : boutons standard.
+msgid "OK"
+msgstr "OK"
+
+# Composant Slint : boutons standard.
+msgid "Cancel"
+msgstr "Annuler"
+
+# Composant Slint : boutons standard.
+msgid "Apply"
+msgstr "Appliquer"
+
+# Composant Slint : boutons standard.
+msgid "Close"
+msgstr "Fermer"
+
+# Composant Slint : boutons standard.
+msgid "Reset"
+msgstr "Réinitialiser"
+
+# Composant Slint : boutons standard.
+msgid "Help"
+msgstr "Aide"
+
+# Composant Slint : boutons standard.
+msgid "Yes"
+msgstr "Oui"
+
+# Composant Slint : boutons standard.
+msgid "No"
+msgstr "Non"
+
+# Composant Slint : boutons standard.
+msgid "Abort"
+msgstr "Abandonner"
+
+# Composant Slint : boutons standard.
+msgid "Retry"
+msgstr "Réessayer"
+
+# Composant Slint : boutons standard.
+msgid "Ignore"
+msgstr "Ignorer"
+
+# Composant Slint : sélecteur de date (titre de la saisie au clavier).
+msgid "Enter date"
+msgstr "Saisir une date"
+
+# Composant Slint : sélecteur de date.
+msgid "Next month"
+msgstr "Mois suivant"
+
+# Composant Slint : sélecteur de date.
+msgid "Previous month"
+msgstr "Mois précédent"
+
+# Composant Slint : sélecteur de date (bascule calendrier / saisie au clavier).
+msgid "Toggle selection mode"
+msgstr "Basculer entre calendrier et saisie"
+
+# Composant Slint : sélecteur de date, initiale du jour.
+msgctxt "One-letter abbrev for Monday"
+msgid "M"
+msgstr "L"
+
+# Composant Slint : sélecteur de date, initiale du jour.
+msgctxt "One-letter abbrev for Tuesday"
+msgid "T"
+msgstr "M"
+
+# Composant Slint : sélecteur de date, initiale du jour.
+msgctxt "One-letter abbrev for Wednesday"
+msgid "W"
+msgstr "M"
+
+# Composant Slint : sélecteur de date, initiale du jour.
+msgctxt "One-letter abbrev for Thursday"
+msgid "T"
+msgstr "J"
+
+# Composant Slint : sélecteur de date, initiale du jour.
+msgctxt "One-letter abbrev for Friday"
+msgid "F"
+msgstr "V"
+
+# Composant Slint : sélecteur de date, initiale du jour.
+msgctxt "One-letter abbrev for Saturday"
+msgid "S"
+msgstr "S"
+
+# Composant Slint : sélecteur de date, initiale du jour.
+msgctxt "One-letter abbrev for Sunday"
+msgid "S"
+msgstr "D"
+
+# Composant Slint : sélecteur d'heure (lecteur d'écran).
+msgid "hour"
+msgstr "heure"
+
+# Composant Slint : sélecteur d'heure (lecteur d'écran).
+msgid "minute"
+msgstr "minute"
+
+# Composant Slint : sélecteur d'heure (lecteur d'écran).
+msgid "AM or PM"
+msgstr "AM ou PM"
+
+# Composant Slint : sélecteur d'heure (lecteur d'écran) : valeur, puis
+# nombre de graduations du cadran (12, 24 ou 60).
+msgid "{} Hours or minutes of {}"
+msgstr "{} sur un cadran de {}"
+
+# Pluriel de l'interface, recopié du code.
+#: polyptyque-app/ui/components.slint:494
+msgid "{n} perdue"
+msgid_plural "{n} perdues"
+msgstr[0] "{n} perdue"
+msgstr[1] "{n} perdues"

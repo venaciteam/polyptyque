@@ -96,7 +96,7 @@ fn describe(key: &Hotkey) -> String {
         parts.push("Ctrl".to_string());
     }
     if key.shift {
-        parts.push("Maj".to_string());
+        parts.push(tr::tr!("Maj"));
     }
     if key.alt {
         parts.push("Alt".to_string());

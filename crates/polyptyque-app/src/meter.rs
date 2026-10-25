@@ -225,7 +225,7 @@ impl MicMeter {
             .spawn(move || run_microphone(platform, device_clone, level_clone, stop_clone))
         {
             log::warn!("test du micro indisponible : {e}");
-            level.set_error(Some("Test du micro indisponible.".into()));
+            level.set_error(Some(tr::tr!("Test du micro indisponible.")));
         }
         Self { device, level, stop }
     }

@@ -8,6 +8,7 @@ mod convert;
 #[cfg(not(windows))]
 mod demo;
 mod format;
+mod i18n;
 mod meter;
 mod preview;
 mod update;
@@ -61,6 +62,7 @@ fn main() {
     };
     let log = init_logging();
     log::info!("Polyptyque {} (interface graphique)", env!("CARGO_PKG_VERSION"));
+    i18n::set_language(i18n::Language::system());
     if at_startup {
         log::info!("lancé par Windows à l'ouverture de session");
     }
@@ -69,7 +71,8 @@ fn main() {
     }
     if let Err(e) = launch(at_startup) {
         log::error!("{e:#}");
-        show_fatal(&format!("{e:#}\n\nJournal : {}", log.map(|p| p.display().to_string()).unwrap_or_default()));
+        let log = log.map(|p| p.display().to_string()).unwrap_or_default();
+        show_fatal(&tr::tr!("{}\n\nJournal : {}", format!("{e:#}"), log));
         std::process::exit(1);
     }
 }
@@ -110,7 +113,7 @@ fn show_fatal(message: &str) {
             .show();
     }
     #[cfg(not(windows))]
-    eprintln!("Erreur : {message}");
+    eprintln!("{}", tr::tr!("Erreur : {}", message));
 }
 
 fn init_logging() -> Option<PathBuf> {

@@ -16,6 +16,7 @@ use polyptyque_core::encoder::{bytes_per_hour, EncoderChoice};
 use polyptyque_core::level::RECENT_SOUND_HNS;
 use polyptyque_core::naming::{self, NameParts};
 use polyptyque_core::platform::{Nv12Frame, Platform};
+use tr::tr;
 
 use crate::audio_task::{AudioInput, AudioTask};
 use crate::output::{clock, OutputPlan, OutputTask};
@@ -207,8 +208,8 @@ impl Session {
     pub fn start(platform: Arc<dyn Platform>, plan: SessionPlan) -> Result<Session> {
         let settings = &plan.settings;
         fs::create_dir_all(&settings.output_dir)
-            .with_context(|| format!("création du dossier {}", settings.output_dir.display()))?;
-        fs::create_dir_all(&plan.log_dir).with_context(|| format!("création du dossier {}", plan.log_dir.display()))?;
+            .with_context(|| tr!("création du dossier {}", settings.output_dir.display()))?;
+        fs::create_dir_all(&plan.log_dir).with_context(|| tr!("création du dossier {}", plan.log_dir.display()))?;
         platform.begin_recording_session();
 
         let t0_hns = platform.now_hns();
@@ -230,14 +231,14 @@ impl Session {
             started: Instant::now(),
         };
         // Départ commun : toutes les sources partagent la même origine.
-        let (date, time) = naming::now_parts();
+        let (date, time) = naming::file_name_parts();
         for source in &plan.sources {
             session.launch(source, t0_hns, &date, &time);
         }
         if let Some(microphone) = plan.microphone {
             let runtime = session.spawn_runtime(
                 MICROPHONE_ID,
-                "Micro",
+                &tr!("Micro"),
                 Capture::Microphone(microphone.device_id),
                 t0_hns,
                 &date,
@@ -252,9 +253,9 @@ impl Session {
     /// maintenant). Refusé si elle enregistre déjà.
     pub fn add_source(&mut self, source: &Source) -> Result<()> {
         if self.is_recording(&source.id) {
-            bail!("« {} » enregistre déjà", source.name);
+            bail!(tr!("« {} » enregistre déjà", source.name));
         }
-        let (date, time) = naming::now_parts();
+        let (date, time) = naming::file_name_parts();
         let origin = self.platform.now_hns();
         self.launch(source, origin, &date, &time);
         Ok(())
@@ -389,7 +390,7 @@ impl Session {
         };
         match thread::Builder::new().name(format!("{name}-encodage")).spawn(encode) {
             Ok(handle) => runtime.output_thread = Some(handle),
-            Err(e) => shared.fail(format!("fil d'encodage : {e}")),
+            Err(e) => shared.fail(tr!("fil d'encodage : {}", e)),
         }
         if !shared.has_failed() {
             let input = match capture {
@@ -406,7 +407,7 @@ impl Session {
                     };
                     match thread::Builder::new().name(format!("{name}-video")).spawn(move || video_task.run()) {
                         Ok(handle) => runtime.capture_threads.push(handle),
-                        Err(e) => shared.fail(format!("fil vidéo : {e}")),
+                        Err(e) => shared.fail(tr!("fil vidéo : {}", e)),
                     }
                     AudioInput::Window
                 }
@@ -422,7 +423,7 @@ impl Session {
             };
             match thread::Builder::new().name(format!("{name}-audio")).spawn(move || audio_task.run()) {
                 Ok(handle) => runtime.capture_threads.push(handle),
-                Err(e) => shared.fail(format!("fil son : {e}")),
+                Err(e) => shared.fail(tr!("fil son : {}", e)),
             }
         }
         log::info!("[{name}] enregistrement vers {}", output.display());

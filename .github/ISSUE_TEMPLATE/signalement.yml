@@ -1,0 +1,48 @@
+name: Signaler un problème (en français)
+description: Quelque chose ne fonctionne pas comme prévu dans Polyptyque.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de prendre le temps de signaler ce problème. Le plus simple est de passer par Polyptyque : **Réglages › Signaler un problème…** prépare un rapport et ouvre cette page, champs du bas déjà remplis.
+
+        Un signalement est public. Le rapport masque le dossier personnel et le nom du compte Windows, mais les noms des scènes et des sources restent visibles : il peut être relu avant d'être joint.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Que s'est-il passé ?
+      description: Ce qui était en cours, ce qui était attendu, et ce qui s'est produit à la place.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Étapes pour reproduire
+      description: Si le problème se reproduit, ce qui y mène.
+      placeholder: |
+        1.
+        2.
+        3.
+  - type: textarea
+    id: report
+    attributes:
+      label: Rapport
+      description: Glisser ici le fichier du rapport préparé par Polyptyque (l'Explorateur s'ouvre, le fichier sélectionné).
+  - type: input
+    id: version
+    attributes:
+      label: Version de Polyptyque
+      placeholder: 1.0.0 (installée)
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Version de Windows
+      placeholder: Windows 11 Pro 24H2
+  - type: input
+    id: gpu
+    attributes:
+      label: Carte graphique
+      placeholder: NVIDIA GeForce RTX 3080

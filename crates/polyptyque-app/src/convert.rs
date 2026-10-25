@@ -14,6 +14,7 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, bail, Result};
 use polyptyque_core::platform::Platform;
 use polyptyque_engine::{probe, remux};
+use tr::tr;
 
 /// Marge d'espace disque gardée libre en plus de la taille du fichier.
 const DISK_MARGIN: u64 = 1_000_000_000;
@@ -149,12 +150,12 @@ fn convert_one(
     on_event: &dyn Fn(ConversionEvent),
 ) -> Result<PathBuf> {
     let ffmpeg = probe::locate_ffmpeg()
-        .ok_or_else(|| anyhow!("FFmpeg introuvable : ffmpeg.exe doit se trouver à côté de polyptyque.exe"))?;
-    let size = fs::metadata(input).map_err(|e| anyhow!("fichier inaccessible : {e}"))?.len();
+        .ok_or_else(|| anyhow!(tr!("FFmpeg introuvable : ffmpeg.exe doit se trouver à côté de polyptyque.exe")))?;
+    let size = fs::metadata(input).map_err(|e| anyhow!(tr!("fichier inaccessible : {}", e)))?.len();
     let dir = input.parent().unwrap_or(Path::new("."));
     if let Some(free) = platform.free_disk_space(dir) {
         if free < size.saturating_add(DISK_MARGIN) {
-            bail!("espace disque insuffisant pour la copie");
+            bail!(tr!("espace disque insuffisant pour la copie"));
         }
     }
     let mut last = Instant::now() - PROGRESS_INTERVAL;

@@ -11,3 +11,4 @@ anyhow.workspace = true
 crossbeam-channel.workspace = true
 log.workspace = true
 polyptyque-core.workspace = true
+tr.workspace = true

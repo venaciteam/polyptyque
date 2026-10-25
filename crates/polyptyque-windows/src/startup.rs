@@ -47,7 +47,7 @@ pub fn enable(exe: &Path, override_windows: bool) -> Result<()> {
             )
         };
         if status != ERROR_SUCCESS {
-            bail!("inscription au démarrage de Windows impossible (code {})", status.0);
+            bail!(tr::tr!("inscription au démarrage de Windows impossible (code {})", status.0));
         }
     }
     if override_windows && blocked_by_windows() {
@@ -121,7 +121,7 @@ pub fn blocked_by_windows() -> bool {
 fn delete(key: &str) -> Result<()> {
     let status = unsafe { RegDeleteKeyValueW(HKEY_CURRENT_USER, &HSTRING::from(key), &HSTRING::from(VALUE)) };
     if status != ERROR_SUCCESS && status != ERROR_FILE_NOT_FOUND {
-        bail!("modification du démarrage de Windows impossible (code {})", status.0);
+        bail!(tr::tr!("modification du démarrage de Windows impossible (code {})", status.0));
     }
     Ok(())
 }

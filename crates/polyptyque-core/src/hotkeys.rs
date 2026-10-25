@@ -1,10 +1,23 @@
 //! Raccourcis clavier globaux : format texte « Ctrl+Maj+F9 », lisible et
-//! enregistrable dans la configuration.
+//! enregistrable dans la configuration. Les deux langues sont lues
+//! (« Maj » ou « Shift ») : comparer deux raccourcis par [`parse`], pas par
+//! leur texte.
 
-/// Raccourcis proposés : Ctrl+Maj+F1 à F12. Ils n'entrent en conflit ni
-/// avec AltGr (Ctrl+Alt sur un clavier AZERTY) ni avec la saisie de texte.
+use tr::tr;
+
+/// Raccourcis proposés : Ctrl+Maj+F1 à F12, écrits dans la langue de
+/// l'interface. Ils n'entrent en conflit ni avec AltGr (Ctrl+Alt sur un
+/// clavier AZERTY) ni avec la saisie de texte.
 pub fn choices() -> Vec<String> {
-    (1..=12).map(|n| format!("Ctrl+Maj+F{n}")).collect()
+    (1..=12).map(|n| tr!("Ctrl+Maj+F{}", n)).collect()
+}
+
+/// Même raccourci, quelle que soit la langue dans laquelle il est écrit.
+pub fn same(a: &str, b: &str) -> bool {
+    match (parse(a), parse(b)) {
+        (Some(a), Some(b)) => a == b,
+        _ => a.eq_ignore_ascii_case(b),
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

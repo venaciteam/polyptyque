@@ -1,0 +1,48 @@
+name: Bug report
+description: Something in Polyptyque doesn’t work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. The quickest way is from Polyptyque itself: **Settings › Report a problem…** prepares a report file and opens this page with the details below already filled in.
+
+        Issues are public. The report hides your user folder and your Windows account name, but scene and source names stay visible: feel free to read it before attaching it.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What were you doing, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: If the problem happens again, what leads to it?
+      placeholder: |
+        1.
+        2.
+        3.
+  - type: textarea
+    id: report
+    attributes:
+      label: Report file
+      description: Drag the report file prepared by Polyptyque here (File Explorer opens with it selected).
+  - type: input
+    id: version
+    attributes:
+      label: Polyptyque version
+      placeholder: 1.0.0 (installed)
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: Windows 11 Pro 24H2
+  - type: input
+    id: gpu
+    attributes:
+      label: Graphics card
+      placeholder: NVIDIA GeForce RTX 3080

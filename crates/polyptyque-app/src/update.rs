@@ -40,7 +40,7 @@ mod imp {
     /// ignore sauf si `beta`.
     fn manager(beta: bool) -> Result<UpdateManager> {
         UpdateManager::new(GithubSource::new(REPOSITORY, None, beta), None, None)
-            .map_err(|e| anyhow!("Polyptyque n'a pas été installé par son installateur ({e})"))
+            .map_err(|e| anyhow!(tr::tr!("Polyptyque n'a pas été installé par son installateur ({})", e)))
     }
 
     pub fn check(beta: bool) -> Result<Option<Available>> {
@@ -63,7 +63,10 @@ mod imp {
         for percent in receiver {
             progress(f32::from(percent.clamp(0, 100)) / 100.0);
         }
-        worker.join().map_err(|_| anyhow!("erreur interne pendant le téléchargement"))?.map_err(|e| anyhow!("{e}"))
+        worker
+            .join()
+            .map_err(|_| anyhow!(tr::tr!("erreur interne pendant le téléchargement")))?
+            .map_err(|e| anyhow!("{e}"))
     }
 
     /// Quitte Polyptyque, installe la nouvelle version et la relance. Ne

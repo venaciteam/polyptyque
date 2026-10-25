@@ -19,8 +19,8 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, Context, Result};
 use polyptyque_core::browsers::{classify_executable, is_tor_browser, program_name};
 use polyptyque_core::config::{
-    BrowserFamily, BrowserRef, Codec, Config, HardwarePreference, PasteError, Scene, Settings, Source, SourceKind,
-    UpdateChannel,
+    BrowserFamily, BrowserRef, ClockChoice, Codec, Config, HardwarePreference, LanguageChoice, PasteError, Scene,
+    Settings, Source, SourceKind, UpdateChannel,
 };
 use polyptyque_core::encoder::{bytes_per_hour, EncoderChoice};
 use polyptyque_core::hotkeys;
@@ -33,6 +33,7 @@ use polyptyque_engine::remux;
 use polyptyque_engine::resolve::{self, PrepareEvent};
 use polyptyque_engine::{probe, MicrophonePlan, Session, SessionPlan, SourceState, SourceStatus, SourceSummary};
 use slint::{CloseRequestResponse, ComponentHandle, Image, Model, ModelRc, SharedString, Timer, TimerMode, VecModel};
+use tr::tr;
 
 use polyptyque_core::schedule::{self, Planner, Slot};
 
@@ -43,6 +44,7 @@ use crate::preview::{self, PreviewManager, PreviewState};
 use crate::update;
 use crate::{AppWindow, Bridge, IncidentFile, SceneItem, ScheduleItem, SourceCard, SourceItem, WindowItem};
 
+mod report;
 mod scheduling;
 use scheduling::Prompt;
 
@@ -70,7 +72,9 @@ const UPDATES_OFF: i32 = 2;
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Raison affichée par Windows si l'on éteint pendant un enregistrement.
 #[cfg(windows)]
-const SHUTDOWN_REASON: &str = "Enregistrement en cours : arrête-le dans Polyptyque pour finaliser les fichiers.";
+fn shutdown_reason() -> String {
+    tr!("Enregistrement en cours : l'arrêter dans Polyptyque pour finaliser les fichiers.")
+}
 
 const RESOLUTIONS: [(u32, u32); 4] = [(1280, 720), (1920, 1080), (2560, 1440), (3840, 2160)];
 const FRAME_RATES: [u32; 5] = [24, 25, 30, 50, 60];
@@ -207,6 +211,8 @@ pub struct App {
     mic_choices: RefCell<Vec<(String, String)>>,
     /// Un problème de micro a déjà été signalé pendant cet enregistrement.
     mic_warned: Cell<bool>,
+    /// Signalement d'un problème en cours.
+    report: RefCell<report::ReportState>,
     /// Nouvelle version trouvée, et où en est son installation.
     update: RefCell<Option<update::Available>>,
     update_state: Cell<UpdateState>,
@@ -241,6 +247,8 @@ pub struct App {
     editing_schedule: RefCell<Option<String>>,
     schedule_scene_ids: RefCell<Vec<String>>,
     schedule_days: Rc<VecModel<bool>>,
+    /// Années de la liste « Année » du formulaire.
+    schedule_years: RefCell<Vec<i32>>,
     /// Lancé par Windows à l'ouverture de session : la fenêtre est réduite
     /// dès qu'elle existe.
     minimize_pending: Cell<bool>,
@@ -302,7 +310,8 @@ pub struct Paths {
 /// `at_startup` : lancé par Windows à l'ouverture de session (réduit, sans
 /// ouvrir les fenêtres de la scène).
 pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, at_startup: bool) -> Result<()> {
-    let ui = AppWindow::new().context("création de la fenêtre")?;
+    let ui = AppWindow::new().context(tr!("création de la fenêtre"))?;
+    crate::i18n::apply_to_ui(crate::i18n::Language::current());
     let (mut config, warning) = match initial {
         Some(config) => (config, None),
         None => Config::load_or_default(&paths.config),
@@ -357,6 +366,7 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
         copied_source: RefCell::new(None),
         mic_choices: RefCell::new(Vec::new()),
         mic_warned: Cell::new(false),
+        report: RefCell::new(report::ReportState::default()),
         update: RefCell::new(None),
         update_state: Cell::new(UpdateState::None),
         update_checking: Cell::new(false),
@@ -377,6 +387,7 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
         editing_schedule: RefCell::new(None),
         schedule_scene_ids: RefCell::new(Vec::new()),
         schedule_days: Rc::new(VecModel::from(vec![false; 7])),
+        schedule_years: RefCell::new(Vec::new()),
         minimize_pending: Cell::new(at_startup),
     });
     APP.with(|a| *a.borrow_mut() = Some(app.clone()));
@@ -387,7 +398,7 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
     let bridge = ui.global::<Bridge>();
     // Version portable : on le signale, avec l'emplacement de ses données.
     let version = match paths::portable_root() {
-        Some(_) => format!("{VERSION} · portable"),
+        Some(_) => tr!("{} · portable", VERSION),
         None => VERSION.to_string(),
     };
     bridge.set_version(version.into());
@@ -396,6 +407,7 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
     bridge.set_schedules(ModelRc::from(app.schedule_items.clone()));
     bridge.set_schedule_days(ModelRc::from(app.schedule_days.clone()));
     bridge.set_can_browse(cfg!(windows));
+    app.apply_language_and_clock();
     app.refresh_all();
     app.restart_previews();
     app.register_hotkeys();
@@ -411,7 +423,7 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
     if let Some(message) = warning {
         app.toast(&message, 2);
     } else if let Some(version) = crate::UPDATED_TO.get() {
-        app.toast(&format!("Polyptyque a été mis à jour : version {version}."), 1);
+        app.toast(&tr!("Polyptyque a été mis à jour : version {}.", version), 1);
     }
 
     ui.window()
@@ -434,7 +446,7 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
         with_app(|app| app.check_for_updates());
     });
 
-    ui.run().context("boucle de l'interface")?;
+    ui.run().context(tr!("boucle de l'interface"))?;
 
     app.previews.borrow_mut().stop();
     app.meters.borrow_mut().stop();
@@ -533,6 +545,18 @@ fn install_callbacks(ui: &AppWindow) {
     b.on_incident_resume(|| {
         with_app(|a| a.incident_resume());
     });
+    b.on_request_report(|from_incident| {
+        with_app(|a| a.request_report(from_incident));
+    });
+    b.on_prepare_report(|| {
+        with_app(|a| a.prepare_report());
+    });
+    b.on_open_report(|| {
+        with_app(|a| a.open_report());
+    });
+    b.on_open_report_page(|| {
+        with_app(|a| a.open_report_page());
+    });
     b.on_toggle_source(|id| {
         with_app(|a| a.toggle_source(&id));
     });
@@ -590,6 +614,9 @@ fn install_callbacks(ui: &AppWindow) {
     b.on_schedule_times_edited(|| {
         with_app(|a| a.schedule_times_edited());
     });
+    b.on_schedule_date_edited(|| {
+        with_app(|a| a.schedule_date_edited());
+    });
     b.on_toggle_schedule_day(|index| {
         with_app(|a| a.toggle_schedule_day(index));
     });
@@ -633,7 +660,7 @@ impl App {
         config.normalize();
         if let Err(e) = config.save(&self.config_path) {
             drop(config);
-            self.toast(&format!("Impossible d'enregistrer la configuration : {e:#}"), 3);
+            self.toast(&tr!("Impossible d'enregistrer la configuration : {}", format!("{e:#}")), 3);
         }
     }
 
@@ -660,7 +687,7 @@ impl App {
             .map(|s| {
                 let kind = match config.scenes_with(&s.id).len() {
                     0 | 1 => s.kind_label(),
-                    n => format!("{} · {n} scènes", s.kind_label()),
+                    n => tr!("{} · {n} scènes", s.kind_label(), n),
                 };
                 SourceItem {
                     id: s.id.as_str().into(),
@@ -677,11 +704,11 @@ impl App {
                 id: s.id.as_str().into(),
                 name: s.name.as_str().into(),
                 kind: s.kind_label().into(),
-                state: if previews { "Recherche…" } else { "En attente" }.into(),
+                state: if previews { tr!("Recherche…") } else { tr!("En attente") }.into(),
                 tone: 0,
                 preview: Image::default(),
                 has_preview: false,
-                placeholder: if previews { "Recherche de la fenêtre…" } else { "Aperçu désactivé" }.into(),
+                placeholder: if previews { tr!("Recherche de la fenêtre…") } else { tr!("Aperçu désactivé") }.into(),
                 level: 0.0,
                 sound: false,
                 size: "".into(),
@@ -755,13 +782,13 @@ impl App {
     fn refresh_encoder_text(&self) {
         let config = self.config.borrow();
         let video = &config.settings.video;
-        let text = format!(
+        let text = tr!(
             "{}x{} · {} i/s · {} · {} kb/s",
             video.width,
             video.height,
             video.fps,
             video.codec.label(),
-            video.bitrate_kbps
+            format::integer(u64::from(video.bitrate_kbps))
         );
         drop(config);
         self.with_bridge(|b| b.set_encoder_text(text.into()));
@@ -810,7 +837,7 @@ impl App {
             Some(free) => {
                 let autonomy = free as f64 / per_hour.max(1) as f64 * 3600.0;
                 (
-                    format!("{} libres · ≈ {} d'enregistrement", format::bytes(free), format::hours(autonomy)),
+                    tr!("{} libres · ≈ {} d'enregistrement", format::bytes(free), format::hours(autonomy)),
                     free < DISK_WARNING_THRESHOLD || free < per_hour,
                 )
             }
@@ -821,7 +848,7 @@ impl App {
             b.set_disk_warning(warning);
         });
         if self.recording() && free.is_some_and(|free| free < DISK_STOP_THRESHOLD) {
-            self.stop_recording(Some("Disque presque plein : arrêt automatique.".into()));
+            self.stop_recording(Some(tr!("Disque presque plein : arrêt automatique.")));
         }
     }
 
@@ -998,11 +1025,13 @@ impl App {
                 }
                 if let Some(state) = state {
                     let (label, tone, placeholder, can_open) = match &state {
-                        PreviewState::Searching => ("Recherche…", 0, "Recherche de la fenêtre…".to_string(), false),
-                        PreviewState::Live => ("Fenêtre trouvée", 1, String::new(), false),
-                        PreviewState::Minimized => ("Réduite", 2, "Fenêtre réduite : l'image est figée.".into(), false),
-                        PreviewState::Missing => ("Introuvable", 2, "Fenêtre introuvable".into(), true),
-                        PreviewState::Failed(e) => ("Aperçu impossible", 3, e.clone(), false),
+                        PreviewState::Searching => (tr!("Recherche…"), 0, tr!("Recherche de la fenêtre…"), false),
+                        PreviewState::Live => (tr!("Fenêtre trouvée"), 1, String::new(), false),
+                        PreviewState::Minimized => {
+                            (tr!("Réduite"), 2, tr!("Fenêtre réduite : l'image est figée."), false)
+                        }
+                        PreviewState::Missing => (tr!("Introuvable"), 2, tr!("Fenêtre introuvable"), true),
+                        PreviewState::Failed(e) => (tr!("Aperçu impossible"), 3, e.clone(), false),
                     };
                     if !matches!(state, PreviewState::Live | PreviewState::Minimized) {
                         card.has_preview = false;
@@ -1030,7 +1059,7 @@ impl App {
         self.save();
         self.refresh_all();
         self.restart_previews();
-        self.toast(if enabled { "Aperçus en direct activés." } else { "Aperçus en direct coupés." }, 1);
+        self.toast(&if enabled { tr!("Aperçus en direct activés.") } else { tr!("Aperçus en direct coupés.") }, 1);
     }
 
     // ----- Enregistrement --------------------------------------------------
@@ -1059,16 +1088,16 @@ impl App {
             sources.retain(|s| s.id == id);
         }
         if sources.is_empty() {
-            self.toast("Ajoute d'abord au moins une source à cette scène.", 2);
+            self.toast(&tr!("Ajouter d'abord au moins une source à cette scène."), 2);
             self.flush_pending_repairs();
             return;
         }
         self.close_sheet();
-        self.set_busy("Recherche du meilleur encodeur…");
+        self.set_busy(&tr!("Recherche du meilleur encodeur…"));
         let platform = self.platform.clone();
         thread::spawn(move || {
             let result = catch_unwind(AssertUnwindSafe(|| prepare(platform.as_ref(), &config, &sources)))
-                .unwrap_or_else(|_| Err(anyhow!("erreur interne pendant la préparation (voir le journal)")));
+                .unwrap_or_else(|_| Err(anyhow!(tr!("erreur interne pendant la préparation (voir le journal)"))));
             post(move |app| app.finish_start(result, config, scene, sources));
         });
     }
@@ -1082,7 +1111,7 @@ impl App {
         let prepared = match result {
             Ok(prepared) => prepared,
             Err(e) => {
-                self.toast(&format!("Impossible de démarrer : {e:#}"), 3);
+                self.toast(&tr!("Impossible de démarrer : {}", format!("{e:#}")), 3);
                 self.recording_start_failed();
                 self.flush_pending_repairs();
                 self.show_next_deferred();
@@ -1128,13 +1157,13 @@ impl App {
                 *self.session.borrow_mut() = Some(session);
                 self.start_session_record(record);
                 let video = &config.settings.video;
-                let text = format!(
+                let text = tr!(
                     "{} · {}x{} · {} i/s · {} kb/s",
                     prepared.encoder.label(),
                     video.width,
                     video.height,
                     video.fps,
-                    video.bitrate_kbps
+                    format::integer(u64::from(video.bitrate_kbps))
                 );
                 self.with_bridge(|b| {
                     b.set_recording(true);
@@ -1153,19 +1182,21 @@ impl App {
                     });
                 }
                 let (message, tone) = if let Some(note) = &prepared.output_note {
-                    (format!("Enregistrement démarré. {note}"), 2)
+                    (tr!("Enregistrement démarré. {}", note), 2)
                 } else if prepared.missing.is_empty() {
                     let message = match sources.as_slice() {
                         [single] if scene.source_ids.len() > 1 => {
-                            format!("Enregistrement de « {} » démarré.", single.name)
+                            tr!("Enregistrement de « {} » démarré.", single.name)
                         }
-                        _ => "Enregistrement démarré.".to_string(),
+                        _ => tr!("Enregistrement démarré."),
                     };
                     (message, 1)
                 } else {
                     (
-                        format!(
-                            "Enregistrement démarré. Fenêtre(s) introuvable(s) : {}. Image noire en attendant leur retour.",
+                        tr!(
+                            "Enregistrement démarré. Fenêtre introuvable : {}. Image noire en attendant son retour."
+                                | "Enregistrement démarré. Fenêtres introuvables : {}. Image noire en attendant leur retour."
+                                % prepared.missing.len(),
                             prepared.missing.join(", ")
                         ),
                         2,
@@ -1176,7 +1207,7 @@ impl App {
                 self.recording_started(&message, tone);
             }
             Err(e) => {
-                self.toast(&format!("Impossible de démarrer : {e:#}"), 3);
+                self.toast(&tr!("Impossible de démarrer : {}", format!("{e:#}")), 3);
                 self.recording_start_failed();
                 self.flush_pending_repairs();
                 self.show_next_deferred();
@@ -1207,11 +1238,11 @@ impl App {
             }
             self.set_card(id, |card| {
                 card.busy = true;
-                card.state = "Finalisation…".into();
+                card.state = tr!("Finalisation…").into();
                 card.tone = 0;
             });
             self.toast(
-                &format!("« {} » arrêtée : son fichier est finalisé, les autres sources continuent.", source.name),
+                &tr!("« {} » arrêtée : son fichier est finalisé, les autres sources continuent.", source.name),
                 1,
             );
         } else {
@@ -1225,7 +1256,7 @@ impl App {
         self.joining.borrow_mut().insert(source.id.clone());
         self.set_card(&source.id, |card| {
             card.busy = true;
-            card.state = "Préparation…".into();
+            card.state = tr!("Préparation…").into();
             card.tone = 0;
         });
         let platform = self.platform.clone();
@@ -1260,10 +1291,10 @@ impl App {
                     card.can_restore = false;
                 });
                 if missing.is_empty() {
-                    self.toast(&format!("« {} » enregistre (nouveau fichier).", source.name), 1);
+                    self.toast(&tr!("« {} » enregistre (nouveau fichier).", source.name), 1);
                 } else {
                     self.toast(
-                        &format!(
+                        &tr!(
                             "« {} » enregistre, mais sa fenêtre est introuvable : image noire en attendant.",
                             source.name
                         ),
@@ -1274,7 +1305,7 @@ impl App {
             Ok(false) => self.set_card(&source.id, |card| card.busy = false),
             Err(e) => {
                 self.set_card(&source.id, |card| card.busy = false);
-                self.toast(&format!("Impossible d'ajouter « {} » : {e:#}", source.name), 3);
+                self.toast(&tr!("Impossible d'ajouter « {} » : {}", source.name, format!("{e:#}")), 3);
                 // Plus rien n'enregistre : l'enregistrement se termine.
                 let idle = self.session.borrow().as_ref().is_some_and(|s| s.recording_count() == 0);
                 if idle && self.joining.borrow().is_empty() {
@@ -1301,11 +1332,11 @@ impl App {
         // Les sources en préparation n'ont plus d'enregistrement à rejoindre.
         self.session_number.set(self.session_number.get() + 1);
         self.joining.borrow_mut().clear();
-        self.set_busy("Arrêt : finalisation des fichiers…");
+        self.set_busy(&tr!("Arrêt : finalisation des fichiers…"));
         let handle = thread::spawn(move || {
             let (summaries, reason, clean) = match catch_unwind(AssertUnwindSafe(move || session.stop())) {
                 Ok(summaries) => (summaries, reason, true),
-                Err(_) => (Vec::new(), Some("Erreur interne pendant l'arrêt (voir le journal).".to_string()), false),
+                Err(_) => (Vec::new(), Some(tr!("Erreur interne pendant l'arrêt (voir le journal).")), false),
             };
             post(move |app| app.finish_stop(summaries, reason, clean));
         });
@@ -1329,7 +1360,7 @@ impl App {
         self.with_bridge(|b| {
             b.set_recording(false);
             b.set_mic_recording(false);
-            b.set_mic_text("Micro".into());
+            b.set_mic_text(tr!("Micro").into());
             b.set_mic_tone(0);
         });
         self.refresh_all();
@@ -1343,7 +1374,7 @@ impl App {
             self.close_sheet();
         }
         let errors: Vec<String> =
-            summaries.iter().filter_map(|s| s.error.as_ref().map(|e| format!("{} : {e}", s.name))).collect();
+            summaries.iter().filter_map(|s| s.error.as_ref().map(|e| tr!("{} : {}", s.name, e))).collect();
         let total: u64 = summaries.iter().map(|s| s.file_size).sum();
         // Dossier réel des fichiers (celui de secours si le dossier choisi
         // était inaccessible).
@@ -1354,7 +1385,11 @@ impl App {
             .display()
             .to_string();
         let count: usize = summaries.iter().map(|s| s.outputs.len()).sum();
-        let mut message = format!("{count} fichier(s) enregistré(s), {} au total, dans {dir}.", format::bytes(total));
+        let mut message = tr!(
+            "{n} fichier enregistré, {} au total, dans {}." | "{n} fichiers enregistrés, {} au total, dans {}." % count,
+            format::bytes(total),
+            dir
+        );
         if let Some(reason) = reason {
             message = format!("{reason} {message}");
         }
@@ -1362,14 +1397,15 @@ impl App {
             let files: Vec<PathBuf> =
                 summaries.iter().flat_map(|s| s.outputs.iter().filter(|p| p.exists()).cloned()).collect();
             if !files.is_empty() {
-                message.push_str(" Conversion MP4 lancée.");
+                message.push(' ');
+                message.push_str(&tr!("Conversion MP4 lancée."));
                 self.enqueue_conversions(files);
             }
         }
         if errors.is_empty() {
             self.toast(&message, 1);
         } else {
-            self.toast(&format!("{message} Problèmes : {}", errors.join(" · ")), 3);
+            self.toast(&tr!("{} Problèmes : {}", message, errors.join(" · ")), 3);
         }
         self.flush_pending_repairs();
         if clean {
@@ -1441,7 +1477,7 @@ impl App {
                         card.busy = false;
                         card.can_open = false;
                         card.can_restore = false;
-                        card.state = "Fichier terminé".into();
+                        card.state = tr!("Fichier terminé").into();
                         card.tone = 0;
                         card.warning = SharedString::new();
                     }
@@ -1453,13 +1489,13 @@ impl App {
                 card.recording = status.state != SourceState::Failed;
                 card.busy = status.state == SourceState::Finishing;
                 let (state, tone) = match status.state {
-                    SourceState::Connected => ("Enregistre", 1),
-                    SourceState::Minimized => ("Réduite (image figée)", 2),
-                    SourceState::Searching => ("En attente de la fenêtre", 2),
-                    SourceState::Lost => ("Fenêtre perdue", 2),
-                    SourceState::Failed => ("Erreur", 3),
-                    SourceState::Finishing => ("Finalisation…", 0),
-                    SourceState::Finished => ("Terminée", 0),
+                    SourceState::Connected => (tr!("Enregistre"), 1),
+                    SourceState::Minimized => (tr!("Réduite (image figée)"), 2),
+                    SourceState::Searching => (tr!("En attente de la fenêtre"), 2),
+                    SourceState::Lost => (tr!("Fenêtre perdue"), 2),
+                    SourceState::Failed => (tr!("Erreur"), 3),
+                    SourceState::Finishing => (tr!("Finalisation…"), 0),
+                    SourceState::Finished => (tr!("Terminée"), 0),
                 };
                 card.state = state.into();
                 card.tone = tone;
@@ -1472,9 +1508,9 @@ impl App {
                 card.warning = if let Some(error) = &status.error {
                     error.as_str().into()
                 } else if status.backlog_seconds >= BACKLOG_WARNING_SECONDS {
-                    format!("L'encodeur prend du retard ({:.0} s)", status.backlog_seconds).into()
+                    tr!("L'encodeur prend du retard ({} s)", format!("{:.0}", status.backlog_seconds)).into()
                 } else if status.part > 1 {
-                    format!("Encodeur relancé : partie {} en cours", status.part).into()
+                    tr!("Encodeur relancé : partie {} en cours", status.part).into()
                 } else {
                     SharedString::new()
                 };
@@ -1537,10 +1573,7 @@ impl App {
                     Ok(false) => {}
                     Ok(true) => {
                         log::info!("[{}] fenêtre perdue : programme rouvert automatiquement", source.name);
-                        app.toast(
-                            &format!("La fenêtre de « {} » a disparu : réouverture automatique.", source.name),
-                            2,
-                        );
+                        app.toast(&tr!("La fenêtre de « {} » a disparu : réouverture automatique.", source.name), 2);
                     }
                     Err(e) => log::warn!("[{}] réouverture automatique impossible : {e:#}", source.name),
                 });
@@ -1622,12 +1655,13 @@ impl App {
             Deferred::Incident(record, reports) => self.present_incident(record, reports),
             Deferred::Repair(files) => self.ask(
                 Confirm::RepairFiles(files.clone()),
-                "Fichiers à réparer",
-                &format!(
-                    "{} fichier(s) n'ont pas été fermés correctement (encodeur arrêté de force). Ils se lisent, mais sans durée ni index. Les réparer maintenant, sans perte de qualité ?",
-                    files.len()
+                &tr!("Fichiers à réparer"),
+                &tr!(
+                    "{n} fichier n'a pas été fermé correctement (encodeur arrêté de force). Il se lit, mais sans durée ni index. Le réparer maintenant, sans perte de qualité ?"
+                        | "{n} fichiers n'ont pas été fermés correctement (encodeur arrêté de force). Ils se lisent, mais sans durée ni index. Les réparer maintenant, sans perte de qualité ?"
+                        % files.len()
                 ),
-                "Réparer",
+                &tr!("Réparer"),
             ),
         }
     }
@@ -1687,19 +1721,31 @@ impl App {
             .map(|(path, _)| path.clone())
             .collect();
         let text = match &record {
-            Some(r) => format!(
-                "{} pendant l'enregistrement commencé le {} à {} (scène « {} »). {}",
-                if r.ended_by_windows {
-                    "Windows s'est éteint, a redémarré ou a fermé la session"
+            Some(r) => {
+                let (date, time) = (display_date(&r.date), display_time(&r.time));
+                let cause = if r.ended_by_windows {
+                    tr!(
+                        "Windows s'est éteint, a redémarré ou a fermé la session pendant l'enregistrement commencé le {} à {} (scène « {} »).",
+                        date,
+                        time,
+                        r.scene_name
+                    )
                 } else {
-                    "Polyptyque s'est fermé"
-                },
-                display_date(&r.date),
-                r.time,
-                r.scene_name,
-                if reports.is_empty() { "Aucun fichier n'avait encore été écrit." } else { "État des fichiers :" }
-            ),
-            None => "Polyptyque s'est fermé pendant un enregistrement, mais son journal est illisible : vérifie les fichiers dans le dossier d'enregistrement.".to_string(),
+                    tr!(
+                        "Polyptyque s'est fermé pendant l'enregistrement commencé le {} à {} (scène « {} »).",
+                        date,
+                        time,
+                        r.scene_name
+                    )
+                };
+                let files = if reports.is_empty() {
+                    tr!("Aucun fichier n'avait encore été écrit.")
+                } else {
+                    tr!("État des fichiers :")
+                };
+                format!("{cause} {files}")
+            }
+            None => tr!("Polyptyque s'est fermé pendant un enregistrement, mais son journal est illisible : vérifier les fichiers dans le dossier d'enregistrement."),
         };
         let files: Vec<IncidentFile> = reports
             .iter()
@@ -1739,7 +1785,7 @@ impl App {
             return;
         }
         self.with_bridge(|b| b.set_incident_can_repair(false));
-        self.toast(&format!("Réparation de {} fichier(s) lancée.", files.len()), 1);
+        self.toast(&tr!("Réparation de {n} fichier lancée." | "Réparation de {n} fichiers lancée." % files.len()), 1);
         self.enqueue_jobs(files, JobKind::Repair);
     }
 
@@ -1779,7 +1825,7 @@ impl App {
                 *self.update.borrow_mut() = Some(available);
                 self.set_update_state(UpdateState::Available);
                 self.toast(
-                    &format!("Polyptyque {version} est disponible : clique sur la pastille en haut pour l'installer."),
+                    &tr!("Polyptyque {} est disponible : un clic sur la pastille en haut l'installe.", version),
                     1,
                 );
             }
@@ -1794,9 +1840,9 @@ impl App {
         let version = self.update.borrow().as_ref().map(|u| u.version.clone()).unwrap_or_default();
         let (key, text) = match state {
             UpdateState::None => ("", String::new()),
-            UpdateState::Available => ("available", format!("Version {version} disponible")),
-            UpdateState::Downloading => ("downloading", "Téléchargement de la mise à jour…".to_string()),
-            UpdateState::Ready => ("ready", format!("Redémarrer pour passer à la version {version}")),
+            UpdateState::Available => ("available", tr!("Version {} disponible", version)),
+            UpdateState::Downloading => ("downloading", tr!("Téléchargement de la mise à jour…")),
+            UpdateState::Ready => ("ready", tr!("Redémarrer pour passer à la version {}", version)),
         };
         self.with_bridge(|b| {
             b.set_update_state(key.into());
@@ -1806,11 +1852,11 @@ impl App {
 
     /// Une mise à jour ne doit jamais interrompre un enregistrement ou une
     /// conversion. Renvoie le message à afficher sinon.
-    fn update_blocked(&self) -> Option<&'static str> {
+    fn update_blocked(&self) -> Option<String> {
         if self.recording() || self.busy.get() {
-            Some("La mise à jour pourra être installée une fois l'enregistrement arrêté.")
+            Some(tr!("La mise à jour pourra être installée une fois l'enregistrement arrêté."))
         } else if self.with_bridge_value(|b| b.get_converting()) {
-            Some("La mise à jour pourra être installée une fois la conversion MP4 terminée.")
+            Some(tr!("La mise à jour pourra être installée une fois la conversion MP4 terminée."))
         } else {
             None
         }
@@ -1823,18 +1869,18 @@ impl App {
         match self.update_state.get() {
             UpdateState::Available => {
                 if let Some(message) = self.update_blocked() {
-                    self.toast(message, 2);
+                    self.toast(&message, 2);
                     return;
                 }
                 self.ask(
                     Confirm::InstallUpdate,
-                    "Mettre à jour Polyptyque",
-                    &format!(
+                    &tr!("Mettre à jour Polyptyque"),
+                    &tr!(
                         "Télécharger la version {} ({}) puis redémarrer Polyptyque ? Scènes, réglages et connexions des navigateurs sont conservés.",
                         available.version,
                         format::bytes(available.size)
                     ),
-                    "Mettre à jour",
+                    &tr!("Mettre à jour"),
                 );
             }
             UpdateState::Ready => self.apply_update(),
@@ -1852,7 +1898,7 @@ impl App {
             let result = catch_unwind(AssertUnwindSafe(|| {
                 update::download(&available, &|progress| {
                     post(move |app| {
-                        let text = format!("Téléchargement de la mise à jour · {:.0} %", progress * 100.0);
+                        let text = tr!("Téléchargement de la mise à jour · {} %", format!("{:.0}", progress * 100.0));
                         app.with_bridge(|b| {
                             b.set_update_progress(progress);
                             b.set_update_text(text.into());
@@ -1860,7 +1906,7 @@ impl App {
                     })
                 })
             }))
-            .unwrap_or_else(|_| Err(anyhow!("erreur interne")));
+            .unwrap_or_else(|_| Err(anyhow!(tr!("erreur interne"))));
             post(move |app| app.on_update_downloaded(result));
         });
     }
@@ -1872,7 +1918,7 @@ impl App {
                 match self.update_blocked() {
                     None => self.apply_update(),
                     Some(_) => self.toast(
-                        "Mise à jour téléchargée : clique sur la pastille une fois l'enregistrement terminé, ou elle s'installera au prochain démarrage.",
+                        &tr!("Mise à jour téléchargée : un clic sur la pastille l'installe une fois l'enregistrement terminé ; sinon, elle s'installera au prochain démarrage."),
                         1,
                     ),
                 }
@@ -1880,7 +1926,7 @@ impl App {
             Err(e) => {
                 log::warn!("téléchargement de la mise à jour : {e:#}");
                 self.set_update_state(UpdateState::Available);
-                self.toast(&format!("Téléchargement de la mise à jour impossible : {e:#}"), 3);
+                self.toast(&tr!("Téléchargement de la mise à jour impossible (détail dans le journal)."), 3);
             }
         }
     }
@@ -1888,7 +1934,7 @@ impl App {
     /// Ferme Polyptyque, installe la nouvelle version et la relance.
     fn apply_update(&self) {
         if let Some(message) = self.update_blocked() {
-            self.toast(message, 2);
+            self.toast(&message, 2);
             return;
         }
         let Some(available) = self.update.borrow().clone() else {
@@ -1898,7 +1944,7 @@ impl App {
         self.previews.borrow_mut().stop();
         if let Err(e) = update::apply(&available) {
             log::warn!("installation de la mise à jour : {e:#}");
-            self.toast(&format!("Installation de la mise à jour impossible : {e:#}"), 3);
+            self.toast(&tr!("Installation de la mise à jour impossible (détail dans le journal)."), 3);
         }
     }
 
@@ -1906,11 +1952,11 @@ impl App {
 
     fn show_microphone(&self, status: &SourceStatus) {
         let (text, tone) = match status.state {
-            SourceState::Connected => ("Micro", 1),
-            SourceState::Searching => ("Micro : ouverture…", 0),
-            SourceState::Lost => ("Micro indisponible", 3),
-            SourceState::Failed => ("Micro : erreur", 3),
-            SourceState::Minimized | SourceState::Finishing | SourceState::Finished => ("Micro", 0),
+            SourceState::Connected => (tr!("Micro"), 1),
+            SourceState::Searching => (tr!("Micro : ouverture…"), 0),
+            SourceState::Lost => (tr!("Micro indisponible"), 3),
+            SourceState::Failed => (tr!("Micro : erreur"), 3),
+            SourceState::Minimized | SourceState::Finishing | SourceState::Finished => (tr!("Micro"), 0),
         };
         let level = format::level(status.audio_level);
         self.with_bridge(|b| {
@@ -1923,14 +1969,14 @@ impl App {
         if tone == 3 && !self.mic_warned.get() {
             if let Some(error) = &status.error {
                 self.mic_warned.set(true);
-                self.toast(&format!("Micro : {error}"), 3);
+                self.toast(&tr!("Micro : {}", error), 3);
             }
         }
     }
 
     fn open_mic_privacy(&self) {
         if let Err(e) = Command::new("explorer").arg("ms-settings:privacy-microphone").spawn() {
-            self.toast(&format!("Impossible d'ouvrir les paramètres de Windows : {e}"), 3);
+            self.toast(&tr!("Impossible d'ouvrir les paramètres de Windows : {}", e), 3);
         }
     }
 
@@ -1951,13 +1997,16 @@ impl App {
         match (count, skipped) {
             (0, 0) => {}
             (0, _) => self.toast(
-                "Ces fichiers sont en cours d'enregistrement : convertis-les une fois l'enregistrement arrêté.",
+                &tr!("Ces fichiers sont en cours d'enregistrement : ils pourront être convertis une fois l'enregistrement arrêté."),
                 2,
             ),
-            (_, 0) => self.toast(&format!("{count} fichier(s) ajouté(s) à la conversion MP4."), 1),
+            (_, 0) => self.toast(&added_to_conversion(count), 1),
             (_, _) => self.toast(
                 &format!(
-                    "{count} fichier(s) ajouté(s) à la conversion MP4 ; {skipped} en cours d'enregistrement ignoré(s)."
+                    "{} {}",
+                    added_to_conversion(count),
+                    tr!("{n} fichier en cours d'enregistrement a été ignoré."
+                        | "{n} fichiers en cours d'enregistrement ont été ignorés." % skipped)
                 ),
                 2,
             ),
@@ -1970,8 +2019,8 @@ impl App {
             return Vec::new();
         };
         let mut dialog = rfd::FileDialog::new()
-            .set_title("Fichiers à convertir en MP4")
-            .add_filter("Enregistrements Polyptyque (MKV, MKA)", &["mkv", "mka"])
+            .set_title(tr!("Fichiers à convertir en MP4"))
+            .add_filter(tr!("Enregistrements Polyptyque (MKV, MKA)"), &["mkv", "mka"])
             .set_parent(&ui.window().window_handle());
         if dir.exists() {
             dialog = dialog.set_directory(dir);
@@ -1992,7 +2041,7 @@ impl App {
             })
             .unwrap_or_default();
         if files.is_empty() {
-            self.toast("Aucun fichier MKV à convertir dans le dossier des enregistrements.", 2);
+            self.toast(&tr!("Aucun fichier MKV à convertir dans le dossier des enregistrements."), 2);
         }
         files
     }
@@ -2004,7 +2053,7 @@ impl App {
     fn enqueue_jobs(&self, files: Vec<PathBuf>, kind: JobKind) {
         let converter = self.converter.borrow();
         let Some(converter) = converter.as_ref() else {
-            self.toast("La conversion n'est pas disponible (voir le journal).", 3);
+            self.toast(&tr!("La conversion n'est pas disponible (voir le journal)."), 3);
             return;
         };
         let mut progress = self.conversion.borrow_mut();
@@ -2029,7 +2078,7 @@ impl App {
                 log::info!("traitement de {}", input.display());
                 self.conversion.borrow_mut().repairing = kind == JobKind::Repair;
                 if kind == JobKind::Repair {
-                    self.set_incident_detail(&input, "Réparation en cours…".into());
+                    self.set_incident_detail(&input, tr!("Réparation en cours…"));
                 }
                 let text = conversion_text(&self.conversion.borrow(), 0.0);
                 self.with_bridge(|b| {
@@ -2048,8 +2097,8 @@ impl App {
             ConversionEvent::Finished { input, result } => {
                 if self.conversion.borrow().repairing {
                     let detail = match &result {
-                        Ok(_) => "Réparé : prêt pour le montage".to_string(),
-                        Err(e) => format!("Échec de la réparation : {e}"),
+                        Ok(_) => tr!("Réparé : prêt pour le montage"),
+                        Err(e) => tr!("Échec de la réparation : {}", e),
                     };
                     self.set_incident_detail(&input, detail);
                 }
@@ -2060,7 +2109,7 @@ impl App {
                     Err(_) if progress.cancelled => {}
                     Err(e) => {
                         let name = input.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-                        progress.failures.push(format!("{name} : {e}"));
+                        progress.failures.push(tr!("{} : {}", name, e));
                     }
                 }
             }
@@ -2074,28 +2123,39 @@ impl App {
                     self.close_sheet();
                 }
                 let what = if progress.repairs == progress.total {
-                    "Réparation"
+                    tr!("Réparation")
                 } else if progress.repairs == 0 {
-                    "Conversion MP4"
+                    tr!("Conversion MP4")
                 } else {
-                    "Conversion et réparation"
+                    tr!("Conversion et réparation")
                 };
+                let done = progress.succeeded;
                 if progress.cancelled {
                     self.toast(
-                        &format!("{what} annulée ({} fichier(s) traités avant l'arrêt).", progress.succeeded),
+                        &tr!(
+                            "{} : annulée, {n} fichier traité avant l'arrêt."
+                                | "{} : annulée, {n} fichiers traités avant l'arrêt." % done,
+                            what
+                        ),
                         2,
                     );
                 } else if progress.failures.is_empty() {
                     self.toast(
-                        &format!("{what} terminée : {} fichier(s) prêts pour le montage.", progress.succeeded),
+                        &tr!(
+                            "{} : terminée, {n} fichier prêt pour le montage."
+                                | "{} : terminée, {n} fichiers prêts pour le montage." % done,
+                            what
+                        ),
                         1,
                     );
                 } else {
+                    let failed = progress.failures.len();
                     self.toast(
-                        &format!(
-                            "{what} : {} réussite(s), {} échec(s). {}",
-                            progress.succeeded,
-                            progress.failures.len(),
+                        &tr!(
+                            "{} : {}, {}. {}",
+                            what,
+                            tr!("{n} réussite" | "{n} réussites" % done),
+                            tr!("{n} échec" | "{n} échecs" % failed),
                             progress.failures.join(" · ")
                         ),
                         3,
@@ -2112,11 +2172,13 @@ impl App {
         };
         self.ask(
             Confirm::CancelConversion,
-            "Annuler la conversion",
-            &format!(
-                "Arrêter la conversion MP4 ({remaining} fichier(s) restant(s)) ? Le fichier en cours de conversion est effacé ; les MKV d'origine ne sont pas touchés."
+            &tr!("Annuler la conversion"),
+            &tr!(
+                "Arrêter la conversion MP4 ({n} fichier restant) ? Le fichier en cours de conversion est effacé ; les MKV d'origine ne sont pas touchés."
+                    | "Arrêter la conversion MP4 ({n} fichiers restants) ? Le fichier en cours de conversion est effacé ; les MKV d'origine ne sont pas touchés."
+                    % remaining
             ),
-            "Arrêter la conversion",
+            &tr!("Arrêter la conversion"),
         );
     }
 
@@ -2142,7 +2204,7 @@ impl App {
     }
 
     fn open_scene_sheet_duplicate(&self) {
-        let name = format!("{} (copie)", self.config.borrow().active_scene().name);
+        let name = tr!("{} (copie)", self.config.borrow().active_scene().name);
         self.with_bridge(|b| {
             b.set_scene_name_input(name.into());
             b.set_sheet("scene-duplicate".into());
@@ -2159,7 +2221,7 @@ impl App {
         let bridge = ui.global::<Bridge>();
         let name = bridge.get_scene_name_input().trim().to_string();
         if name.is_empty() {
-            self.toast("Indique un nom de scène.", 2);
+            self.toast(&tr!("Nom de scène manquant."), 2);
             return;
         }
         let mode = bridge.get_sheet();
@@ -2195,34 +2257,35 @@ impl App {
             let config = self.config.borrow();
             (config.active_scene.clone(), config.active_scene().name.clone())
         };
-        let schedules = match self.scene_schedule_count(&id) {
-            0 => String::new(),
-            1 => " Sa programmation aussi.".to_string(),
-            n => format!(" Ses {n} programmations aussi."),
-        };
         // Les sources partagées avec d'autres scènes y restent.
         let (total, only_here) = {
             let config = self.config.borrow();
             (config.scene(&id).map_or(0, |s| s.source_ids.len()), config.sources_only_in(&id).len())
         };
-        let sources = if total == 0 {
-            format!("La scène « {name} » sera supprimée.")
+        let mut text = vec![if total == 0 {
+            tr!("La scène « {} » sera supprimée.", name)
         } else if only_here == 0 {
-            format!("La scène « {name} » sera supprimée. Ses sources restent dans les autres scènes.")
+            tr!("La scène « {} » sera supprimée. Ses sources restent dans les autres scènes.", name)
         } else if only_here == total {
-            format!("La scène « {name} » et ses sources seront supprimées.")
+            tr!("La scène « {} » et ses sources seront supprimées.", name)
         } else {
-            let gone = match only_here {
-                1 => "la source qui n'est".to_string(),
-                n => format!("les {n} sources qui ne sont"),
-            };
-            format!("La scène « {name} » sera supprimée, ainsi que {gone} dans aucune autre scène.")
-        };
+            tr!(
+                "La scène « {} » sera supprimée, ainsi que la source qui n'est dans aucune autre scène."
+                    | "La scène « {} » sera supprimée, ainsi que les {n} sources qui ne sont dans aucune autre scène."
+                        % only_here,
+                name
+            )
+        }];
+        let schedules = self.scene_schedule_count(&id);
+        if schedules > 0 {
+            text.push(tr!("Sa programmation aussi." | "Ses {n} programmations aussi." % schedules));
+        }
+        text.push(tr!("Les profils de navigateur restent sur le disque."));
         self.ask(
             Confirm::DeleteScene,
-            "Supprimer la scène",
-            &format!("{sources}{schedules} Les profils de navigateur restent sur le disque."),
-            "Supprimer",
+            &tr!("Supprimer la scène"),
+            &text.join(" "),
+            &tr!("Bouton : supprimer une scène" => "Supprimer"),
         );
     }
 
@@ -2231,12 +2294,12 @@ impl App {
     fn open_browser_sheet(&self) {
         let browsers = self.platform.detect_browsers();
         let mut choices: Vec<SharedString> = browsers.iter().map(|b| b.name.as_str().into()).collect();
-        choices.push("Autre navigateur…".into());
+        choices.push(tr!("Autre navigateur…").into());
         let count = self.config.borrow().active_scene().source_ids.len() + 1;
         let default_name = browsers
             .first()
             .map(|b| format!("{} {count}", b.name.split_whitespace().last().unwrap_or(&b.name)))
-            .unwrap_or_else(|| format!("Navigateur {count}"));
+            .unwrap_or_else(|| tr!("Navigateur {}", count));
         *self.browsers.borrow_mut() = browsers;
         self.with_bridge(|b| {
             b.set_browser_choices(ModelRc::new(VecModel::from(choices)));
@@ -2265,21 +2328,24 @@ impl App {
                 None => {
                     let path = PathBuf::from(bridge.get_browser_path().trim().trim_matches('"'));
                     if !path.exists() {
-                        self.toast("Ce fichier de navigateur n'existe pas.", 3);
+                        self.toast(&tr!("Ce fichier de navigateur n'existe pas."), 3);
                         return;
                     }
                     if is_tor_browser(&path) {
-                        self.toast("Tor Browser s'ajoute comme source application (il efface tout à la fermeture).", 2);
+                        self.toast(
+                            &tr!("Tor Browser s'ajoute comme source application (il efface tout à la fermeture)."),
+                            2,
+                        );
                         return;
                     }
                     let family = classify_executable(&path).unwrap_or(BrowserFamily::Chromium);
-                    let name = program_name(&path).map(|n| format::capitalize(&n)).unwrap_or("Navigateur".into());
+                    let name = program_name(&path).map(|n| format::capitalize(&n)).unwrap_or_else(|| tr!("Navigateur"));
                     BrowserRef { name, exe_path: path, family }
                 }
             }
         };
         if bridge.get_new_name().trim().is_empty() {
-            self.toast("Indique un nom pour cette source.", 2);
+            self.toast(&tr!("Nom de source manquant."), 2);
             return;
         }
         let url = bridge.get_new_url().to_string();
@@ -2299,13 +2365,17 @@ impl App {
         if open_now {
             match resolve::launch(&source) {
                 Ok(()) => self.toast(
-                    &format!("« {name} » ajoutée. Connecte-toi et prépare tes onglets : tout sera conservé."),
+                    &tr!(
+                        "« {} » ajoutée : les connexions et les onglets préparés dans ce navigateur seront conservés.",
+                        name
+                    ),
                     1,
                 ),
-                Err(e) => self.toast(&format!("« {name} » ajoutée, mais le navigateur ne s'ouvre pas : {e:#}"), 3),
+                Err(e) => self
+                    .toast(&tr!("« {} » ajoutée, mais le navigateur ne s'ouvre pas : {}", name, format!("{e:#}")), 3),
             }
         } else {
-            self.toast(&format!("« {name} » ajoutée."), 1);
+            self.toast(&tr!("« {} » ajoutée.", name), 1);
         }
     }
 
@@ -2361,7 +2431,7 @@ impl App {
             return;
         };
         if bridge.get_new_name().trim().is_empty() {
-            self.toast("Indique un nom pour cette source.", 2);
+            self.toast(&tr!("Nom de source manquant."), 2);
             return;
         }
         let source =
@@ -2372,7 +2442,7 @@ impl App {
         self.save();
         self.refresh_all();
         self.restart_previews();
-        self.toast(&format!("« {name} » ajoutée."), 1);
+        self.toast(&tr!("« {} » ajoutée.", name), 1);
     }
 
     /// Source de la scène active.
@@ -2398,20 +2468,29 @@ impl App {
                 .scenes_with(&source.id)
                 .into_iter()
                 .filter(|s| s.id != config.active_scene)
-                .map(|s| format!("« {} »", s.name))
+                .map(|s| tr!("« {} »", s.name))
                 .collect()
         };
         let text = if others.is_empty() {
-            let detail = if source.is_browser() { " Son profil de navigateur reste sur le disque." } else { "" };
-            format!("La source « {} » sera supprimée.{detail}", source.name)
+            let removed = tr!("La source « {} » sera supprimée.", source.name);
+            if source.is_browser() {
+                format!("{removed} {}", tr!("Son profil de navigateur reste sur le disque."))
+            } else {
+                removed
+            }
         } else {
-            format!(
+            tr!(
                 "La source « {} » sera retirée de cette scène seulement : elle reste dans {}.",
                 source.name,
                 format::join_list(&others)
             )
         };
-        self.ask(Confirm::RemoveSource(source.id.clone()), "Supprimer la source", &text, "Supprimer");
+        self.ask(
+            Confirm::RemoveSource(source.id.clone()),
+            &tr!("Supprimer la source"),
+            &text,
+            &tr!("Bouton : retirer une source" => "Supprimer"),
+        );
     }
 
     /// Mémorise la source sélectionnée, pour la coller dans une autre scène.
@@ -2423,7 +2502,7 @@ impl App {
         *self.copied_source.borrow_mut() = Some(source.id.clone());
         let can_paste = self.can_paste();
         self.with_bridge(|b| b.set_can_paste(can_paste));
-        self.toast(&format!("« {} » copiée : colle-la dans une autre scène avec Ctrl+V.", source.name), 1);
+        self.toast(&tr!("« {} » copiée, prête à être collée dans une autre scène (Ctrl+V).", source.name), 1);
     }
 
     /// La source copiée existe encore et n'est pas déjà dans la scène active
@@ -2440,14 +2519,14 @@ impl App {
     /// fenêtre, même profil de navigateur), pas une copie.
     fn paste_source(&self) {
         if self.recording() {
-            self.toast("Arrête l'enregistrement pour coller une source.", 2);
+            self.toast(&tr!("Impossible de coller une source pendant un enregistrement."), 2);
             return;
         }
         if self.busy.get() {
             return;
         }
         let Some(id) = self.copied_source.borrow().clone() else {
-            self.toast("Copie d'abord une source (Ctrl+C), puis colle-la ici (Ctrl+V).", 2);
+            self.toast(&tr!("Copier d'abord une source (Ctrl+C), puis la coller ici (Ctrl+V)."), 2);
             return;
         };
         let result = self.config.borrow_mut().paste_source(&id);
@@ -2462,14 +2541,15 @@ impl App {
                 self.refresh_all();
                 self.with_bridge(|b| b.set_selected_source(index));
                 self.restart_previews();
-                self.toast(&format!("« {name} » collée dans « {scene} » : c'est la même source, partagée."), 1);
+                self.toast(&tr!("« {} » collée dans « {} » : c'est la même source, partagée.", name, scene), 1);
             }
-            Err(PasteError::AlreadyInScene) => self
-                .toast(&format!("« {name} » est déjà dans cette scène : une même source n'y figure qu'une fois."), 2),
+            Err(PasteError::AlreadyInScene) => {
+                self.toast(&tr!("« {} » est déjà dans cette scène : une même source n'y figure qu'une fois.", name), 2)
+            }
             Err(PasteError::Missing) => {
                 self.copied_source.borrow_mut().take();
                 self.refresh_all();
-                self.toast("La source copiée a été supprimée entre-temps.", 2);
+                self.toast(&tr!("La source copiée a été supprimée entre-temps."), 2);
             }
         }
     }
@@ -2505,20 +2585,23 @@ impl App {
         };
         if let SourceKind::Application { exe_path, .. } = &source.kind {
             if !exe_path.exists() {
-                self.toast(&format!("Programme introuvable ({}) : ouvre la fenêtre toi-même.", exe_path.display()), 2);
+                self.toast(
+                    &tr!("Programme introuvable ({}) : la fenêtre est à ouvrir à la main.", exe_path.display()),
+                    2,
+                );
                 return;
             }
         }
         match resolve::launch_once(&source) {
-            Ok(true) => self.toast(&format!("Ouverture de « {} »…", source.name), 1),
+            Ok(true) => self.toast(&tr!("Ouverture de « {} »…", source.name), 1),
             Ok(false) => self.toast(
-                &format!(
-                    "« {} » est déjà en train de s'ouvrir (ou de se fermer) : patiente quelques secondes.",
+                &tr!(
+                    "« {} » est déjà en train de s'ouvrir (ou de se fermer) : patienter quelques secondes.",
                     source.name
                 ),
                 2,
             ),
-            Err(e) => self.toast(&format!("Impossible d'ouvrir « {} » : {e:#}", source.name), 3),
+            Err(e) => self.toast(&tr!("Impossible d'ouvrir « {} » : {}", source.name, format!("{e:#}")), 3),
         }
     }
 
@@ -2529,7 +2612,7 @@ impl App {
     fn open_scene_windows(&self, auto: bool) {
         if self.opening_windows.get() {
             if !auto {
-                self.toast("Les fenêtres de la scène sont déjà en train de s'ouvrir.", 1);
+                self.toast(&tr!("Les fenêtres de la scène sont déjà en train de s'ouvrir."), 1);
             }
             return;
         }
@@ -2538,7 +2621,7 @@ impl App {
         if sources.is_empty() {
             if !auto {
                 self.toast(
-                    "Aucune fenêtre à ouvrir : seuls les navigateurs, et les applications avec « Relancer », s'ouvrent depuis Polyptyque.",
+                    &tr!("Aucune fenêtre à ouvrir : seuls les navigateurs, et les applications avec « Relancer », s'ouvrent depuis Polyptyque."),
                     2,
                 );
             }
@@ -2553,7 +2636,7 @@ impl App {
                 resolve::prepare_windows(platform.as_ref(), &sources, LAUNCH_WAIT, |event| match event {
                     PrepareEvent::Launching(source) => {
                         if opening.is_empty() {
-                            post(|app| app.toast("Ouverture des fenêtres de la scène…", 1));
+                            post(|app| app.toast(&tr!("Ouverture des fenêtres de la scène…"), 1));
                         }
                         opening.push(source.name.clone());
                     }
@@ -2574,16 +2657,23 @@ impl App {
         self.opening_windows.set(false);
         if !failed.is_empty() {
             self.toast(
-                &format!("Impossible d'ouvrir : {} (programme introuvable ? voir le journal).", failed.join(", ")),
+                &tr!("Impossible d'ouvrir : {} (programme introuvable ? voir le journal).", failed.join(", ")),
                 3,
             );
         } else if !missing.is_empty() {
-            self.toast(&format!("Fenêtre(s) toujours absente(s) après 30 s : {}.", missing.join(", ")), 2);
+            self.toast(
+                &tr!(
+                    "Fenêtre toujours absente après 30 s : {}."
+                        | "Fenêtres toujours absentes après 30 s : {}." % missing.len(),
+                    missing.join(", ")
+                ),
+                2,
+            );
         } else if !opening.is_empty() {
             log::info!("fenêtres de la scène ouvertes : {}", opening.join(", "));
-            self.toast(&format!("{} fenêtre(s) ouverte(s).", opening.len()), 1);
+            self.toast(&tr!("{n} fenêtre ouverte." | "{n} fenêtres ouvertes." % opening.len()), 1);
         } else if !auto {
-            self.toast("Toutes les fenêtres de la scène sont déjà ouvertes.", 1);
+            self.toast(&tr!("Toutes les fenêtres de la scène sont déjà ouvertes."), 1);
         }
     }
 
@@ -2609,14 +2699,14 @@ impl App {
             });
             let result = match handle {
                 Some(handle) => platform.restore_window(handle),
-                None => Err(anyhow!("fenêtre introuvable")),
+                None => Err(anyhow!(tr!("fenêtre introuvable"))),
             };
             post(move |app| match result {
                 Ok(()) => {
                     log::info!("[{}] fenêtre rétablie à la demande", source.name);
-                    app.toast(&format!("Fenêtre de « {} » rétablie.", source.name), 1);
+                    app.toast(&tr!("Fenêtre de « {} » rétablie.", source.name), 1);
                 }
-                Err(e) => app.toast(&format!("Impossible de rétablir « {} » : {e:#}", source.name), 3),
+                Err(e) => app.toast(&tr!("Impossible de rétablir « {} » : {}", source.name, format!("{e:#}")), 3),
             });
         });
     }
@@ -2630,22 +2720,22 @@ impl App {
         let resolution_index = match RESOLUTIONS.iter().position(|&r| r == (s.video.width, s.video.height)) {
             Some(i) => i,
             None => {
-                resolutions.push(format!("{} × {} (personnalisée)", s.video.width, s.video.height).into());
+                resolutions.push(tr!("{} × {} (personnalisée)", s.video.width, s.video.height).into());
                 resolutions.len() - 1
             }
         };
-        let mut fps: Vec<SharedString> = FRAME_RATES.iter().map(|f| format!("{f} i/s").into()).collect();
+        let mut fps: Vec<SharedString> = FRAME_RATES.iter().map(|f| tr!("{} i/s", f).into()).collect();
         let fps_index = match FRAME_RATES.iter().position(|&f| f == s.video.fps) {
             Some(i) => i,
             None => {
-                fps.push(format!("{} i/s (personnalisé)", s.video.fps).into());
+                fps.push(tr!("{} i/s (personnalisé)", s.video.fps).into());
                 fps.len() - 1
             }
         };
         // Liste commune aux trois raccourcis, valeurs personnalisées comprises.
-        let mut hotkey_list: Vec<String> = std::iter::once("Aucun".to_string()).chain(hotkeys::choices()).collect();
+        let mut hotkey_list: Vec<String> = std::iter::once(tr!("Aucun")).chain(hotkeys::choices()).collect();
         for custom in [&s.hotkeys.toggle_recording, &s.hotkeys.show_window, &s.hotkeys.toggle_previews] {
-            if !custom.is_empty() && !hotkey_list.iter().any(|c| c.eq_ignore_ascii_case(custom)) {
+            if !custom.is_empty() && !hotkey_list.iter().any(|c| hotkeys::same(c, custom)) {
                 hotkey_list.push(custom.clone());
             }
         }
@@ -2653,14 +2743,14 @@ impl App {
             if value.is_empty() {
                 return 0;
             }
-            hotkey_list.iter().position(|c| c.eq_ignore_ascii_case(value)).map_or(0, |i| i as i32)
+            hotkey_list.iter().position(|c| hotkeys::same(c, value)).map_or(0, |i| i as i32)
         };
         let mut audio_choices: Vec<SharedString> =
-            AUDIO_BITRATES.iter().map(|a| SharedString::from(format!("{a} kb/s"))).collect();
+            AUDIO_BITRATES.iter().map(|a| SharedString::from(tr!("{} kb/s", a))).collect();
         let audio_index = match AUDIO_BITRATES.iter().position(|&a| a == s.audio.bitrate_kbps) {
             Some(i) => i,
             None => {
-                audio_choices.push(format!("{} kb/s (personnalisé)", s.audio.bitrate_kbps).into());
+                audio_choices.push(tr!("{} kb/s (personnalisé)", s.audio.bitrate_kbps).into());
                 audio_choices.len() - 1
             }
         };
@@ -2686,15 +2776,25 @@ impl App {
             hotkey_index(&s.hotkeys.toggle_previews),
         );
         let hotkey_choices: Vec<SharedString> = hotkey_list.into_iter().map(Into::into).collect();
+        let language_index = match s.language {
+            LanguageChoice::Auto => 0,
+            LanguageChoice::French => 1,
+            LanguageChoice::English => 2,
+        };
+        let clock_index = match s.clock {
+            ClockChoice::Auto => 0,
+            ClockChoice::H24 => 1,
+            ClockChoice::H12 => 2,
+        };
         // Micros : celui de Windows par défaut, puis ceux qui sont branchés ;
         // un micro choisi mais débranché reste proposé.
-        let mut mics: Vec<(String, String)> = vec![(String::new(), "Micro par défaut de Windows".into())];
+        let mut mics: Vec<(String, String)> = vec![(String::new(), tr!("Micro par défaut de Windows"))];
         mics.extend(self.platform.list_microphones().into_iter().map(|d| (d.id, d.name)));
         let mic = &s.microphone;
         let mic_index = match mics.iter().position(|(id, _)| *id == mic.device_id) {
             Some(index) => index,
             None => {
-                mics.push((mic.device_id.clone(), format!("{} (débranché)", mic.device_name)));
+                mics.push((mic.device_id.clone(), tr!("{} (débranché)", mic.device_name)));
                 mics.len() - 1
             }
         };
@@ -2712,8 +2812,8 @@ impl App {
             b.set_fps_index(values.3);
             b.set_bitrate_text(values.4.into());
             b.set_codec_choices(ModelRc::new(VecModel::from(vec![
-                SharedString::from("H.264 : compatibilité maximale (recommandé)"),
-                SharedString::from("HEVC : fichiers plus légers"),
+                SharedString::from(tr!("H.264 : compatibilité maximale (recommandé)")),
+                SharedString::from(tr!("HEVC : fichiers plus légers")),
             ])));
             b.set_codec_index(values.5);
             b.set_hardware_choices(ModelRc::new(VecModel::from(
@@ -2727,6 +2827,8 @@ impl App {
             b.set_settings_previews(values.10);
             b.set_settings_convert(values.11);
             b.set_settings_update_index(values.12);
+            b.set_settings_language_index(language_index);
+            b.set_settings_clock_index(clock_index);
             b.set_settings_open_windows(s_open_windows);
             b.set_settings_close_browsers(s_close_browsers);
             b.set_settings_startup(s_startup);
@@ -2750,7 +2852,7 @@ impl App {
             };
             let current = Some(ui.global::<Bridge>().get_output_dir().to_string());
             let mut dialog = rfd::FileDialog::new()
-                .set_title("Dossier des enregistrements")
+                .set_title(tr!("Dossier des enregistrements"))
                 .set_parent(&ui.window().window_handle());
             if let Some(dir) = current.filter(|d| std::path::Path::new(d).exists()) {
                 dialog = dialog.set_directory(dir);
@@ -2766,16 +2868,24 @@ impl App {
             return;
         };
         let b = ui.global::<Bridge>();
-        let bitrate: u32 = match b.get_bitrate_text().trim().replace([' ', '\u{a0}'], "").parse() {
+        // Séparateurs de milliers acceptés : espaces, et virgule en anglais
+        // (« 12,000 » ; en français, la virgule n'a pas ce sens).
+        let mut separators = vec![' ', '\u{a0}', '\u{202f}'];
+        if crate::i18n::Language::current() == crate::i18n::Language::English {
+            separators.push(',');
+        }
+        let bitrate: u32 = match b.get_bitrate_text().trim().replace(separators.as_slice(), "").parse() {
             Ok(value) if (250..=500_000).contains(&value) => value,
             _ => {
-                b.set_settings_error("Débit vidéo invalide : indique un nombre entre 250 et 500 000 kb/s.".into());
+                b.set_settings_error(
+                    tr!("Débit vidéo invalide : un nombre entre 250 et 500 000 kb/s est attendu.").into(),
+                );
                 return;
             }
         };
         let output_dir = b.get_output_dir().trim().trim_matches('"').to_string();
         if output_dir.is_empty() {
-            b.set_settings_error("Indique un dossier pour les enregistrements.".into());
+            b.set_settings_error(tr!("Dossier des enregistrements manquant.").into());
             return;
         }
         let choices: Vec<String> = b.get_hotkey_choices().iter().map(|c| c.to_string()).collect();
@@ -2793,7 +2903,7 @@ impl App {
         ];
         let assigned: Vec<&String> = chosen.iter().filter(|h| !h.is_empty()).collect();
         if (1..assigned.len()).any(|i| assigned[..i].contains(&assigned[i])) {
-            b.set_settings_error("Un même raccourci ne peut servir qu'à une seule action.".into());
+            b.set_settings_error(tr!("Un même raccourci ne peut servir qu'à une seule action.").into());
             return;
         }
         let previews_before;
@@ -2801,6 +2911,7 @@ impl App {
         let updates_before;
         let updates_after;
         let startup_changed;
+        let display_changed;
         {
             let mut config = self.config.borrow_mut();
             let s = &mut config.settings;
@@ -2841,6 +2952,19 @@ impl App {
             s.close_browsers_at_exit = b.get_settings_close_browsers();
             startup_changed = s.launch_at_startup != b.get_settings_startup();
             s.launch_at_startup = b.get_settings_startup();
+            let language = match b.get_settings_language_index() {
+                1 => LanguageChoice::French,
+                2 => LanguageChoice::English,
+                _ => LanguageChoice::Auto,
+            };
+            let clock = match b.get_settings_clock_index() {
+                1 => ClockChoice::H24,
+                2 => ClockChoice::H12,
+                _ => ClockChoice::Auto,
+            };
+            display_changed = (s.language, s.clock) != (language, clock);
+            s.language = language;
+            s.clock = clock;
             s.microphone.enabled = b.get_settings_mic();
             if let Some((id, name)) = self.mic_choices.borrow().get(b.get_mic_index().max(0) as usize) {
                 if *id != s.microphone.device_id {
@@ -2855,15 +2979,21 @@ impl App {
         }
         b.set_sheet("".into());
         self.save();
+        if display_changed {
+            self.apply_language_and_clock();
+        }
         self.refresh_all();
-        if previews_before != previews_after {
+        if previews_before != previews_after || display_changed {
             self.restart_previews();
+        }
+        if display_changed {
+            self.refresh_display_texts();
         }
         self.register_hotkeys();
         if startup_changed {
             self.apply_launch_at_startup(true);
         }
-        self.toast("Réglages enregistrés.", 1);
+        self.toast(&tr!("Réglages enregistrés."), 1);
         if updates_after != updates_before && updates_after != UPDATES_OFF {
             // Une version trouvée sur l'autre canal n'est plus proposée.
             if self.update_state.get() == UpdateState::Available {
@@ -2874,21 +3004,60 @@ impl App {
         }
     }
 
+    /// Langue et horloge des réglages, appliquées partout : textes de
+    /// l'interface, messages de toutes les crates, heures affichées.
+    fn apply_language_and_clock(&self) {
+        let (language, clock) = {
+            let config = self.config.borrow();
+            (config.settings.language, config.settings.clock)
+        };
+        let language = crate::i18n::Language::from_choice(language);
+        crate::i18n::set_language(language);
+        crate::i18n::apply_to_ui(language);
+        let twelve_hour = match clock {
+            ClockChoice::Auto => self.platform.uses_twelve_hour_clock(),
+            ClockChoice::H24 => false,
+            ClockChoice::H12 => true,
+        };
+        polyptyque_core::clock::set_twelve_hour(twelve_hour);
+        self.with_bridge(|b| {
+            b.set_twelve_hour(twelve_hour);
+            b.set_month_first(language == crate::i18n::Language::English);
+        });
+    }
+
+    /// Après un changement de langue ou d'horloge : textes calculés en Rust
+    /// et déjà affichés, recalculés (l'interface Slint suit d'elle-même).
+    fn refresh_display_texts(&self) {
+        if !self.recording() {
+            self.refresh_encoder_text();
+            self.with_bridge(|b| b.set_mic_text(tr!("Micro").into()));
+        }
+        self.refresh_disk(true);
+        self.refresh_schedule_texts();
+        self.set_update_state(self.update_state.get());
+        self.apply_launch_at_startup(false);
+    }
+
     fn open_output_folder(&self) {
         let dir = self.config.borrow().settings.output_dir.clone();
         if let Err(e) = fs::create_dir_all(&dir) {
-            self.toast(&format!("Impossible de créer {} : {e}", dir.display()), 3);
+            self.toast(&tr!("Impossible de créer {} : {}", dir.display(), e), 3);
             return;
         }
         let opener = if cfg!(windows) { "explorer" } else { "xdg-open" };
         if let Err(e) = Command::new(opener).arg(&dir).spawn() {
-            self.toast(&format!("Impossible d'ouvrir le dossier : {e}"), 3);
+            self.toast(&tr!("Impossible d'ouvrir le dossier : {}", e), 3);
         }
     }
 
     // ----- Fenêtres modales et confirmations --------------------------------
 
     fn close_sheet(&self) {
+        // Signalement ouvert depuis le bilan d'incident : retour au bilan.
+        if self.report_closing() {
+            return;
+        }
         self.confirm.borrow_mut().take();
         self.quit_with_schedules.set(false);
         if self.incident.borrow_mut().take().is_some() {
@@ -2997,37 +3166,38 @@ impl App {
 
     fn close_requested(&self) -> CloseRequestResponse {
         if self.busy.get() {
-            self.toast("Opération en cours : Polyptyque pourra être fermé dans un instant.", 2);
+            self.toast(&tr!("Opération en cours : Polyptyque pourra être fermé dans un instant."), 2);
             return CloseRequestResponse::KeepWindowShown;
         }
         if self.recording() {
             let owned = self.planner.borrow().owned().map(|slot| slot.end);
             let schedules = schedule::any_active(&self.config.borrow().schedules, chrono::Utc::now(), &chrono::Local);
             let mut text = match owned {
-                Some(end) => format!(
+                Some(end) => tr!(
                     "Un enregistrement programmé est en cours (jusqu'à {}). L'arrêter et quitter Polyptyque ? Les fichiers seront finalisés proprement, et il ne sera pas relancé dans ce créneau.",
                     schedule::clock_label(end, &chrono::Local)
                 ),
-                None => "Arrêter l'enregistrement et quitter Polyptyque ? Les fichiers seront finalisés proprement.".into(),
+                None => tr!("Arrêter l'enregistrement et quitter Polyptyque ? Les fichiers seront finalisés proprement."),
             };
             if schedules {
-                text.push_str(" Les programmations ne se lancent pas tant que Polyptyque est fermé.");
+                text.push(' ');
+                text.push_str(&tr!("Les programmations ne se lancent pas tant que Polyptyque est fermé."));
             }
-            self.ask(Confirm::QuitWhileRecording, "Enregistrement en cours", &text, "Arrêter et quitter");
+            self.ask(Confirm::QuitWhileRecording, &tr!("Enregistrement en cours"), &text, &tr!("Arrêter et quitter"));
             return CloseRequestResponse::KeepWindowShown;
         }
         if !self.quit_with_schedules.get() {
             if let Some(text) = self.quit_schedule_warning() {
-                self.ask(Confirm::QuitWithSchedules, "Programmation active", &text, "Quitter quand même");
+                self.ask(Confirm::QuitWithSchedules, &tr!("Programmation active"), &text, &tr!("Quitter quand même"));
                 return CloseRequestResponse::KeepWindowShown;
             }
         }
         if self.with_bridge_value(|b| b.get_converting()) {
             self.ask(
                 Confirm::QuitWhileConverting,
-                "Conversion en cours",
-                "Quitter maintenant interrompt la conversion MP4. Les fichiers MKV d'origine sont conservés : tu pourras les convertir plus tard.",
-                "Quitter quand même",
+                &tr!("Conversion en cours"),
+                &tr!("Quitter maintenant interrompt la conversion MP4. Les fichiers MKV d'origine sont conservés : ils pourront être convertis plus tard."),
+                &tr!("Quitter quand même"),
             );
             return CloseRequestResponse::KeepWindowShown;
         }
@@ -3137,7 +3307,7 @@ impl App {
             let (_, time) = naming::now_parts();
             *self.sleep_stop.borrow_mut() = Some((scene_id, time));
         }
-        self.stop_recording(Some("Mise en veille de l'ordinateur : enregistrement arrêté.".into()));
+        self.stop_recording(Some(tr!("Mise en veille de l'ordinateur : enregistrement arrêté.")));
     }
 
     #[cfg(windows)]
@@ -3149,11 +3319,12 @@ impl App {
         log::info!("sortie de veille : reprise de l'enregistrement proposée");
         self.ask(
             Confirm::ResumeAfterSleep(scene_id),
-            "Reprendre l'enregistrement ?",
-            &format!(
-                "L'enregistrement a été arrêté proprement à {time}, juste avant la mise en veille de l'ordinateur. Le reprendre maintenant (dans de nouveaux fichiers) ?"
+            &tr!("Reprendre l'enregistrement ?"),
+            &tr!(
+                "L'enregistrement a été arrêté proprement à {}, juste avant la mise en veille de l'ordinateur. Le reprendre maintenant (dans de nouveaux fichiers) ?",
+                display_time(&time)
             ),
-            "Reprendre",
+            &tr!("Reprendre"),
         );
     }
 
@@ -3201,7 +3372,7 @@ impl App {
             return;
         };
         if on {
-            if let Err(e) = polyptyque_windows::session_end::block(window, SHUTDOWN_REASON) {
+            if let Err(e) = polyptyque_windows::session_end::block(window, &shutdown_reason()) {
                 log::warn!("{e:#}");
             }
         } else {
@@ -3253,7 +3424,11 @@ impl App {
                 *self.hotkeys.borrow_mut() = Some(listener);
                 if !failed.is_empty() {
                     self.toast(
-                        &format!("Raccourci(s) déjà utilisé(s) par un autre programme : {}", failed.join(", ")),
+                        &tr!(
+                            "Raccourci déjà utilisé par un autre programme : {}"
+                                | "Raccourcis déjà utilisés par un autre programme : {}" % failed.len(),
+                            failed.join(", ")
+                        ),
                         2,
                     );
                 }
@@ -3270,14 +3445,14 @@ impl App {
 /// l'interface : peut durer plusieurs secondes).
 fn prepare(platform: &dyn Platform, config: &Config, sources: &[Source]) -> Result<Prepared> {
     let ffmpeg = probe::locate_ffmpeg()
-        .ok_or_else(|| anyhow!("FFmpeg introuvable : ffmpeg.exe doit se trouver à côté de polyptyque.exe"))?;
+        .ok_or_else(|| anyhow!(tr!("FFmpeg introuvable : ffmpeg.exe doit se trouver à côté de polyptyque.exe")))?;
     let video = &config.settings.video;
     let encoder = probe::select_encoder(platform, &ffmpeg, video.hardware, video.codec).ok_or_else(|| {
-        anyhow!(
-            "aucun encodeur {} utilisable avec le réglage « {} ». Essaie un autre matériel ou le format H.264.",
+        anyhow!(tr!(
+            "aucun encodeur {} utilisable avec le réglage « {} ». Essayer un autre matériel ou le format H.264.",
             video.codec.label(),
             video.hardware.label()
-        )
+        ))
     })?;
     // Dossier choisi inaccessible (disque débranché, autre PC) : dossier de
     // secours plutôt qu'un refus de démarrer.
@@ -3287,16 +3462,16 @@ fn prepare(platform: &dyn Platform, config: &Config, sources: &[Source]) -> Resu
     } else {
         let fallback = paths::default_output_dir();
         if !storage::dir_writable(&fallback) {
-            return Err(anyhow!("impossible d'écrire dans {} ni dans {}", chosen.display(), fallback.display()));
+            return Err(anyhow!(tr!("impossible d'écrire dans {} ni dans {}", chosen.display(), fallback.display())));
         }
         log::warn!("dossier {} inaccessible : enregistrement dans {}", chosen.display(), fallback.display());
-        let note = format!("Dossier {} inaccessible : enregistrement dans {}.", chosen.display(), fallback.display());
+        let note = tr!("Dossier {} inaccessible : enregistrement dans {}.", chosen.display(), fallback.display());
         (fallback, Some(note))
     };
-    post(|app| app.set_busy("Ouverture des fenêtres…"));
+    post(|app| app.set_busy(&tr!("Ouverture des fenêtres…")));
     let missing = resolve::prepare_windows(platform, sources, LAUNCH_WAIT, |event| {
         if let PrepareEvent::Launching(source) = event {
-            let text = format!("Ouverture de « {} »…", source.name);
+            let text = tr!("Ouverture de « {} »…", source.name);
             post(move |app| app.set_busy(&text));
         }
     });
@@ -3327,12 +3502,16 @@ fn same_file(a: &std::path::Path, b: &std::path::Path) -> bool {
 fn conversion_text(progress: &ConversionProgress, value: f32) -> String {
     let current = (progress.finished + 1).min(progress.total.max(1));
     let percent = (value * 100.0).round() as u32;
-    let what = if progress.repairing { "Réparation" } else { "MP4" };
-    if progress.total > 1 {
-        format!("{what} · {current} sur {} · {percent} %", progress.total)
-    } else {
-        format!("{what} · {percent} %")
+    match (progress.repairing, progress.total > 1) {
+        (true, true) => tr!("Réparation · {} sur {} · {} %", current, progress.total, percent),
+        (true, false) => tr!("Réparation · {} %", percent),
+        (false, true) => tr!("MP4 · {} sur {} · {} %", current, progress.total, percent),
+        (false, false) => tr!("MP4 · {} %", percent),
     }
+}
+
+fn added_to_conversion(count: usize) -> String {
+    tr!("{n} fichier ajouté à la conversion MP4." | "{n} fichiers ajoutés à la conversion MP4." % count)
 }
 
 /// Examine les fichiers d'un enregistrement interrompu.
@@ -3345,7 +3524,7 @@ fn inspect_interrupted(platform: &dyn Platform, files: &[PathBuf]) -> Vec<(PathB
                 Err(_) => FileReport::Missing,
                 Ok(meta) if meta.len() == 0 => FileReport::Empty,
                 Ok(meta) => match &ffmpeg {
-                    None => FileReport::Unreadable("FFmpeg introuvable".into()),
+                    None => FileReport::Unreadable(tr!("FFmpeg introuvable")),
                     Some(ffmpeg) => match remux::inspect(platform, ffmpeg, path) {
                         Ok(info) if remux::needs_repair(&info) => FileReport::NeedsRepair { size: meta.len() },
                         Ok(info) => FileReport::Complete { seconds: info.duration.unwrap_or(0.0), size: meta.len() },
@@ -3360,25 +3539,30 @@ fn inspect_interrupted(platform: &dyn Platform, files: &[PathBuf]) -> Vec<(PathB
 
 fn report_text(report: &FileReport) -> String {
     match report {
-        FileReport::Missing => "Introuvable : déplacé ou supprimé ?".into(),
-        FileReport::Empty => "Vide : rien n'avait été écrit".into(),
+        FileReport::Missing => tr!("Introuvable : déplacé ou supprimé ?"),
+        FileReport::Empty => tr!("Vide : rien n'avait été écrit"),
         FileReport::Complete { seconds, size } => {
-            format!(
+            tr!(
                 "Complet · {} · {}",
                 format::clock(Duration::try_from_secs_f64(*seconds).unwrap_or_default()),
                 format::bytes(*size)
             )
         }
-        FileReport::NeedsRepair { size } => format!("Interrompu, lisible, à réparer · {}", format::bytes(*size)),
-        FileReport::Unreadable(e) => format!("Illisible : {e}"),
+        FileReport::NeedsRepair { size } => tr!("Interrompu, lisible, à réparer · {}", format::bytes(*size)),
+        FileReport::Unreadable(e) => tr!("Illisible : {}", e),
     }
 }
 
-/// « 2026-10-21 » → « 21/10/2026 ».
+/// Date d'un journal (« 2026-10-21 ») écrite avec le nom du mois :
+/// « mer. 21 oct. » (« Wed, Oct 21 »).
 fn display_date(date: &str) -> String {
-    let parts: Vec<&str> = date.split('-').collect();
-    match parts.as_slice() {
-        [year, month, day] => format!("{day}/{month}/{year}"),
-        _ => date.to_string(),
+    match chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d") {
+        Ok(date) => polyptyque_core::clock::date(date, chrono::Local::now().date_naive()),
+        Err(_) => date.to_string(),
     }
+}
+
+/// Heure d'un journal (« 14h32 ») selon l'horloge : « 14:32 », « 2:32 PM ».
+fn display_time(time: &str) -> String {
+    schedule::TimeOfDay::parse(time).map_or_else(|| time.to_string(), schedule::TimeOfDay::label)
 }

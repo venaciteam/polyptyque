@@ -3,8 +3,21 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-/// Modèle par défaut : `2026-10-20_14h32_Podcast_Discord`.
+use chrono::format::{Item, StrftimeItems};
+use tr::tr;
+
+/// Modèle par défaut en français : `2026-10-20_14h32_Podcast_Discord`.
 pub const DEFAULT_TEMPLATE: &str = "{date}_{heure}_{scène}_{source}";
+
+/// Heure des noms de fichiers en français : `14h32`.
+const FILE_TIME_FORMAT: &str = "%Hh%M";
+
+/// Modèle par défaut d'une nouvelle configuration, dans la langue de
+/// l'interface (en anglais : `{date}_{time}_{scene}_{source}`). Les variables
+/// des deux langues sont reconnues ([`render`]).
+pub fn default_template() -> String {
+    tr!("{date}_{heure}_{scène}_{source}")
+}
 
 pub const TEMPLATE_HELP: &str = "Variables : {date} (2026-10-20), {heure} (14h32), {scène}, {source}";
 
@@ -15,10 +28,27 @@ pub struct NameParts<'a> {
     pub source: &'a str,
 }
 
-/// Date et heure locales au format utilisé dans les noms de fichiers.
+/// Date et heure locales, au format des journaux et des fichiers internes
+/// (indépendant de la langue).
 pub fn now_parts() -> (String, String) {
     let now = chrono::Local::now();
-    (now.format("%Y-%m-%d").to_string(), now.format("%Hh%M").to_string())
+    (now.format("%Y-%m-%d").to_string(), now.format(FILE_TIME_FORMAT).to_string())
+}
+
+/// Date et heure locales pour les noms des fichiers enregistrés : la date
+/// reste au format ISO dans toutes les langues (tri chronologique), l'heure
+/// reste sur 24 h, écrite à la façon de la langue (`14h32`, `14-32`).
+pub fn file_name_parts() -> (String, String) {
+    let now = chrono::Local::now();
+    // Format venu du catalogue : un format invalide ferait échouer
+    // l'affichage de chrono, on garde alors celui du français.
+    let translated = tr!("%Hh%M");
+    let format = if StrftimeItems::new(&translated).any(|item| matches!(item, Item::Error)) {
+        FILE_TIME_FORMAT
+    } else {
+        translated.as_str()
+    };
+    (now.format("%Y-%m-%d").to_string(), now.format(format).to_string())
 }
 
 /// Remplace les variables du modèle puis nettoie le résultat pour en faire

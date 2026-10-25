@@ -13,6 +13,7 @@ use anyhow::{Context, Result};
 use polyptyque_core::browsers::{command_line_uses_profile, file_stem, launch_args, window_class, GECKO_USER_JS};
 use polyptyque_core::config::{BrowserFamily, Source, SourceKind};
 use polyptyque_core::platform::{Platform, WindowInfo};
+use tr::tr;
 
 /// Retrouve la fenêtre d'une source parmi `windows` (ordre d'empilement).
 ///
@@ -221,11 +222,11 @@ pub fn profile_in_use(source: &Source) -> bool {
 /// Renvoie vrai s'il s'agit du tout premier lancement.
 pub fn prepare_profile(profile_dir: &Path, family: BrowserFamily) -> Result<bool> {
     let first_launch = !profile_dir.exists();
-    fs::create_dir_all(profile_dir).with_context(|| format!("création du profil {}", profile_dir.display()))?;
+    fs::create_dir_all(profile_dir).with_context(|| tr!("création du profil {}", profile_dir.display()))?;
     if family == BrowserFamily::Gecko {
         let user_js = profile_dir.join("user.js");
         if !user_js.exists() {
-            fs::write(&user_js, GECKO_USER_JS).with_context(|| format!("écriture de {}", user_js.display()))?;
+            fs::write(&user_js, GECKO_USER_JS).with_context(|| tr!("écriture de {}", user_js.display()))?;
         }
     }
     Ok(first_launch)
@@ -237,7 +238,7 @@ fn spawn_detached(exe: &Path, args: &[OsString]) -> Result<()> {
     if let Some(dir) = exe.parent().filter(|d| d.exists()) {
         command.current_dir(dir);
     }
-    command.spawn().with_context(|| format!("lancement de {}", exe.display()))?;
+    command.spawn().with_context(|| tr!("lancement de {}", exe.display()))?;
     Ok(())
 }
 

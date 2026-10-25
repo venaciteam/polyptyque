@@ -15,6 +15,7 @@ pub mod session_end;
 pub mod single_instance;
 pub mod startup;
 mod system;
+mod system_info;
 mod video;
 mod windows_list;
 
@@ -31,6 +32,14 @@ use polyptyque_core::platform::{
 /// indépendamment de l'enregistrement. À appeler depuis n'importe quel fil.
 pub fn keep_awake_for_schedules(on: bool) {
     system::keep_awake_for_schedules(on);
+}
+
+/// Langue des messages propres à Windows (voir [`polyptyque_core::i18n`]).
+pub fn set_catalog(catalog: Option<std::sync::Arc<polyptyque_core::i18n::Catalog>>) {
+    match catalog {
+        Some(catalog) => tr::set_translator!(catalog),
+        None => tr::set_translator!(polyptyque_core::i18n::French),
+    }
 }
 
 /// Pas de fenêtre de console pour FFmpeg.
@@ -133,5 +142,25 @@ impl Platform for WindowsPlatform {
 
     fn free_disk_space(&self, path: &Path) -> Option<u64> {
         system::free_space(path)
+    }
+
+    fn os_description(&self) -> String {
+        system_info::os_description()
+    }
+
+    fn graphics_adapters(&self) -> Vec<String> {
+        system_info::graphics_adapters()
+    }
+
+    fn uses_twelve_hour_clock(&self) -> bool {
+        system_info::uses_twelve_hour_clock()
+    }
+
+    fn shell_open(&self, target: &str) -> anyhow::Result<()> {
+        system_info::shell_open(target)
+    }
+
+    fn reveal_file(&self, path: &Path) -> anyhow::Result<()> {
+        system_info::reveal_file(path)
     }
 }

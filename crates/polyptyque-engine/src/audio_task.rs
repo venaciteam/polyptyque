@@ -44,10 +44,10 @@ impl AudioTask {
         // reprend au même point de l'horloge.
         let mut sent = 0u64;
         let what = match self.input {
-            AudioInput::Window => "la capture du son",
-            AudioInput::Microphone(_) => "la capture du micro",
+            AudioInput::Window => tr::tr!("la capture du son"),
+            AudioInput::Microphone(_) => tr::tr!("la capture du micro"),
         };
-        run_protected(&self.shared, &self.name, what, || self.capture(&mut sent));
+        run_protected(&self.shared, &self.name, &what, || self.capture(&mut sent));
     }
 
     fn capture(&self, sent: &mut u64) {
@@ -117,7 +117,7 @@ impl AudioTask {
                         Err(e) => {
                             if warned_pid != Some(pid) {
                                 log::warn!("[{name}] son du processus {pid} indisponible : {e:#}");
-                                shared.note_error(format!("son indisponible : {e:#}"));
+                                shared.note_error(tr::tr!("son indisponible : {}", format!("{e:#}")));
                                 warned_pid = Some(pid);
                             }
                             retry_at = now + RETRY_HNS;

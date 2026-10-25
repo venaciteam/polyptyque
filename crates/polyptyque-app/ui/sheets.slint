@@ -1,61 +1,61 @@
 // Fenêtres modales : ajout de sources, scènes, réglages, confirmations.
 
-import { ComboBox, LineEdit, CheckBox, ListView, Spinner } from "std-widgets.slint";
+import { ComboBox, LineEdit, CheckBox, ListView, ScrollView, Spinner } from "std-widgets.slint";
 import { Theme } from "theme.slint";
 import { Bridge, ScheduleItem } from "bridge.slint";
 import { ActionButton, Field, Footer, IconButton, LevelMeter, Note, Sheet, ListRow, Toggle } from "components.slint";
 
 export component AddBrowserSheet inherits Sheet {
-    title: "Ajouter une source navigateur";
+    title: @tr("Ajouter une source navigateur");
     close => {
         Bridge.close-sheet();
     }
 
     Field {
-        label: "Navigateur";
+        label: @tr("Navigateur");
         ComboBox {
             model: Bridge.browser-choices;
             current-index <=> Bridge.browser-index;
         }
     }
     if Bridge.browser-index == Bridge.browser-choices.length - 1: Field {
-        label: "Fichier .exe du navigateur";
+        label: @tr("Fichier .exe du navigateur");
         LineEdit {
             text <=> Bridge.browser-path;
-            placeholder-text: "C:\\Program Files\\…\\navigateur.exe";
+            placeholder-text: @tr("C:\\Program Files\\…\\navigateur.exe");
         }
     }
     Field {
-        label: "Nom de la source";
-        hint: "Utilisé dans le nom du fichier enregistré.";
+        label: @tr("Nom de la source");
+        hint: @tr("Utilisé dans le nom du fichier enregistré.");
         LineEdit {
             text <=> Bridge.new-name;
         }
     }
     Field {
-        label: "Adresse au premier lancement (facultatif)";
+        label: @tr("Adresse au premier lancement (facultatif)");
         LineEdit {
             text <=> Bridge.new-url;
             placeholder-text: "https://…";
         }
     }
     CheckBox {
-        text: "Ouvrir maintenant pour me connecter et préparer mes onglets";
+        text: @tr("Ouvrir maintenant pour se connecter et préparer les onglets");
         checked <=> Bridge.open-now;
     }
     Note {
-        text: "Cette source a son propre profil : connexions et onglets sont conservés. Tout son joué dans ce profil, quel que soit l'onglet, sera enregistré dans son fichier.";
+        text: @tr("Cette source a son propre profil : connexions et onglets sont conservés. Tout son joué dans ce profil, quel que soit l'onglet, sera enregistré dans son fichier.");
     }
     Footer {
         ActionButton {
-            text: "Annuler";
+            text: @tr("Annuler");
             kind: "ghost";
             clicked => {
                 Bridge.close-sheet();
             }
         }
         ActionButton {
-            text: "Ajouter";
+            text: @tr("Ajouter");
             kind: "primary";
             enabled: Bridge.new-name != "";
             clicked => {
@@ -66,14 +66,14 @@ export component AddBrowserSheet inherits Sheet {
 }
 
 export component AddApplicationSheet inherits Sheet {
-    title: "Ajouter une source application";
+    title: @tr("Ajouter une source application");
     sheet-width: 600px;
     close => {
         Bridge.close-sheet();
     }
 
     Field {
-        label: "Fenêtre à enregistrer";
+        label: @tr("Fenêtre à enregistrer");
         Rectangle {
             height: 230px;
             background: Theme.surface-raised;
@@ -96,7 +96,7 @@ export component AddApplicationSheet inherits Sheet {
     HorizontalLayout {
         alignment: end;
         ActionButton {
-            text: "Actualiser la liste";
+            text: @tr("Actualiser la liste");
             icon: @image-url("icons/refresh.svg");
             has-icon: true;
             kind: "ghost";
@@ -107,33 +107,33 @@ export component AddApplicationSheet inherits Sheet {
     }
     if Bridge.window-index >= 0 && Bridge.window-index < Bridge.windows.length && Bridge.windows[Bridge.window-index].browser: Note {
         tone: 2;
-        text: "C'est un navigateur : son son sera mélangé avec celui de toutes ses autres fenêtres. Pour isoler le son, ajoute plutôt une source navigateur.";
+        text: @tr("C'est un navigateur : son son sera mélangé avec celui de toutes ses autres fenêtres. Pour isoler le son, mieux vaut ajouter une source navigateur.");
     }
     Field {
-        label: "Nom de la source";
-        hint: "Utilisé dans le nom du fichier enregistré.";
+        label: @tr("Nom de la source");
+        hint: @tr("Utilisé dans le nom du fichier enregistré.");
         LineEdit {
             text <=> Bridge.new-name;
         }
     }
     CheckBox {
-        text: "Relancer ce programme s'il n'est pas ouvert au démarrage d'un enregistrement";
+        text: @tr("Relancer ce programme s'il n'est pas ouvert au démarrage d'un enregistrement");
         checked <=> Bridge.relaunch;
     }
     CheckBox {
-        text: "Afficher le curseur de la souris dans l'enregistrement";
+        text: @tr("Afficher le curseur de la souris dans l'enregistrement");
         checked <=> Bridge.capture-cursor;
     }
     Footer {
         ActionButton {
-            text: "Annuler";
+            text: @tr("Annuler");
             kind: "ghost";
             clicked => {
                 Bridge.close-sheet();
             }
         }
         ActionButton {
-            text: "Ajouter";
+            text: @tr("Ajouter");
             kind: "primary";
             enabled: Bridge.window-index >= 0 && Bridge.new-name != "";
             clicked => {
@@ -144,7 +144,7 @@ export component AddApplicationSheet inherits Sheet {
 }
 
 export component SceneNameSheet inherits Sheet {
-    title: Bridge.sheet == "scene-new" ? "Nouvelle scène" : Bridge.sheet == "scene-duplicate" ? "Dupliquer la scène" : "Renommer la scène";
+    title: Bridge.sheet == "scene-new" ? @tr("Nouvelle scène") : Bridge.sheet == "scene-duplicate" ? @tr("Dupliquer la scène") : @tr("Renommer la scène");
     sheet-width: 440px;
     close => {
         Bridge.close-sheet();
@@ -154,7 +154,7 @@ export component SceneNameSheet inherits Sheet {
     }
 
     Field {
-        label: "Nom de la scène";
+        label: @tr("Nom de la scène");
         name-edit := LineEdit {
             text <=> Bridge.scene-name-input;
             accepted => {
@@ -163,18 +163,18 @@ export component SceneNameSheet inherits Sheet {
         }
     }
     if Bridge.sheet == "scene-duplicate": Note {
-        text: "La nouvelle scène reprend les sources de « \{Bridge.scene-name} », partagées : ce sont les mêmes (même fenêtre, mêmes connexions), pas des copies. Retirer une source d'une scène ne la retire pas de l'autre.";
+        text: @tr("La nouvelle scène reprend les sources de « {} », partagées : ce sont les mêmes (même fenêtre, mêmes connexions), pas des copies. Retirer une source d'une scène ne la retire pas de l'autre.", Bridge.scene-name);
     }
     Footer {
         ActionButton {
-            text: "Annuler";
+            text: @tr("Annuler");
             kind: "ghost";
             clicked => {
                 Bridge.close-sheet();
             }
         }
         ActionButton {
-            text: Bridge.sheet == "scene-new" ? "Créer" : Bridge.sheet == "scene-duplicate" ? "Dupliquer" : "Renommer";
+            text: Bridge.sheet == "scene-new" ? @tr("Créer") : Bridge.sheet == "scene-duplicate" ? @tr("Dupliquer") : @tr("Renommer");
             kind: "primary";
             enabled: Bridge.scene-name-input != "";
             clicked => {
@@ -198,7 +198,7 @@ export component ConfirmSheet inherits Sheet {
     }
     Footer {
         ActionButton {
-            text: "Annuler";
+            text: @tr("Annuler");
             kind: "ghost";
             clicked => {
                 Bridge.close-sheet();
@@ -216,7 +216,7 @@ export component ConfirmSheet inherits Sheet {
 
 // Bilan d'un enregistrement interrompu, au lancement suivant.
 export component IncidentSheet inherits Sheet {
-    title: "Enregistrement interrompu";
+    title: @tr("Enregistrement interrompu");
     sheet-width: 640px;
     close => {
         Bridge.close-sheet();
@@ -243,24 +243,31 @@ export component IncidentSheet inherits Sheet {
     }
     if Bridge.incident-can-repair: Note {
         tone: 2;
-        text: "« Réparer » recopie les fichiers interrompus sans réencodage pour reconstruire leur durée et leur index. Chaque original n'est remplacé qu'une fois sa copie vérifiée.";
+        text: @tr("« Réparer » recopie les fichiers interrompus sans réencodage pour reconstruire leur durée et leur index. Chaque original n'est remplacé qu'une fois sa copie vérifiée.");
     }
     Footer {
         ActionButton {
-            text: "Fermer";
+            text: @tr("Signaler ce problème");
+            kind: "ghost";
+            clicked => {
+                Bridge.request-report(true);
+            }
+        }
+        ActionButton {
+            text: @tr("Fermer");
             kind: "ghost";
             clicked => {
                 Bridge.close-sheet();
             }
         }
         if Bridge.incident-can-repair: ActionButton {
-            text: "Réparer les fichiers";
+            text: @tr("Réparer les fichiers");
             clicked => {
                 Bridge.incident-repair();
             }
         }
         if Bridge.incident-can-resume: ActionButton {
-            text: "Reprendre l'enregistrement";
+            text: @tr("Reprendre l'enregistrement");
             kind: "primary";
             clicked => {
                 Bridge.incident-resume();
@@ -269,217 +276,322 @@ export component IncidentSheet inherits Sheet {
     }
 }
 
+// Signalement d'un problème : rapport à joindre à une issue GitHub.
+export component ReportSheet inherits Sheet {
+    title: @tr("Signaler un problème");
+    sheet-width: 560px;
+    close => {
+        Bridge.close-sheet();
+    }
+
+    // Avant : ce que contient le rapport ; après : comment le joindre.
+    property <bool> ready: Bridge.report-path != "";
+    if !root.ready: Text {
+        text: @tr("Polyptyque prépare un rapport à joindre au signalement, sur GitHub. Il contient :");
+        color: Theme.text-muted;
+        wrap: word-wrap;
+    }
+    if !root.ready: Text {
+        text: @tr("• les versions de Polyptyque et de Windows, et la carte graphique ;\n• les réglages d'enregistrement, sans aucun chemin de dossier ;\n• les journaux des trois derniers lancements et du dernier enregistrement.");
+        color: Theme.text-muted;
+        wrap: word-wrap;
+    }
+    if !root.ready: Note {
+        tone: 2;
+        text: @tr("Un signalement sur GitHub est public et demande un compte GitHub. Le dossier personnel et le nom du compte Windows sont masqués ; les noms des scènes et des sources restent visibles. Le rapport peut être relu avant d'être joint.");
+    }
+    if root.ready: Text {
+        text: @tr("Rapport prêt. Pour terminer :");
+        color: Theme.text;
+        wrap: word-wrap;
+    }
+    if root.ready: Text {
+        text: @tr("1. Décrire le problème dans la page GitHub qui vient de s'ouvrir.\n2. Glisser le fichier du rapport, sélectionné dans l'Explorateur, dans le champ « Rapport » de la page.");
+        color: Theme.text-muted;
+        wrap: word-wrap;
+    }
+    if root.ready: Text {
+        text: Bridge.report-name;
+        color: Theme.text-faint;
+        font-size: Theme.font-small;
+        wrap: word-wrap;
+    }
+    Footer {
+        if !root.ready: ActionButton {
+            text: @tr("Annuler");
+            kind: "ghost";
+            clicked => {
+                Bridge.close-sheet();
+            }
+        }
+        if !root.ready: ActionButton {
+            text: @tr("Préparer le signalement");
+            kind: "primary";
+            clicked => {
+                Bridge.prepare-report();
+            }
+        }
+        if root.ready: ActionButton {
+            text: @tr("Relire le rapport");
+            kind: "ghost";
+            clicked => {
+                Bridge.open-report();
+            }
+        }
+        if root.ready: ActionButton {
+            text: @tr("Rouvrir la page GitHub");
+            clicked => {
+                Bridge.open-report-page();
+            }
+        }
+        if root.ready: ActionButton {
+            text: @tr("Fermer");
+            kind: "primary";
+            clicked => {
+                Bridge.close-sheet();
+            }
+        }
+    }
+}
+
 export component SettingsSheet inherits Sheet {
-    title: "Réglages";
+    title: @tr("Réglages");
     sheet-width: 780px;
     close => {
         Bridge.close-sheet();
     }
 
-    // Deux colonnes de même largeur, remplies de haut en bas.
-    HorizontalLayout {
-        spacing: 28px;
-        VerticalLayout {
-            spacing: 14px;
-            alignment: start;
-            horizontal-stretch: 1;
-            preferred-width: 0px;
-            Text {
-                text: "Enregistrement";
-                color: Theme.text;
-                font-weight: 700;
-            }
-            Field {
-                label: "Résolution";
-                ComboBox {
-                    model: Bridge.resolution-choices;
-                    current-index <=> Bridge.resolution-index;
-                }
-            }
-            Field {
-                label: "Images par seconde";
-                ComboBox {
-                    model: Bridge.fps-choices;
-                    current-index <=> Bridge.fps-index;
-                }
-            }
-            Field {
-                label: "Débit vidéo (kb/s)";
-                hint: "En 1080p à 60 i/s : 6 000 léger, 12 000 bon, 20 000 très bon.";
-                LineEdit {
-                    text <=> Bridge.bitrate-text;
-                    input-type: number;
-                }
-            }
-            Field {
-                label: "Format vidéo";
-                ComboBox {
-                    model: Bridge.codec-choices;
-                    current-index <=> Bridge.codec-index;
-                }
-            }
-            Field {
-                label: "Matériel d'encodage";
-                ComboBox {
-                    model: Bridge.hardware-choices;
-                    current-index <=> Bridge.hardware-index;
-                }
-            }
-            Field {
-                label: "Débit audio";
-                ComboBox {
-                    model: Bridge.audio-choices;
-                    current-index <=> Bridge.audio-index;
-                }
-            }
-            Field {
-                label: "Micro";
-                Toggle {
-                    text: "Enregistrer mon micro dans un fichier séparé";
-                    checked: Bridge.settings-mic;
-                    toggled(value) => {
-                        Bridge.settings-mic = value;
-                    }
-                }
-            }
-            if Bridge.settings-mic: ComboBox {
-                model: Bridge.mic-choices;
-                current-index <=> Bridge.mic-index;
-            }
-            // Le micro choisi est écouté tant que les réglages sont ouverts.
-            if Bridge.settings-mic: HorizontalLayout {
-                spacing: 10px;
-                LevelMeter {
-                    width: 120px;
-                    y: (parent.height - self.height) / 2;
-                    level: Bridge.mic-test-level;
-                    active: Bridge.mic-test-sound;
-                }
-                Text {
-                    horizontal-stretch: 1;
-                    text: Bridge.mic-test-error != "" ? Bridge.mic-test-error
-                        : Bridge.mic-test-sound ? "Son capté" : "Aucun son capté : parle pour vérifier";
-                    color: Bridge.mic-test-error != "" ? Theme.warning : Theme.text-faint;
-                    font-size: Theme.font-small;
-                    vertical-alignment: center;
-                    wrap: word-wrap;
-                }
-            }
-            if Bridge.settings-mic: Note {
-                text: "Le son de ce micro sera enregistré pendant chaque enregistrement, dans son propre fichier (.mka), calé sur les vidéos. Windows doit autoriser l'accès au micro pour les applications de bureau.";
-            }
-            if Bridge.settings-mic && Bridge.can-browse: HorizontalLayout {
+    // Seules les deux colonnes défilent quand la fenêtre est petite : le bas
+    // (version, signalement, boutons) reste toujours visible.
+    scroller := ScrollView {
+        max-height: max(160px, root.available-height - footer-row.preferred-height - 16px
+            - (Bridge.settings-error != "" ? 64px : 0px));
+        preferred-height: columns.preferred-height;
+        content-width: self.visible-width;
+        content-height: columns.preferred-height;
+        // Deux colonnes de même largeur, remplies de haut en bas.
+        columns := HorizontalLayout {
+            width: scroller.visible-width;
+            // Place de la barre de défilement, hors des champs.
+            padding-right: 14px;
+            spacing: 28px;
+            VerticalLayout {
+                spacing: 14px;
                 alignment: start;
-                ActionButton {
-                    text: "Autorisations du micro dans Windows";
-                    icon: @image-url("icons/launch.svg");
-                    has-icon: true;
-                    kind: "ghost";
-                    clicked => {
-                        Bridge.open-mic-privacy();
+                horizontal-stretch: 1;
+                preferred-width: 0px;
+                Text {
+                    text: @tr("Enregistrement");
+                    color: Theme.text;
+                    font-weight: 700;
+                }
+                Field {
+                    label: @tr("Résolution");
+                    ComboBox {
+                        model: Bridge.resolution-choices;
+                        current-index <=> Bridge.resolution-index;
                     }
                 }
-            }
-        }
-        VerticalLayout {
-            spacing: 14px;
-            alignment: start;
-            horizontal-stretch: 1;
-            preferred-width: 0px;
-            Text {
-                text: "Fichiers et interface";
-                color: Theme.text;
-                font-weight: 700;
-            }
-            Field {
-                label: "Dossier des enregistrements";
-                HorizontalLayout {
-                    spacing: 8px;
-                    LineEdit {
-                        text <=> Bridge.output-dir;
-                        horizontal-stretch: 1;
+                Field {
+                    label: @tr("Images par seconde");
+                    ComboBox {
+                        model: Bridge.fps-choices;
+                        current-index <=> Bridge.fps-index;
                     }
-                    if Bridge.can-browse: ActionButton {
-                        text: "Parcourir…";
+                }
+                Field {
+                    label: @tr("Débit vidéo (kb/s)");
+                    hint: @tr("En 1080p à 60 i/s : 6 000 léger, 12 000 bon, 20 000 très bon.");
+                    LineEdit {
+                        text <=> Bridge.bitrate-text;
+                        input-type: number;
+                    }
+                }
+                Field {
+                    label: @tr("Format vidéo");
+                    ComboBox {
+                        model: Bridge.codec-choices;
+                        current-index <=> Bridge.codec-index;
+                    }
+                }
+                Field {
+                    label: @tr("Matériel d'encodage");
+                    ComboBox {
+                        model: Bridge.hardware-choices;
+                        current-index <=> Bridge.hardware-index;
+                    }
+                }
+                Field {
+                    label: @tr("Débit audio");
+                    ComboBox {
+                        model: Bridge.audio-choices;
+                        current-index <=> Bridge.audio-index;
+                    }
+                }
+                Field {
+                    label: @tr("Micro");
+                    Toggle {
+                        text: @tr("Enregistrer le micro dans un fichier séparé");
+                        checked: Bridge.settings-mic;
+                        toggled(value) => {
+                            Bridge.settings-mic = value;
+                        }
+                    }
+                }
+                if Bridge.settings-mic: ComboBox {
+                    model: Bridge.mic-choices;
+                    current-index <=> Bridge.mic-index;
+                }
+                // Le micro choisi est écouté tant que les réglages sont ouverts.
+                if Bridge.settings-mic: HorizontalLayout {
+                    spacing: 10px;
+                    LevelMeter {
+                        width: 120px;
+                        y: (parent.height - self.height) / 2;
+                        level: Bridge.mic-test-level;
+                        active: Bridge.mic-test-sound;
+                    }
+                    Text {
+                        horizontal-stretch: 1;
+                        text: Bridge.mic-test-error != "" ? Bridge.mic-test-error
+                            : Bridge.mic-test-sound ? @tr("Son capté") : @tr("Aucun son capté : parler dans le micro pour vérifier");
+                        color: Bridge.mic-test-error != "" ? Theme.warning : Theme.text-faint;
+                        font-size: Theme.font-small;
+                        vertical-alignment: center;
+                        wrap: word-wrap;
+                    }
+                }
+                if Bridge.settings-mic: Note {
+                    text: @tr("Le son de ce micro sera enregistré pendant chaque enregistrement, dans son propre fichier (.mka), calé sur les vidéos. Windows doit autoriser l'accès au micro pour les applications de bureau.");
+                }
+                if Bridge.settings-mic && Bridge.can-browse: HorizontalLayout {
+                    alignment: start;
+                    ActionButton {
+                        text: @tr("Autorisations du micro dans Windows");
+                        icon: @image-url("icons/launch.svg");
+                        has-icon: true;
+                        kind: "ghost";
                         clicked => {
-                            Bridge.browse-output();
+                            Bridge.open-mic-privacy();
                         }
                     }
                 }
             }
-            Field {
-                label: "Modèle de nom de fichier";
-                hint: "Variables : {date}, {heure}, {scène}, {source}.";
-                LineEdit {
-                    text <=> Bridge.template;
+            VerticalLayout {
+                spacing: 14px;
+                alignment: start;
+                horizontal-stretch: 1;
+                preferred-width: 0px;
+                Text {
+                    text: @tr("Fichiers et interface");
+                    color: Theme.text;
+                    font-weight: 700;
                 }
-            }
-            Toggle {
-                text: "Aperçus en direct des sources";
-                checked: Bridge.settings-previews;
-                toggled(value) => {
-                    Bridge.settings-previews = value;
-                }
-            }
-            Toggle {
-                text: "Ouvrir les fenêtres de la scène au lancement";
-                checked: Bridge.settings-open-windows;
-                toggled(value) => {
-                    Bridge.settings-open-windows = value;
-                }
-            }
-            Toggle {
-                text: "Fermer les navigateurs des sources en quittant";
-                checked: Bridge.settings-close-browsers;
-                toggled(value) => {
-                    Bridge.settings-close-browsers = value;
-                }
-            }
-            Toggle {
-                text: "Lancer Polyptyque au démarrage de Windows";
-                checked: Bridge.settings-startup;
-                toggled(value) => {
-                    Bridge.settings-startup = value;
-                }
-            }
-            Field {
-                label: "Conversion pour le montage";
-                hint: "Copie MP4 sans perte de qualité, créée à côté du MKV, qui est conservé. Prévois le double d'espace disque.";
-                Toggle {
-                    text: "Convertir en MP4 à la fin de l'enregistrement";
-                    checked: Bridge.settings-convert;
-                    toggled(value) => {
-                        Bridge.settings-convert = value;
+                Field {
+                    label: @tr("Langue");
+                    ComboBox {
+                        // Chaque langue écrite dans sa propre langue.
+                        model: [@tr("Automatique (langue de Windows)"), "Français", "English"];
+                        current-index <=> Bridge.settings-language-index;
                     }
                 }
-            }
-            Field {
-                label: "Mises à jour";
-                hint: "Revenir aux versions stables ne réinstalle pas une version plus ancienne : la bêta reste jusqu'à la prochaine version stable.";
-                ComboBox {
-                    model: ["Versions stables", "Versions stables et bêta", "Ne pas rechercher"];
-                    current-index <=> Bridge.settings-update-index;
+                Field {
+                    label: @tr("Horloge");
+                    ComboBox {
+                        model: [@tr("Automatique (comme Windows)"), @tr("24 h (21:00)"), @tr("12 h (9:00 PM)")];
+                        current-index <=> Bridge.settings-clock-index;
+                    }
                 }
-            }
-            Field {
-                label: "Raccourci : démarrer ou arrêter l'enregistrement";
-                ComboBox {
-                    model: Bridge.hotkey-choices;
-                    current-index <=> Bridge.hotkey-record-index;
+                Field {
+                    label: @tr("Dossier des enregistrements");
+                    HorizontalLayout {
+                        spacing: 8px;
+                        LineEdit {
+                            text <=> Bridge.output-dir;
+                            horizontal-stretch: 1;
+                        }
+                        if Bridge.can-browse: ActionButton {
+                            text: @tr("Parcourir…");
+                            clicked => {
+                                Bridge.browse-output();
+                            }
+                        }
+                    }
                 }
-            }
-            Field {
-                label: "Raccourci : afficher ou réduire Polyptyque";
-                ComboBox {
-                    model: Bridge.hotkey-choices;
-                    current-index <=> Bridge.hotkey-show-index;
+                Field {
+                    label: @tr("Modèle de nom de fichier");
+                    hint: @tr("Variables : {{date}}, {{heure}}, {{scène}}, {{source}}.");
+                    LineEdit {
+                        text <=> Bridge.template;
+                    }
                 }
-            }
-            Field {
-                label: "Raccourci : activer ou couper les aperçus";
-                ComboBox {
-                    model: Bridge.hotkey-choices;
-                    current-index <=> Bridge.hotkey-previews-index;
+                Toggle {
+                    text: @tr("Aperçus en direct des sources");
+                    checked: Bridge.settings-previews;
+                    toggled(value) => {
+                        Bridge.settings-previews = value;
+                    }
+                }
+                Toggle {
+                    text: @tr("Ouvrir les fenêtres de la scène au lancement");
+                    checked: Bridge.settings-open-windows;
+                    toggled(value) => {
+                        Bridge.settings-open-windows = value;
+                    }
+                }
+                Toggle {
+                    text: @tr("Fermer les navigateurs des sources en quittant");
+                    checked: Bridge.settings-close-browsers;
+                    toggled(value) => {
+                        Bridge.settings-close-browsers = value;
+                    }
+                }
+                Toggle {
+                    text: @tr("Lancer Polyptyque au démarrage de Windows");
+                    checked: Bridge.settings-startup;
+                    toggled(value) => {
+                        Bridge.settings-startup = value;
+                    }
+                }
+                Field {
+                    label: @tr("Conversion pour le montage");
+                    hint: @tr("Copie MP4 sans perte de qualité, créée à côté du MKV, qui est conservé. Prévoir le double d'espace disque.");
+                    Toggle {
+                        text: @tr("Convertir en MP4 à la fin de l'enregistrement");
+                        checked: Bridge.settings-convert;
+                        toggled(value) => {
+                            Bridge.settings-convert = value;
+                        }
+                    }
+                }
+                Field {
+                    label: @tr("Mises à jour");
+                    hint: @tr("Revenir aux versions stables ne réinstalle pas une version plus ancienne : la bêta reste jusqu'à la prochaine version stable.");
+                    ComboBox {
+                        model: [@tr("Versions stables"), @tr("Versions stables et bêta"), @tr("Ne pas rechercher")];
+                        current-index <=> Bridge.settings-update-index;
+                    }
+                }
+                Field {
+                    label: @tr("Raccourci : démarrer ou arrêter l'enregistrement");
+                    ComboBox {
+                        model: Bridge.hotkey-choices;
+                        current-index <=> Bridge.hotkey-record-index;
+                    }
+                }
+                Field {
+                    label: @tr("Raccourci : afficher ou réduire Polyptyque");
+                    ComboBox {
+                        model: Bridge.hotkey-choices;
+                        current-index <=> Bridge.hotkey-show-index;
+                    }
+                }
+                Field {
+                    label: @tr("Raccourci : activer ou couper les aperçus");
+                    ComboBox {
+                        model: Bridge.hotkey-choices;
+                        current-index <=> Bridge.hotkey-previews-index;
+                    }
                 }
             }
         }
@@ -488,23 +600,35 @@ export component SettingsSheet inherits Sheet {
         tone: 3;
         text: Bridge.settings-error;
     }
-    HorizontalLayout {
+    footer-row := HorizontalLayout {
+        spacing: 10px;
         Text {
             text: "Polyptyque \{Bridge.version}";
             color: Theme.text-faint;
             font-size: Theme.font-small;
             vertical-alignment: center;
         }
+        VerticalLayout {
+            alignment: center;
+            padding-top: 6px;
+            ActionButton {
+                text: @tr("Signaler un problème…");
+                kind: "ghost";
+                clicked => {
+                    Bridge.request-report(false);
+                }
+            }
+        }
         Footer {
             ActionButton {
-                text: "Annuler";
+                text: @tr("Annuler");
                 kind: "ghost";
                 clicked => {
                     Bridge.close-sheet();
                 }
             }
             ActionButton {
-                text: "Enregistrer";
+                text: @tr("Enregistrer");
                 kind: "primary";
                 clicked => {
                     Bridge.save-settings();
@@ -608,7 +732,7 @@ component ScheduleRow inherits Rectangle {
                 text: "";
                 checked: root.item.enabled;
                 opacity: root.item.locked ? 0.4 : 1;
-                accessible-label: root.item.enabled ? "Désactiver la programmation" : "Activer la programmation";
+                accessible-label: root.item.enabled ? @tr("Désactiver la programmation") : @tr("Activer la programmation");
                 toggled(value) => {
                     if !root.item.locked {
                         Bridge.toggle-schedule(root.item.id, value);
@@ -636,7 +760,7 @@ component ScheduleRow inherits Rectangle {
         IconButton {
             y: (parent.height - self.height) / 2;
             icon: @image-url("icons/edit.svg");
-            label: "Modifier la programmation";
+            label: @tr("Modifier la programmation");
             enabled: !root.item.locked;
             clicked => {
                 Bridge.edit-schedule(root.item.id);
@@ -645,7 +769,7 @@ component ScheduleRow inherits Rectangle {
         IconButton {
             y: (parent.height - self.height) / 2;
             icon: @image-url("icons/trash.svg");
-            label: "Supprimer la programmation";
+            label: @tr("Supprimer la programmation");
             enabled: !root.item.locked;
             clicked => {
                 Bridge.delete-schedule(root.item.id);
@@ -656,19 +780,19 @@ component ScheduleRow inherits Rectangle {
 
 // Liste des programmations et lancement au démarrage de Windows.
 export component SchedulesSheet inherits Sheet {
-    title: "Programmations";
+    title: @tr("Programmations");
     sheet-width: 640px;
     close => {
         Bridge.close-sheet();
     }
 
     Text {
-        text: "Polyptyque lance et arrête lui-même l'enregistrement d'une scène aux heures prévues. Il doit rester ouvert pour cela ; tant qu'une programmation est active, l'ordinateur et l'écran ne se mettent pas en veille d'eux-mêmes.";
+        text: @tr("Polyptyque lance et arrête lui-même l'enregistrement d'une scène aux heures prévues. Il doit rester ouvert pour cela ; tant qu'une programmation est active, l'ordinateur et l'écran ne se mettent pas en veille d'eux-mêmes.");
         color: Theme.text-muted;
         wrap: word-wrap;
     }
     if Bridge.schedules.length == 0: Text {
-        text: "Aucune programmation pour l'instant.";
+        text: @tr("Aucune programmation pour l'instant.");
         color: Theme.text-faint;
     }
     if Bridge.schedules.length > 0: VerticalLayout {
@@ -680,7 +804,7 @@ export component SchedulesSheet inherits Sheet {
     HorizontalLayout {
         alignment: start;
         ActionButton {
-            text: "Nouvelle programmation";
+            text: @tr("Nouvelle programmation");
             icon: @image-url("icons/plus.svg");
             has-icon: true;
             kind: "primary";
@@ -690,10 +814,10 @@ export component SchedulesSheet inherits Sheet {
         }
     }
     Field {
-        label: "Démarrage de Windows";
-        hint: "Sans cela, après un redémarrage de Windows (une mise à jour, par exemple), les programmations attendent que tu rouvres Polyptyque. Lancé par Windows, il démarre réduit, sans ouvrir les fenêtres de la scène.";
+        label: @tr("Démarrage de Windows");
+        hint: @tr("Sans cela, après un redémarrage de Windows (une mise à jour, par exemple), les programmations attendent la réouverture de Polyptyque. Lancé par Windows, il démarre réduit, sans ouvrir les fenêtres de la scène.");
         Toggle {
-            text: "Lancer Polyptyque au démarrage de Windows";
+            text: @tr("Lancer Polyptyque au démarrage de Windows");
             checked: Bridge.startup-enabled;
             toggled(value) => {
                 Bridge.set-launch-at-startup(value);
@@ -706,7 +830,7 @@ export component SchedulesSheet inherits Sheet {
     }
     Footer {
         ActionButton {
-            text: "Fermer";
+            text: @tr("Fermer");
             kind: "ghost";
             clicked => {
                 Bridge.close-sheet();
@@ -750,18 +874,38 @@ component DayChip inherits Rectangle {
 }
 
 // Formulaire d'une programmation.
-export component ScheduleEditorSheet inherits Sheet {
-    property <[string]> day-letters: ["L", "M", "M", "J", "V", "S", "D"];
-    property <[string]> day-names: ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
+// Jour d'une date, dans le formulaire d'une programmation.
+component DayList inherits ComboBox {
+    model: Bridge.schedule-day-choices;
+    current-index <=> Bridge.schedule-day-index;
+    accessible-label: @tr("Jour");
+    min-width: 76px;
+    horizontal-stretch: 0;
+    selected => {
+        Bridge.schedule-date-edited();
+    }
+}
 
-    title: Bridge.sheet == "schedule-new" ? "Nouvelle programmation" : "Modifier la programmation";
+export component ScheduleEditorSheet inherits Sheet {
+    property <[string]> day-letters: [
+        @tr("Initiale du lundi" => "L"),
+        @tr("Initiale du mardi" => "M"),
+        @tr("Initiale du mercredi" => "M"),
+        @tr("Initiale du jeudi" => "J"),
+        @tr("Initiale du vendredi" => "V"),
+        @tr("Initiale du samedi" => "S"),
+        @tr("Initiale du dimanche" => "D"),
+    ];
+    property <[string]> day-names: [@tr("lundi"), @tr("mardi"), @tr("mercredi"), @tr("jeudi"), @tr("vendredi"), @tr("samedi"), @tr("dimanche")];
+
+    title: Bridge.sheet == "schedule-new" ? @tr("Nouvelle programmation") : @tr("Modifier la programmation");
     sheet-width: 520px;
     close => {
         Bridge.close-schedule-editor();
     }
 
     Field {
-        label: "Scène à enregistrer";
+        label: @tr("Scène à enregistrer");
         ComboBox {
             model: Bridge.schedule-scene-choices;
             current-index <=> Bridge.schedule-scene-index;
@@ -770,22 +914,22 @@ export component ScheduleEditorSheet inherits Sheet {
     HorizontalLayout {
         spacing: 12px;
         Field {
-            label: "Début";
+            label: @tr("Début");
             horizontal-stretch: 1;
             LineEdit {
                 text <=> Bridge.schedule-start;
-                placeholder-text: "21:00";
+                placeholder-text: Bridge.twelve-hour ? "9:00 PM" : "21:00";
                 edited(text) => {
                     Bridge.schedule-times-edited();
                 }
             }
         }
         Field {
-            label: "Fin";
+            label: @tr("Fin");
             horizontal-stretch: 1;
             LineEdit {
                 text <=> Bridge.schedule-end;
-                placeholder-text: "22:30";
+                placeholder-text: Bridge.twelve-hour ? "10:30 PM" : "22:30";
                 edited(text) => {
                     Bridge.schedule-times-edited();
                 }
@@ -798,22 +942,46 @@ export component ScheduleEditorSheet inherits Sheet {
         font-size: Theme.font-small;
     }
     Field {
-        label: "Répétition";
+        label: @tr("Répétition");
         ComboBox {
-            model: ["Une seule fois", "Tous les jours", "Certains jours de la semaine"];
+            model: [@tr("Une seule fois"), @tr("Tous les jours"), @tr("Certains jours de la semaine")];
             current-index <=> Bridge.schedule-repeat-index;
         }
     }
+    // Trois listes plutôt qu'un sélecteur de date : celui de Slint commence
+    // la semaine le dimanche et écrit les mois en anglais. Ordre de la
+    // langue : « 25 octobre 2026 », « October 25, 2026 ».
     if Bridge.schedule-repeat-index == 0: Field {
-        label: "Date";
-        hint: "Jour où le créneau commence.";
-        LineEdit {
-            text <=> Bridge.schedule-date;
-            placeholder-text: "25/10/2026";
+        label: @tr("Date");
+        hint: Bridge.schedule-date-note;
+        HorizontalLayout {
+            spacing: 8px;
+            if !Bridge.month-first: DayList { }
+            ComboBox {
+                model: Bridge.schedule-month-choices;
+                current-index <=> Bridge.schedule-month-index;
+                accessible-label: @tr("Mois");
+                min-width: 140px;
+                horizontal-stretch: 1;
+                selected => {
+                    Bridge.schedule-date-edited();
+                }
+            }
+            if Bridge.month-first: DayList { }
+            ComboBox {
+                model: Bridge.schedule-year-choices;
+                current-index <=> Bridge.schedule-year-index;
+                accessible-label: @tr("Année");
+                min-width: 96px;
+                horizontal-stretch: 0;
+                selected => {
+                    Bridge.schedule-date-edited();
+                }
+            }
         }
     }
     if Bridge.schedule-repeat-index == 2: Field {
-        label: "Jours où le créneau commence";
+        label: @tr("Jours où le créneau commence");
         HorizontalLayout {
             spacing: 6px;
             alignment: start;
@@ -828,7 +996,7 @@ export component ScheduleEditorSheet inherits Sheet {
         }
     }
     Note {
-        text: "Polyptyque doit être ouvert à l'heure prévue. S'il était fermé, ou l'ordinateur en veille, il demande à son retour s'il faut lancer l'enregistrement : sans réponse au bout de deux minutes, il le lance.";
+        text: @tr("Polyptyque doit être ouvert à l'heure prévue. S'il était fermé, ou l'ordinateur en veille, il demande à son retour s'il faut lancer l'enregistrement : sans réponse au bout de deux minutes, il le lance.");
     }
     if Bridge.schedule-error != "": Note {
         tone: 3;
@@ -836,14 +1004,14 @@ export component ScheduleEditorSheet inherits Sheet {
     }
     Footer {
         ActionButton {
-            text: "Annuler";
+            text: @tr("Annuler");
             kind: "ghost";
             clicked => {
                 Bridge.close-schedule-editor();
             }
         }
         ActionButton {
-            text: "Enregistrer";
+            text: @tr("Enregistrer");
             kind: "primary";
             clicked => {
                 Bridge.save-schedule();

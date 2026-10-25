@@ -35,7 +35,8 @@ impl VideoTask {
         // Images déjà émises : une relance après une erreur interne reprend
         // au même rang, image et son restent calés.
         let mut sent = 0u64;
-        run_protected(&self.shared, &self.source.name, "la capture de l'image", || self.capture(&mut sent));
+        let what = tr::tr!("la capture de l'image");
+        run_protected(&self.shared, &self.source.name, &what, || self.capture(&mut sent));
     }
 
     fn capture(&self, sent: &mut u64) {
@@ -78,7 +79,7 @@ impl VideoTask {
                         }
                         Err(e) => {
                             log::warn!("[{}] capture de la fenêtre impossible : {e:#}", source.name);
-                            shared.note_error(format!("capture de la fenêtre impossible : {e:#}"));
+                            shared.note_error(tr::tr!("capture de la fenêtre impossible : {}", format!("{e:#}")));
                         }
                     }
                 }

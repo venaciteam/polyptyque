@@ -7,14 +7,17 @@
 //! [`platform::Platform`] et implémentées ailleurs.
 
 pub mod browsers;
+pub mod clock;
 pub mod config;
 pub mod encoder;
 pub mod hotkeys;
+pub mod i18n;
 pub mod level;
 pub mod naming;
 pub mod paths;
 pub mod platform;
 pub mod recovery;
+pub mod report;
 pub mod schedule;
 pub mod storage;
 pub mod timeline;

@@ -2,12 +2,12 @@
 //! du planificateur (`polyptyque_core::schedule`), pose les questions,
 //! affiche les programmations et les modifie.
 
-use chrono::{DateTime, Duration as Span, Local, Timelike, Utc};
+use chrono::{DateTime, Datelike, Duration as Span, Local, NaiveDate, Timelike, Utc};
 use polyptyque_core::schedule::{
-    self, clock_label, parse_date, when_label, Action, Repeat, Schedule, ScheduleError, Slot, TimeOfDay,
-    PROMPT_COUNTDOWN,
+    self, clock_label, day_name, when_label, Action, Repeat, Schedule, ScheduleError, Slot, TimeOfDay, PROMPT_COUNTDOWN,
 };
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
+use tr::tr;
 
 use super::{App, Confirm};
 use crate::{format, ScheduleItem};
@@ -93,7 +93,7 @@ impl App {
             }
             Action::Stop(slot) => {
                 log::info!("fin du créneau « {} » : arrêt programmé", self.slot_scene(&slot));
-                self.stop_recording(Some("Fin du créneau programmé.".into()));
+                self.stop_recording(Some(tr!("Fin du créneau programmé.")));
             }
         }
     }
@@ -103,15 +103,15 @@ impl App {
     fn start_scheduled(&self, slot: Slot) {
         let scene = self.config.borrow().scene(&slot.scene_id).map(|s| (s.name.clone(), s.source_ids.len()));
         let problem = match scene {
-            None => Some("sa scène n'existe plus".to_string()),
-            Some((name, 0)) => Some(format!("la scène « {name} » n'a aucune source")),
-            Some(_) if self.recording() || self.busy.get() => Some("un enregistrement est déjà en cours".into()),
+            None => Some(tr!("sa scène n'existe plus")),
+            Some((name, 0)) => Some(tr!("la scène « {} » n'a aucune source", name)),
+            Some(_) if self.recording() || self.busy.get() => Some(tr!("un enregistrement est déjà en cours")),
             Some(_) => None,
         };
         if let Some(problem) = problem {
             log::warn!("créneau programmé non lancé : {problem}");
             self.planner.borrow_mut().give_up(&slot);
-            self.toast(&format!("Enregistrement programmé impossible : {problem}."), 3);
+            self.toast(&tr!("Enregistrement programmé impossible : {}.", problem), 3);
             return;
         }
         log::info!("créneau « {} » : démarrage de l'enregistrement programmé", self.slot_scene(&slot));
@@ -133,7 +133,10 @@ impl App {
         let now = Utc::now();
         if let Some(slot) = self.scheduled_start.borrow_mut().take() {
             self.toast(
-                &format!("{message} Enregistrement programmé : arrêt prévu à {}.", clock_label(slot.end, &Local)),
+                &format!(
+                    "{message} {}",
+                    tr!("Enregistrement programmé : arrêt prévu à {}.", clock_label(slot.end, &Local))
+                ),
                 tone,
             );
             self.planner.borrow_mut().started(slot);
@@ -182,34 +185,35 @@ impl App {
         let (kind, title, text, accept, decline) = match prompt {
             Prompt::Missed { slot, .. } => (
                 "missed",
-                "Enregistrement programmé".to_string(),
-                format!(
+                tr!("Enregistrement programmé"),
+                tr!(
                     "Le créneau « {} » a commencé à {} sans que Polyptyque puisse le lancer (fermé, ou ordinateur en veille). Lancer l'enregistrement maintenant, jusqu'à {} ?",
                     self.slot_scene(slot),
                     clock_label(slot.start, &Local),
                     clock_label(slot.end, &Local)
                 ),
-                "Enregistrer maintenant".to_string(),
-                "Ne pas enregistrer".to_string(),
+                tr!("Enregistrer maintenant"),
+                tr!("Ne pas enregistrer"),
             ),
             Prompt::KeepAutoStop { slot, .. } => {
                 let end = clock_label(slot.end, &Local);
                 (
                     "auto-stop",
-                    "Créneau programmé en cours".to_string(),
-                    format!(
-                        "Tu es dans le créneau d'enregistrement « {} », qui se termine à {end}. Arrêter automatiquement cet enregistrement à {end} ?",
-                        self.slot_scene(slot)
+                    tr!("Créneau programmé en cours"),
+                    tr!(
+                        "Le créneau d'enregistrement « {} » est en cours et se termine à {end}. Arrêter automatiquement cet enregistrement à {end} ?",
+                        self.slot_scene(slot),
+                        end
                     ),
-                    format!("Arrêter à {end}"),
-                    "Ne pas l'arrêter".to_string(),
+                    tr!("Arrêter à {}", end),
+                    tr!("Ne pas l'arrêter"),
                 )
             }
             Prompt::ManualRunning { slot } => (
                 "info",
-                "Créneau programmé".to_string(),
+                tr!("Créneau programmé"),
                 self.manual_running_text(slot),
-                "Compris".to_string(),
+                tr!("Compris"),
                 String::new(),
             ),
         };
@@ -226,7 +230,7 @@ impl App {
     }
 
     fn manual_running_text(&self, slot: &Slot) -> String {
-        format!(
+        tr!(
             "Le créneau « {} » commence, mais un enregistrement est déjà en cours : il continue tel quel. La programmation ne lance rien et ne l'arrêtera pas à {}.",
             self.slot_scene(slot),
             clock_label(slot.end, &Local)
@@ -236,9 +240,9 @@ impl App {
     fn countdown_text(&self, now: DateTime<Utc>) -> String {
         match self.prompt.borrow().as_ref() {
             Some(Prompt::Missed { deadline, .. }) => {
-                format!("Sans réponse, l'enregistrement démarre dans {}.", remaining(*deadline - now))
+                tr!("Sans réponse, l'enregistrement démarre dans {}.", remaining(*deadline - now))
             }
-            Some(Prompt::KeepAutoStop { slot, deadline }) => format!(
+            Some(Prompt::KeepAutoStop { slot, deadline }) => tr!(
                 "Sans réponse dans {}, il continuera après {}.",
                 remaining(*deadline - now),
                 clock_label(slot.end, &Local)
@@ -305,7 +309,7 @@ impl App {
                         "arrêt automatique accepté pour l'enregistrement manuel ({})",
                         clock_label(slot.end, &Local)
                     );
-                    self.toast(&format!("L'enregistrement s'arrêtera à {}.", clock_label(slot.end, &Local)), 1);
+                    self.toast(&tr!("L'enregistrement s'arrêtera à {}.", clock_label(slot.end, &Local)), 1);
                     self.planner.borrow_mut().claim(&slot, true);
                 }
             }
@@ -321,11 +325,11 @@ impl App {
             Some(Prompt::Missed { slot, .. }) => {
                 log::info!("démarrage manqué refusé : rien dans ce créneau");
                 self.planner.borrow_mut().give_up(&slot);
-                self.toast("Enregistrement programmé annulé pour ce créneau. Les suivants restent prévus.", 1);
+                self.toast(&tr!("Enregistrement programmé annulé pour ce créneau. Les suivants restent prévus."), 1);
             }
             Some(Prompt::KeepAutoStop { slot, .. }) if self.recording() => {
                 log::info!("enregistrement manuel gardé après la fin du créneau");
-                self.toast(&format!("L'enregistrement continuera après {}.", clock_label(slot.end, &Local)), 1);
+                self.toast(&tr!("L'enregistrement continuera après {}.", clock_label(slot.end, &Local)), 1);
             }
             Some(Prompt::KeepAutoStop { .. }) => {}
             Some(Prompt::ManualRunning { .. }) | None => {}
@@ -342,13 +346,13 @@ impl App {
         match owned {
             Some(slot) => self.ask(
                 Confirm::StopScheduled,
-                "Créneau d'enregistrement en cours",
-                &format!(
-                    "Tu es dans un créneau d'enregistrement programmé (« {} », jusqu'à {}). L'arrêter quand même ? Il ne sera pas relancé avant le prochain créneau.",
+                &tr!("Créneau d'enregistrement en cours"),
+                &tr!(
+                    "Un créneau d'enregistrement programmé est en cours (« {} », jusqu'à {}). L'arrêter quand même ? Il ne sera pas relancé avant le prochain créneau.",
                     self.slot_scene(&slot),
                     clock_label(slot.end, &Local)
                 ),
-                "Arrêter",
+                &tr!("Arrêter"),
             ),
             None => self.stop_recording(None),
         }
@@ -361,8 +365,9 @@ impl App {
         let config = self.config.borrow();
         let slot = schedule::next_slot(&config.schedules, now, &Local)?;
         let scene = config.scene(&slot.scene_id).map(|s| s.name.clone()).unwrap_or_default();
-        Some(format!(
-            "« {scene} » est programmé {} : Polyptyque doit rester ouvert pour le lancer. Quitter quand même ?",
+        Some(tr!(
+            "« {} » est programmé {} : Polyptyque doit rester ouvert pour le lancer. Quitter quand même ?",
+            scene,
             when_label(slot.start, now, &Local)
         ))
     }
@@ -437,7 +442,7 @@ impl App {
             };
             if let Err(e) = result {
                 log::warn!("{e:#}");
-                self.toast(&format!("Lancement au démarrage de Windows : {e:#}"), 3);
+                self.toast(&tr!("Lancement au démarrage de Windows : {}", format!("{e:#}")), 3);
             } else if explicit {
                 log::info!("lancement au démarrage de Windows : {}", if enabled { "activé" } else { "désactivé" });
             }
@@ -455,10 +460,10 @@ impl App {
         let enabled = self.config.borrow().settings.launch_at_startup;
         #[cfg(windows)]
         if enabled && polyptyque_windows::startup::blocked_by_windows() {
-            return "Windows empêche ce lancement (désactivé dans Paramètres > Applications > Démarrage) : réactive-le là-bas, ou coupe puis remets cette option.".into();
+            return tr!("Windows empêche ce lancement (désactivé dans Paramètres > Applications > Démarrage) : le réactiver là-bas, ou couper puis remettre cette option.");
         }
         if enabled && polyptyque_core::paths::portable_root().is_some() {
-            return "Version portable : ce lancement est inscrit dans Windows. Coupe l'option avant d'emporter le dossier sur un autre PC.".into();
+            return tr!("Version portable : ce lancement est inscrit dans Windows. Couper l'option avant d'emporter le dossier sur un autre PC.");
         }
         String::new()
     }
@@ -472,15 +477,23 @@ impl App {
     // ----- Affichage -----------------------------------------------------------
 
     fn slot_scene(&self, slot: &Slot) -> String {
-        self.config.borrow().scene(&slot.scene_id).map(|s| s.name.clone()).unwrap_or_else(|| "scène supprimée".into())
+        self.config.borrow().scene(&slot.scene_id).map(|s| s.name.clone()).unwrap_or_else(|| tr!("scène supprimée"))
     }
 
     /// Pastille de la barre du haut : prochain créneau, ou fin prévue de
     /// l'enregistrement programmé.
+    /// Textes de la programmation recalculés (changement de langue ou
+    /// d'horloge).
+    pub(super) fn refresh_schedule_texts(&self) {
+        let now = Utc::now();
+        self.refresh_schedule_pill(now);
+        self.refresh_schedule_list(now);
+    }
+
     fn refresh_schedule_pill(&self, now: DateTime<Utc>) {
         let owned = self.planner.borrow().owned().cloned();
         let (text, running) = match owned {
-            Some(slot) if self.recording() => (format!("Arrêt programmé à {}", clock_label(slot.end, &Local)), true),
+            Some(slot) if self.recording() => (tr!("Arrêt programmé à {}", clock_label(slot.end, &Local)), true),
             _ => {
                 let config = self.config.borrow();
                 let planner = self.planner.borrow();
@@ -494,7 +507,7 @@ impl App {
                     .filter_map(|s| s.slot_at(now, &Local))
                     .find(|slot| !planner.is_done(&slot.key()));
                 let text = match current {
-                    Some(slot) => format!("{} · créneau jusqu'à {}", scene(&slot), clock_label(slot.end, &Local)),
+                    Some(slot) => tr!("{} · créneau jusqu'à {}", scene(&slot), clock_label(slot.end, &Local)),
                     None => schedule::next_slot(&config.schedules, now, &Local)
                         .map(|slot| format!("{} · {}", scene(&slot), when_label(slot.start, now, &Local)))
                         .unwrap_or_default(),
@@ -527,22 +540,22 @@ impl App {
             .map(|s| {
                 let locked = owned.as_ref().is_some_and(|slot| slot.schedule_id == s.id);
                 let next = if locked {
-                    format!("Enregistre jusqu'à {}", clock_label(owned.as_ref().map_or(now, |o| o.end), &Local))
+                    tr!("Enregistre jusqu'à {}", clock_label(owned.as_ref().map_or(now, |o| o.end), &Local))
                 } else if !s.enabled {
-                    "Désactivée".into()
+                    tr!("Désactivée")
                 } else if let Some(slot) = s.slot_at(now, &Local) {
                     if self.planner.borrow().is_done(&slot.key()) {
-                        format!(
+                        tr!(
                             "Créneau en cours, sans enregistrement programmé (jusqu'à {})",
                             clock_label(slot.end, &Local)
                         )
                     } else {
-                        "Créneau en cours".into()
+                        tr!("Créneau en cours")
                     }
                 } else if let Some(slot) = s.next_slot(now, &Local) {
-                    format!("Prochain : {}", when_label(slot.start, now, &Local))
+                    tr!("Prochain : {}", when_label(slot.start, now, &Local))
                 } else {
-                    "Terminée".into()
+                    tr!("Terminée")
                 };
                 ScheduleItem {
                     id: s.id.as_str().into(),
@@ -573,7 +586,10 @@ impl App {
     /// Ouvre le formulaire d'une programmation (`id` vide : nouvelle).
     pub(super) fn edit_schedule(&self, id: &str) {
         if self.is_locked_schedule(id) {
-            self.toast("Cette programmation enregistre en ce moment : modifiable une fois son créneau terminé.", 2);
+            self.toast(
+                &tr!("Cette programmation enregistre en ce moment : modifiable une fois son créneau terminé."),
+                2,
+            );
             return;
         }
         let config = self.config.borrow();
@@ -610,14 +626,66 @@ impl App {
         self.with_bridge(|b| {
             b.set_schedule_scene_choices(ModelRc::new(VecModel::from(names)));
             b.set_schedule_scene_index(scene_index);
-            b.set_schedule_start(start.to_string().into());
-            b.set_schedule_end(end.to_string().into());
+            b.set_schedule_start(start.label().into());
+            b.set_schedule_end(end.label().into());
             b.set_schedule_repeat_index(repeat_index);
-            b.set_schedule_date(date.format("%d/%m/%Y").to_string().into());
             b.set_schedule_error(SharedString::new());
             b.set_sheet(if id.is_empty() { "schedule-new" } else { "schedule-edit" }.into());
         });
+        self.set_schedule_date(date, now.date_naive());
         self.schedule_times_edited();
+    }
+
+    /// Listes de la date (« une seule fois ») : années proposées, l'année en
+    /// cours et la suivante, plus celle de la date si elle n'en fait pas
+    /// partie (programmation passée qu'on modifie).
+    fn set_schedule_date(&self, date: NaiveDate, today: NaiveDate) {
+        let mut years = vec![today.year(), today.year() + 1];
+        if !years.contains(&date.year()) {
+            years.push(date.year());
+            years.sort_unstable();
+        }
+        let year_index = years.iter().position(|y| *y == date.year()).unwrap_or(0) as i32;
+        let year_names: Vec<SharedString> = years.iter().map(|y| y.to_string().into()).collect();
+        let month_names: Vec<SharedString> = (1..=12).map(|m| polyptyque_core::clock::month_name(m).into()).collect();
+        *self.schedule_years.borrow_mut() = years;
+        self.with_bridge(|b| {
+            b.set_schedule_year_choices(ModelRc::new(VecModel::from(year_names)));
+            b.set_schedule_year_index(year_index);
+            b.set_schedule_month_choices(ModelRc::new(VecModel::from(month_names)));
+            b.set_schedule_month_index(date.month0() as i32);
+            b.set_schedule_day_index(date.day0() as i32);
+        });
+        self.schedule_date_edited();
+    }
+
+    /// Date choisie : liste des jours du mois (le jour se cale sur le
+    /// dernier si le mois est plus court : 31 octobre → 30 novembre), et
+    /// jour de la semaine rappelé sous les listes.
+    pub(super) fn schedule_date_edited(&self) {
+        let date = self.schedule_date();
+        let days: Vec<SharedString> = (1..=polyptyque_core::clock::days_in_month(date.year(), date.month()))
+            .map(|d| d.to_string().into())
+            .collect();
+        let note = tr!("Le créneau commence un {}.", day_name(date.weekday().number_from_monday() as u8));
+        self.with_bridge(|b| {
+            b.set_schedule_day_choices(ModelRc::new(VecModel::from(days)));
+            b.set_schedule_day_index(date.day0() as i32);
+            b.set_schedule_date_note(note.into());
+        });
+    }
+
+    /// Date des trois listes, toujours valide (jour ramené au dernier du
+    /// mois).
+    fn schedule_date(&self) -> NaiveDate {
+        let (day, month, year_index) = self.with_bridge_value(|b| {
+            (b.get_schedule_day_index(), b.get_schedule_month_index(), b.get_schedule_year_index())
+        });
+        let today = Local::now().date_naive();
+        let year = self.schedule_years.borrow().get(year_index.max(0) as usize).copied().unwrap_or(today.year());
+        let month = (month.clamp(0, 11) + 1) as u32;
+        let day = ((day.max(0) + 1) as u32).min(polyptyque_core::clock::days_in_month(year, month));
+        NaiveDate::from_ymd_opt(year, month, day).unwrap_or(today)
     }
 
     /// Heures saisies : signale une fin le lendemain.
@@ -626,8 +694,8 @@ impl App {
             (TimeOfDay::parse(&b.get_schedule_start()), TimeOfDay::parse(&b.get_schedule_end()))
         });
         let note = match (start, end) {
-            (Some(start), Some(end)) if end < start => "Se termine le lendemain.",
-            _ => "",
+            (Some(start), Some(end)) if end < start => tr!("Se termine le lendemain."),
+            _ => String::new(),
         };
         self.with_bridge(|b| b.set_schedule_times_note(note.into()));
     }
@@ -652,33 +720,26 @@ impl App {
         let fail = |message: &str| b.set_schedule_error(message.into());
         let editing = self.editing_schedule.borrow().clone();
         if editing.as_deref().is_some_and(|id| self.is_locked_schedule(id)) {
-            fail("Cette programmation enregistre en ce moment : modifiable une fois son créneau terminé.");
+            fail(&tr!("Cette programmation enregistre en ce moment : modifiable une fois son créneau terminé."));
             return;
         }
         let Some(scene_id) =
             self.schedule_scene_ids.borrow().get(b.get_schedule_scene_index().max(0) as usize).cloned()
         else {
-            fail("Choisis une scène.");
+            fail(&tr!("Aucune scène choisie."));
             return;
         };
         let Some(start) = TimeOfDay::parse(&b.get_schedule_start()) else {
-            fail("Heure de début invalide : écris-la par exemple 21:00.");
+            fail(&tr!("Heure de début invalide (exemple : {}).", example(21, 0)));
             return;
         };
         let Some(end) = TimeOfDay::parse(&b.get_schedule_end()) else {
-            fail("Heure de fin invalide : écris-la par exemple 22:30.");
+            fail(&tr!("Heure de fin invalide (exemple : {}).", example(22, 30)));
             return;
         };
         let now = Utc::now();
-        let today = now.with_timezone(&Local).date_naive();
         let repeat = match b.get_schedule_repeat_index() {
-            REPEAT_ONCE => match parse_date(&b.get_schedule_date(), today) {
-                Some(date) => Repeat::Once { date },
-                None => {
-                    fail("Date invalide : écris-la par exemple 25/10/2026.");
-                    return;
-                }
-            },
+            REPEAT_ONCE => Repeat::Once { date: self.schedule_date() },
             REPEAT_DAILY => Repeat::Weekly { days: (1..=7).collect() },
             _ => Repeat::Weekly {
                 days: (1..=7u8).filter(|d| self.schedule_days.row_data(usize::from(d - 1)).unwrap_or(false)).collect(),
@@ -712,11 +773,9 @@ impl App {
         self.editing_schedule.borrow_mut().take();
         let next = schedule.next_slot(now, &Local).or_else(|| schedule.slot_at(now, &Local));
         let message = match next {
-            Some(slot) if slot.contains(now) => "Programmation enregistrée : son créneau a déjà commencé.".to_string(),
-            Some(slot) => {
-                format!("Programmation enregistrée : prochain créneau {}.", when_label(slot.start, now, &Local))
-            }
-            None => "Programmation enregistrée.".to_string(),
+            Some(slot) if slot.contains(now) => tr!("Programmation enregistrée : son créneau a déjà commencé."),
+            Some(slot) => tr!("Programmation enregistrée : prochain créneau {}.", when_label(slot.start, now, &Local)),
+            None => tr!("Programmation enregistrée."),
         };
         self.open_schedules();
         self.toast(&message, 1);
@@ -733,7 +792,7 @@ impl App {
         schedule.enabled = enabled;
         if enabled {
             if let Err(e) = schedule.validate(&self.config.borrow().schedules, now, &Local) {
-                self.toast(&format!("Impossible de l'activer : {}", self.schedule_error_text(&e)), 2);
+                self.toast(&tr!("Impossible de l'activer : {}", self.schedule_error_text(&e)), 2);
                 self.refresh_schedule_list(now);
                 return;
             }
@@ -749,7 +808,10 @@ impl App {
 
     pub(super) fn delete_schedule(&self, id: &str) {
         if self.is_locked_schedule(id) {
-            self.toast("Cette programmation enregistre en ce moment : supprimable une fois son créneau terminé.", 2);
+            self.toast(
+                &tr!("Cette programmation enregistre en ce moment : supprimable une fois son créneau terminé."),
+                2,
+            );
             return;
         }
         self.config.borrow_mut().schedules.retain(|s| s.id != id);
@@ -757,7 +819,7 @@ impl App {
         self.save();
         self.save_planner();
         self.refresh_schedule_list(Utc::now());
-        self.toast("Programmation supprimée.", 1);
+        self.toast(&tr!("Programmation supprimée."), 1);
     }
 
     /// Programmation dont l'enregistrement est en cours : ni modifiable ni
@@ -768,19 +830,19 @@ impl App {
 
     fn schedule_error_text(&self, error: &ScheduleError) -> String {
         match error {
-            ScheduleError::SameTimes => "l'heure de fin doit être différente de l'heure de début.".into(),
-            ScheduleError::NoDay => "choisis au moins un jour.".into(),
-            ScheduleError::InPast => "ce créneau est déjà passé : choisis une autre date ou une autre heure.".into(),
+            ScheduleError::SameTimes => tr!("l'heure de fin doit être différente de l'heure de début."),
+            ScheduleError::NoDay => tr!("aucun jour choisi."),
+            ScheduleError::InPast => tr!("ce créneau est déjà passé : choisir une autre date ou une autre heure."),
             ScheduleError::Overlap(id) => {
                 let config = self.config.borrow();
                 match config.schedules.iter().find(|s| s.id == *id) {
-                    Some(other) => format!(
+                    Some(other) => tr!(
                         "ce créneau chevauche la programmation « {} » ({}, {}) : un seul enregistrement à la fois.",
                         config.scene(&other.scene_id).map(|s| s.name.as_str()).unwrap_or_default(),
                         other.times_label(),
                         other.repeat_label().to_lowercase()
                     ),
-                    None => "ce créneau chevauche une autre programmation : un seul enregistrement à la fois.".into(),
+                    None => tr!("ce créneau chevauche une autre programmation : un seul enregistrement à la fois."),
                 }
             }
         }
@@ -793,12 +855,17 @@ impl App {
     }
 }
 
+/// Heure d'exemple dans un message, selon l'horloge.
+fn example(hour: u32, minute: u32) -> String {
+    polyptyque_core::clock::time(hour, minute)
+}
+
 /// « 1 min 47 s », « 12 s ».
 fn remaining(span: Span) -> String {
     let seconds = span.num_seconds().max(0);
     if seconds >= 60 {
-        format!("{} min {:02} s", seconds / 60, seconds % 60)
+        tr!("{} min {} s", seconds / 60, format!("{:02}", seconds % 60))
     } else {
-        format!("{seconds} s")
+        tr!("{} s", seconds)
     }
 }

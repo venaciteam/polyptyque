@@ -266,11 +266,11 @@ pub(crate) fn run_protected(shared: &Shared, name: &str, what: &str, mut task: i
         }
         restarts += 1;
         if restarts > MAX_TASK_RESTARTS || shared.stop_at().is_some() {
-            shared.fail(format!("[{name}] erreur interne répétée dans {what} (voir le journal)"));
+            shared.fail(tr::tr!("[{}] erreur interne répétée dans {} (voir le journal)", name, what));
             return;
         }
         log::warn!("[{name}] erreur interne dans {what} : relance ({restarts}/{MAX_TASK_RESTARTS})");
-        shared.note_error(format!("Erreur interne dans {what} : relancée"));
+        shared.note_error(tr::tr!("Erreur interne dans {} : relancée", what));
         std::thread::sleep(std::time::Duration::from_millis(500));
     }
 }

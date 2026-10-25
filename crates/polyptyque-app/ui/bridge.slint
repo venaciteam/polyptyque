@@ -52,7 +52,7 @@ export struct ScheduleItem {
     scene: string,
     // « 21:00 → 22:00 », « 22:00 → 02:00 (lendemain) ».
     times: string,
-    // « Tous les jours », « Une fois, le 25/10/2026 »…
+    // « Tous les jours », « Une fois, le dim. 25 oct. »…
     repeat: string,
     // « Prochain : aujourd'hui à 21:00 », « Désactivée »…
     next: string,
@@ -84,7 +84,7 @@ export global Bridge {
     // pendant l'enregistrement.
     in property <bool> mic-enabled;
     in property <bool> mic-recording;
-    in property <string> mic-text: "Micro";
+    in property <string> mic-text: @tr("Micro");
     in property <int> mic-tone;
     in property <float> mic-level;
     in property <bool> mic-sound;
@@ -135,7 +135,15 @@ export global Bridge {
     in property <string> schedule-times-note;
     // Répétition : 0 une seule fois, 1 tous les jours, 2 certains jours.
     in-out property <int> schedule-repeat-index;
-    in-out property <string> schedule-date;
+    // Date d'une programmation « une seule fois » : jour, mois (en toutes
+    // lettres) et année, chacun dans sa liste ; jour de la semaine rappelé.
+    in property <[string]> schedule-day-choices;
+    in-out property <int> schedule-day-index;
+    in property <[string]> schedule-month-choices;
+    in-out property <int> schedule-month-index;
+    in property <[string]> schedule-year-choices;
+    in-out property <int> schedule-year-index;
+    in property <string> schedule-date-note;
     // Jours cochés, du lundi au dimanche.
     in property <[bool]> schedule-days;
     in property <string> schedule-error;
@@ -193,6 +201,14 @@ export global Bridge {
     in-out property <bool> settings-convert;
     // Mises à jour : 0 versions stables, 1 stables et bêta, 2 ne pas rechercher.
     in-out property <int> settings-update-index;
+    // Langue : 0 automatique, 1 français, 2 anglais. Horloge : 0 automatique,
+    // 1 24 h, 2 12 h.
+    in-out property <int> settings-language-index;
+    in-out property <int> settings-clock-index;
+    // Horloge en vigueur (exemples d'heures dans la programmation).
+    in property <bool> twelve-hour;
+    // Mois avant le jour dans une date (anglais : « October 25, 2026 »).
+    in property <bool> month-first;
     in-out property <bool> settings-open-windows;
     in-out property <bool> settings-close-browsers;
     in-out property <bool> settings-startup;
@@ -245,6 +261,14 @@ export global Bridge {
     in property <bool> incident-can-resume;
     callback incident-repair();
     callback incident-resume();
+    // Signalement d'un problème : chemin du rapport une fois préparé (vide
+    // avant).
+    in property <string> report-path;
+    in property <string> report-name;
+    callback request-report(bool);
+    callback prepare-report();
+    callback open-report();
+    callback open-report-page();
     // Démarre ou arrête l'enregistrement d'une seule source.
     callback toggle-source(string);
     callback open-settings();
@@ -268,6 +292,7 @@ export global Bridge {
     callback delete-schedule(string);
     callback save-schedule();
     callback schedule-times-edited();
+    callback schedule-date-edited();
     callback toggle-schedule-day(int);
     callback close-schedule-editor();
     callback set-launch-at-startup(bool);

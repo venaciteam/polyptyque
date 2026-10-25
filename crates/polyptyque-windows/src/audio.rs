@@ -3,7 +3,7 @@
 //!   disponible depuis Windows 10 version 2004 ;
 //! - d'un micro.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use polyptyque_core::platform::{AudioCapture, AudioDevice, AudioPacket};
 use wasapi::{
     AudioCaptureClient, AudioClient, DeviceEnumerator, Direction, Handle, SampleType, StreamMode, WasapiError,
@@ -27,28 +27,28 @@ impl WasapiCapture {
     pub fn process(pid: u32, sample_rate: u32, channels: u16) -> Result<Self> {
         let _ = wasapi::initialize_mta();
         let client = AudioClient::new_application_loopback_client(pid, true)
-            .with_context(|| format!("activation de la capture audio du processus {pid}"))?;
-        Self::start(client, sample_rate, channels).map_err(|e| anyhow!("initialisation de la capture audio : {e}"))
+            .map_err(|e| hidden(tr::tr!("activation de la capture audio du processus {}", pid), e))?;
+        Self::start(client, sample_rate, channels).map_err(|e| hidden(tr::tr!("initialisation de la capture audio"), e))
     }
 
     /// Son d'un micro (`None` : le micro par défaut de Windows).
     pub fn microphone(device_id: Option<&str>, sample_rate: u32, channels: u16) -> Result<Self> {
         let _ = wasapi::initialize_mta();
-        let enumerator = DeviceEnumerator::new().context("liste des périphériques audio")?;
+        let enumerator = DeviceEnumerator::new().map_err(|e| hidden(tr::tr!("liste des périphériques audio"), e))?;
         let device = match device_id {
-            Some(id) => enumerator.get_device(id).context("micro introuvable (débranché ?)")?,
-            None => {
-                enumerator.get_default_device(&Direction::Capture).context("aucun micro par défaut dans Windows")?
-            }
+            Some(id) => enumerator.get_device(id).map_err(|e| hidden(tr::tr!("micro introuvable (débranché ?)"), e))?,
+            None => enumerator
+                .get_default_device(&Direction::Capture)
+                .map_err(|e| hidden(tr::tr!("aucun micro par défaut dans Windows"), e))?,
         };
-        let client = device.get_iaudioclient().context("ouverture du micro")?;
+        let client = device.get_iaudioclient().map_err(|e| hidden(tr::tr!("ouverture du micro"), e))?;
         Self::start(client, sample_rate, channels).map_err(|e| {
             if access_denied(&e) {
-                anyhow!(
-                    "Windows refuse l'accès au micro. Autorise-le dans Paramètres > Confidentialité et sécurité > Microphone (accès au micro, et accès pour les applications de bureau)."
-                )
+                anyhow!(tr::tr!(
+                    "Windows refuse l'accès au micro. L'autoriser dans Paramètres > Confidentialité et sécurité > Microphone (accès au micro, et accès pour les applications de bureau)."
+                ))
             } else {
-                anyhow!("micro inutilisable : {e}")
+                hidden(tr::tr!("micro inutilisable"), e)
             }
         })
     }
@@ -64,6 +64,13 @@ impl WasapiCapture {
         client.start_stream()?;
         Ok(Self { client, capture, event, frame_bytes: channels as usize * 4, buffer: Vec::new() })
     }
+}
+
+/// Erreur de la bibliothèque audio, en anglais : le détail va au journal, le
+/// message affiché (dans la langue de l'interface) y renvoie.
+fn hidden(what: String, detail: impl std::fmt::Display) -> anyhow::Error {
+    log::warn!("{what} : {detail}");
+    anyhow!(tr::tr!("{} (détail dans le journal)", what))
 }
 
 fn access_denied(error: &WasapiError) -> bool {

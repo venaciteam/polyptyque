@@ -80,14 +80,14 @@ pub trait Platform: Send + Sync {
     /// si besoin, sans lui donner le focus. Peut attendre le programme de la
     /// fenêtre : à appeler hors du fil de l'interface.
     fn restore_window(&self, _handle: WindowHandle) -> anyhow::Result<()> {
-        anyhow::bail!("non disponible sur ce système")
+        anyhow::bail!(tr::tr!("non disponible sur ce système"))
     }
 
     /// Demande à une fenêtre de se fermer, comme un clic sur sa croix : son
     /// programme enregistre sa session, ou demande confirmation s'il a des
     /// données non enregistrées. N'attend pas la fermeture.
     fn close_window(&self, _handle: WindowHandle) -> anyhow::Result<()> {
-        anyhow::bail!("non disponible sur ce système")
+        anyhow::bail!(tr::tr!("non disponible sur ce système"))
     }
     fn process_command_line(&self, pid: u32) -> Option<String>;
     fn detect_browsers(&self) -> Vec<BrowserInstall>;
@@ -132,4 +132,31 @@ pub trait Platform: Send + Sync {
     fn end_recording_session(&self);
 
     fn free_disk_space(&self, path: &Path) -> Option<u64>;
+
+    /// Système, pour un rapport de problème : « Windows 11 Pro 24H2 (build
+    /// 26100.2033) ».
+    fn os_description(&self) -> String {
+        std::env::consts::OS.to_string()
+    }
+
+    /// Horloge du format régional du système : vrai pour 12 h (AM/PM).
+    fn uses_twelve_hour_clock(&self) -> bool {
+        false
+    }
+
+    /// Cartes graphiques, pour un rapport de problème.
+    fn graphics_adapters(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// Ouvre une adresse web dans le navigateur par défaut, ou un fichier
+    /// avec son programme habituel.
+    fn shell_open(&self, _target: &str) -> anyhow::Result<()> {
+        anyhow::bail!(tr::tr!("non disponible sur ce système"))
+    }
+
+    /// Montre un fichier dans le gestionnaire de fichiers, sélectionné.
+    fn reveal_file(&self, _path: &Path) -> anyhow::Result<()> {
+        anyhow::bail!(tr::tr!("non disponible sur ce système"))
+    }
 }

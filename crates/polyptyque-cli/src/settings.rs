@@ -101,7 +101,7 @@ pub fn menu(platform: &dyn Platform, config: &mut Config) -> Result<()> {
             }
             4 => {
                 let prefs = [HardwarePreference::Auto, HardwarePreference::Gpu, HardwarePreference::Cpu];
-                let labels: Vec<&str> = prefs.iter().map(|p| p.label()).collect();
+                let labels: Vec<String> = prefs.iter().map(|p| p.label()).collect();
                 let i = Select::with_theme(&theme)
                     .with_prompt("Matériel d'encodage")
                     .items(&labels)

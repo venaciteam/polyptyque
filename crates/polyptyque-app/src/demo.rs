@@ -17,7 +17,8 @@ use polyptyque_core::platform::*;
 
 struct DemoWindow {
     handle: WindowHandle,
-    title: &'static str,
+    /// Titre en français et en anglais.
+    title: (&'static str, &'static str),
     class: &'static str,
     exe: &'static str,
     /// Teinte de l'image (chrominance U, V).
@@ -30,27 +31,43 @@ const DISCORD: WindowHandle = 3;
 const WINDOWS: [DemoWindow; 4] = [
     DemoWindow {
         handle: 1,
-        title: "Concert en direct — Mozilla Firefox",
+        title: ("Concert en direct — Mozilla Firefox", "Live concert — Mozilla Firefox"),
         class: "MozillaWindowClass",
         exe: "/demo/firefox.exe",
         tint: (96, 168),
     },
     DemoWindow {
         handle: 2,
-        title: "Conférence - Google Chrome",
+        title: ("Conférence - Google Chrome", "Conference - Google Chrome"),
         class: "Chrome_WidgetWin_1",
         exe: "/demo/chrome.exe",
         tint: (168, 150),
     },
     DemoWindow {
         handle: 3,
-        title: "#général | Discord",
+        title: ("#général | Discord", "#general | Discord"),
         class: "Chrome_WidgetWin_1",
         exe: "/demo/Discord.exe",
         tint: (176, 112),
     },
-    DemoWindow { handle: 4, title: "Notes", class: "Notepad", exe: "/demo/notepad.exe", tint: (128, 128) },
+    DemoWindow { handle: 4, title: ("Notes", "Notes"), class: "Notepad", exe: "/demo/notepad.exe", tint: (128, 128) },
 ];
+
+impl DemoWindow {
+    fn title(&self) -> &'static str {
+        demo_text(self.title.0, self.title.1)
+    }
+}
+
+/// Données d'exemple dans la langue du système au lancement, pour des
+/// captures d'écran cohérentes. Hors catalogue : la démonstration n'est pas
+/// livrée.
+fn demo_text(french: &'static str, english: &'static str) -> &'static str {
+    match crate::i18n::Language::current() {
+        crate::i18n::Language::French => french,
+        crate::i18n::Language::English => english,
+    }
+}
 
 pub struct DemoPlatform {
     start: Instant,
@@ -80,7 +97,7 @@ impl DemoPlatform {
     /// Configuration de démonstration : une scène avec trois sources.
     pub fn seed_config(&self) -> Config {
         let mut config = Config::default();
-        config.settings.output_dir = self.root.join("enregistrements");
+        config.settings.output_dir = self.root.join(demo_text("enregistrements", "recordings"));
         let firefox =
             BrowserRef { name: "Firefox".into(), exe_path: "/demo/firefox.exe".into(), family: BrowserFamily::Gecko };
         let chrome = BrowserRef {
@@ -89,13 +106,14 @@ impl DemoPlatform {
             family: BrowserFamily::Chromium,
         };
         let mut concert = Source::browser("Concert", firefox, None, &self.root.join("profils"));
-        let mut conference = Source::browser("Conférence", chrome, None, &self.root.join("profils"));
+        let mut conference =
+            Source::browser(demo_text("Conférence", "Conference"), chrome, None, &self.root.join("profils"));
         set_profile(&mut concert, self.profile("concert"));
         set_profile(&mut conference, self.profile("conference"));
         let discord = WindowInfo {
             handle: 3,
             pid: 103,
-            title: WINDOWS[2].title.into(),
+            title: WINDOWS[2].title().into(),
             class: WINDOWS[2].class.into(),
             exe: WINDOWS[2].exe.into(),
         };
@@ -122,7 +140,7 @@ impl Platform for DemoPlatform {
             .map(|w| WindowInfo {
                 handle: w.handle,
                 pid: 100 + w.handle as u32,
-                title: w.title.into(),
+                title: w.title().into(),
                 class: w.class.into(),
                 exe: w.exe.into(),
             })
@@ -195,8 +213,10 @@ impl Platform for DemoPlatform {
 
     fn list_microphones(&self) -> Vec<AudioDevice> {
         vec![
-            AudioDevice { id: "demo-usb".into(), name: "Micro USB de démonstration".into() },
-            AudioDevice { id: "demo-casque".into(), name: "Micro du casque".into() },
+            AudioDevice {
+                id: "demo-usb".into(), name: demo_text("Micro USB de démonstration", "Demo USB mic").into()
+            },
+            AudioDevice { id: "demo-casque".into(), name: demo_text("Micro du casque", "Headset mic").into() },
         ]
     }
 
@@ -222,6 +242,27 @@ impl Platform for DemoPlatform {
 
     fn free_disk_space(&self, _: &Path) -> Option<u64> {
         Some(412_300_000_000)
+    }
+
+    fn os_description(&self) -> String {
+        format!("{} ({})", std::env::consts::OS, demo_text("démonstration", "demo"))
+    }
+
+    fn graphics_adapters(&self) -> Vec<String> {
+        vec![demo_text("Carte graphique de démonstration", "Demo graphics card").into()]
+    }
+
+    /// Démonstration : rien ne s'ouvre, l'action est seulement affichée.
+    fn shell_open(&self, target: &str) -> Result<()> {
+        log::info!("démo : ouverture de {target}");
+        println!("démo : ouverture de {target}");
+        Ok(())
+    }
+
+    fn reveal_file(&self, path: &Path) -> Result<()> {
+        log::info!("démo : fichier montré : {}", path.display());
+        println!("démo : fichier montré : {}", path.display());
+        Ok(())
     }
 }
 

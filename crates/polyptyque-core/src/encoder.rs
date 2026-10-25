@@ -17,12 +17,12 @@ pub enum EncoderKind {
 }
 
 impl EncoderKind {
-    pub fn label(self) -> &'static str {
+    pub fn label(self) -> String {
         match self {
-            EncoderKind::Nvenc => "NVIDIA NVENC",
-            EncoderKind::Amf => "AMD AMF",
-            EncoderKind::Qsv => "Intel Quick Sync",
-            EncoderKind::Software => "Processeur",
+            EncoderKind::Nvenc => "NVIDIA NVENC".into(),
+            EncoderKind::Amf => "AMD AMF".into(),
+            EncoderKind::Qsv => "Intel Quick Sync".into(),
+            EncoderKind::Software => tr::tr!("Processeur"),
         }
     }
 }

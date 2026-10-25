@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/*"]
 
 [workspace.package]
-version = "1.0.0-beta.4"
+version = "1.0.0-beta.5"
 edition = "2021"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/venaciteam/Polyptyque"
@@ -24,6 +24,8 @@ log = "0.4"
 serde = { version = "1", features = ["derive"] }
 simplelog = "0.12"
 toml = "1"
+rspolib = "0.1"
+tr = { version = "0.1.11", default-features = false }
 wasapi = "0.26"
 windows = "0.62"
 

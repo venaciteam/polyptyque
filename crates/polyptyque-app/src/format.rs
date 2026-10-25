@@ -1,18 +1,48 @@
-//! Mise en forme des valeurs affichées, en français.
+//! Mise en forme des valeurs affichées, dans la langue de l'interface.
 
 use std::time::Duration;
 
-/// Taille lisible : « 850 Mo », « 1,2 Go ».
+use tr::tr;
+
+use crate::i18n::Language;
+
+/// Nombre à virgule dans la langue de l'interface : « 1,2 » ou « 1.2 ».
+fn decimal(value: f64, digits: usize) -> String {
+    let text = format!("{value:.digits$}");
+    match Language::current() {
+        Language::French => text.replace('.', ","),
+        Language::English => text,
+    }
+}
+
+/// Nombre entier avec séparateur de milliers : « 12 000 » (espace
+/// insécable), « 12,000 ».
+pub fn integer(value: u64) -> String {
+    let separator = match Language::current() {
+        Language::French => '\u{a0}',
+        Language::English => ',',
+    };
+    let digits = value.to_string();
+    let mut out = String::with_capacity(digits.len() + digits.len() / 3);
+    for (i, digit) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i) % 3 == 0 {
+            out.push(separator);
+        }
+        out.push(digit);
+    }
+    out
+}
+
+/// Taille lisible : « 850 Mo », « 1,2 Go » (« 850 MB », « 1.2 GB »).
 pub fn bytes(value: u64) -> String {
     let v = value as f64;
-    let text = if v >= 1e9 {
-        format!("{:.1} Go", v / 1e9)
+    if v >= 1e9 {
+        tr!("{} Go", decimal(v / 1e9, 1))
     } else if v >= 1e6 {
-        format!("{:.0} Mo", v / 1e6)
+        tr!("{} Mo", decimal(v / 1e6, 0))
     } else {
-        format!("{:.0} Ko", v / 1e3)
-    };
-    text.replace('.', ",")
+        tr!("{} Ko", decimal(v / 1e3, 0))
+    }
 }
 
 /// Durée « 02:14:37 ».
@@ -24,9 +54,9 @@ pub fn clock(duration: Duration) -> String {
 /// Durée approximative : « 31 h », « 45 min ».
 pub fn hours(seconds: f64) -> String {
     if seconds >= 3600.0 {
-        format!("{:.0} h", seconds / 3600.0)
+        tr!("{} h", format!("{:.0}", seconds / 3600.0))
     } else {
-        format!("{:.0} min", (seconds / 60.0).max(0.0))
+        tr!("{} min", format!("{:.0}", (seconds / 60.0).max(0.0)))
     }
 }
 
@@ -47,12 +77,14 @@ pub fn capitalize(text: &str) -> String {
     }
 }
 
-/// Liste en français : « A », « A et B », « A, B et C ».
+/// Liste : « A », « A et B », « A, B et C » (« A, B and C »).
 pub fn join_list(items: &[String]) -> String {
     match items {
         [] => String::new(),
         [single] => single.clone(),
-        [rest @ .., last] => format!("{} et {last}", rest.join(", ")),
+        // Pluriel selon le nombre d'éléments avant le dernier : l'anglais
+        // ajoute une virgule à partir de trois (« A, B, and C »).
+        [rest @ .., last] => tr!("{} et {}" | "{} et {}" % rest.len(), rest.join(", "), last),
     }
 }
 
@@ -70,6 +102,9 @@ mod tests {
         assert_eq!(level(0.0), 0.0);
         assert!((level(0.001) - 0.0).abs() < 1e-6);
         assert_eq!(capitalize("discord"), "Discord");
+        assert_eq!(integer(12000), "12\u{a0}000");
+        assert_eq!(integer(500), "500");
+        assert_eq!(integer(1_234_567), "1\u{a0}234\u{a0}567");
         let names = ["« A »".to_string(), "« B »".into(), "« C »".into()];
         assert_eq!(join_list(&names[..1]), "« A »");
         assert_eq!(join_list(&names[..2]), "« A » et « B »");

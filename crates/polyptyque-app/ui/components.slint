@@ -308,7 +308,7 @@ component RecordToggle inherits Rectangle {
     border-color: root.recording ? Theme.recording.with-alpha(0.6) : Theme.border;
     opacity: root.enabled ? 1 : 0.4;
     accessible-role: button;
-    accessible-label: root.recording ? "Arrêter cette source" : "Enregistrer cette source";
+    accessible-label: root.recording ? @tr("Arrêter cette source") : @tr("Enregistrer cette source");
     animate background { duration: 120ms; }
 
     Image {
@@ -395,8 +395,8 @@ export component SourceCardView inherits Rectangle {
                 height: 34px;
                 alignment: center;
                 ActionButton {
-                    text: root.card.can-restore ? "Rétablir la fenêtre"
-                        : root.recording ? "Rouvrir la fenêtre" : "Ouvrir la fenêtre";
+                    text: root.card.can-restore ? @tr("Rétablir la fenêtre")
+                        : root.recording ? @tr("Rouvrir la fenêtre") : @tr("Ouvrir la fenêtre");
                     icon: root.card.can-restore ? @image-url("icons/restore.svg") : @image-url("icons/launch.svg");
                     has-icon: true;
                     clicked => {
@@ -477,7 +477,7 @@ export component SourceCardView inherits Rectangle {
                     active: root.card.sound;
                 }
                 Text {
-                    text: root.card.sound ? "Son actif" : "Muet";
+                    text: root.card.sound ? @tr("Son actif") : @tr("Muet");
                     color: Theme.text-faint;
                     font-size: Theme.font-small;
                 }
@@ -491,7 +491,7 @@ export component SourceCardView inherits Rectangle {
                     horizontal-alignment: right;
                 }
                 Text {
-                    text: root.card.dropped > 0 ? "\{root.card.dropped} perdues" : "0 perdue";
+                    text: @tr("{n} perdue" | "{n} perdues" % root.card.dropped);
                     color: root.card.dropped > 0 ? Theme.warning : Theme.text-faint;
                     font-size: Theme.font-small;
                     horizontal-alignment: right;
@@ -609,6 +609,10 @@ export component Note inherits Rectangle {
 export component Sheet inherits Rectangle {
     in property <string> title;
     in property <length> sheet-width: 540px;
+    // Hauteur disponible pour le contenu quand la fenêtre est à sa taille
+    // maximale (marges, titre) : une fenêtre peut s'en servir pour ne faire
+    // défiler qu'une partie de son contenu.
+    out property <length> available-height: root.height - 40px - 2 * 22px - header.preferred-height - 16px;
     callback close();
 
     background: Theme.backdrop;
@@ -651,7 +655,7 @@ export component Sheet inherits Rectangle {
                     }
                     IconButton {
                         icon: @image-url("icons/close.svg");
-                        label: "Fermer";
+                        label: @tr("Fermer");
                         clicked => {
                             root.close();
                         }

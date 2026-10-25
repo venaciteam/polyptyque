@@ -40,7 +40,7 @@ impl NamedPipe {
             )
         };
         if handle.is_invalid() {
-            bail!("création du tube {path} impossible : {}", std::io::Error::last_os_error());
+            bail!(tr::tr!("création du tube {} impossible : {}", path, std::io::Error::last_os_error()));
         }
         Ok(Self { path, handle })
     }
@@ -61,7 +61,7 @@ impl StreamPipe for NamedPipe {
                 unsafe {
                     let _ = CloseHandle(handle);
                 }
-                bail!("connexion de FFmpeg au tube {path} : {e}");
+                bail!(tr::tr!("connexion de FFmpeg au tube {} : {}", path, e));
             }
         }
         let file = unsafe { File::from_raw_handle(handle.0 as RawHandle) };

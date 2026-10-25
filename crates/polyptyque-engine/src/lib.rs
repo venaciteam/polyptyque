@@ -21,3 +21,11 @@ mod writer;
 
 pub use session::{MicrophonePlan, Session, SessionPlan, SourceStatus, SourceSummary, MICROPHONE_ID};
 pub use shared::SourceState;
+
+/// Langue des messages du moteur (voir [`polyptyque_core::i18n`]).
+pub fn set_catalog(catalog: Option<std::sync::Arc<polyptyque_core::i18n::Catalog>>) {
+    match catalog {
+        Some(catalog) => tr::set_translator!(catalog),
+        None => tr::set_translator!(polyptyque_core::i18n::French),
+    }
+}

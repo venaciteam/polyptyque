@@ -121,7 +121,7 @@ pub fn restore(handle: WindowHandle) -> Result<()> {
     let window = hwnd(handle);
     unsafe {
         if !IsWindow(Some(window)).as_bool() {
-            bail!("la fenêtre n'existe plus");
+            bail!(tr::tr!("la fenêtre n'existe plus"));
         }
         if IsIconic(window).as_bool() {
             let mut placement =
@@ -141,7 +141,7 @@ pub fn restore(handle: WindowHandle) -> Result<()> {
         let primary = MonitorFromPoint(POINT { x: 0, y: 0 }, MONITOR_DEFAULTTOPRIMARY);
         let mut info = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
         if !GetMonitorInfoW(primary, &mut info).as_bool() {
-            bail!("écran principal introuvable");
+            bail!(tr::tr!("écran principal introuvable"));
         }
         let area = info.rcWork;
         let (area_width, area_height) = (area.right - area.left, area.bottom - area.top);
