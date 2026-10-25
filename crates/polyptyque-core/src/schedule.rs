@@ -256,8 +256,12 @@ impl Schedule {
             .find(|slot| slot.contains(now))
     }
 
-    /// Prochain créneau commençant après `now`.
+    /// Prochain créneau commençant après `now`. Une programmation unique a
+    /// son créneau à sa date, aussi lointaine soit-elle.
     pub fn next_slot<Tz: TimeZone>(&self, now: DateTime<Utc>, tz: &Tz) -> Option<Slot> {
+        if let Repeat::Once { date } = &self.repeat {
+            return self.slot_on(*date, tz).filter(|slot| slot.start > now);
+        }
         let today = now.with_timezone(tz).date_naive();
         (-1..=LOOKAHEAD_DAYS)
             .filter_map(|offset| today.checked_add_signed(Duration::days(offset)))
@@ -754,6 +758,18 @@ mod tests {
         let s = weekly("02:15", "03:00", &ALL);
         assert_eq!(s.slot_on(date(2026, 3, 29), &Paris), None);
         assert!(s.slot_on(date(2026, 3, 30), &Paris).is_some());
+    }
+
+    #[test]
+    fn distant_once_schedule_is_upcoming() {
+        // Une date lointaine (au-delà de la semaine examinée pour une
+        // répétition) reste à venir : liste, pastille, anti-veille.
+        let s = once("21:00", "22:00", date(2027, 10, 31));
+        let now = paris(2026, 10, 25, 10, 0);
+        assert_eq!(s.next_slot(now, &Paris).unwrap().start, paris(2027, 10, 31, 21, 0));
+        assert!(s.is_active(now, &Paris));
+        assert!(any_active(&[s.clone()], now, &Paris));
+        assert_eq!(next_slot(&[s], now, &Paris).unwrap().day, date(2027, 10, 31));
     }
 
     #[test]
