@@ -139,6 +139,11 @@ pub trait Platform: Send + Sync {
         std::env::consts::OS.to_string()
     }
 
+    /// Horloge du format régional du système : vrai pour 12 h (AM/PM).
+    fn uses_twelve_hour_clock(&self) -> bool {
+        false
+    }
+
     /// Cartes graphiques, pour un rapport de problème.
     fn graphics_adapters(&self) -> Vec<String> {
         Vec::new()

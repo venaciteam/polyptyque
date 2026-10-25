@@ -488,6 +488,21 @@ export component SettingsSheet inherits Sheet {
                     font-weight: 700;
                 }
                 Field {
+                    label: @tr("Langue");
+                    ComboBox {
+                        // Chaque langue écrite dans sa propre langue.
+                        model: [@tr("Automatique (langue de Windows)"), "Français", "English"];
+                        current-index <=> Bridge.settings-language-index;
+                    }
+                }
+                Field {
+                    label: @tr("Horloge");
+                    ComboBox {
+                        model: [@tr("Automatique (comme Windows)"), @tr("24 h (21:00)"), @tr("12 h (9:00 PM)")];
+                        current-index <=> Bridge.settings-clock-index;
+                    }
+                }
+                Field {
                     label: @tr("Dossier des enregistrements");
                     HorizontalLayout {
                         spacing: 8px;
@@ -891,7 +906,7 @@ export component ScheduleEditorSheet inherits Sheet {
             horizontal-stretch: 1;
             LineEdit {
                 text <=> Bridge.schedule-start;
-                placeholder-text: "21:00";
+                placeholder-text: Bridge.twelve-hour ? "9:00 PM" : "21:00";
                 edited(text) => {
                     Bridge.schedule-times-edited();
                 }
@@ -902,7 +917,7 @@ export component ScheduleEditorSheet inherits Sheet {
             horizontal-stretch: 1;
             LineEdit {
                 text <=> Bridge.schedule-end;
-                placeholder-text: "22:30";
+                placeholder-text: Bridge.twelve-hour ? "10:30 PM" : "22:30";
                 edited(text) => {
                     Bridge.schedule-times-edited();
                 }

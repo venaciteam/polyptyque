@@ -152,6 +152,10 @@ impl Platform for WindowsPlatform {
         system_info::graphics_adapters()
     }
 
+    fn uses_twelve_hour_clock(&self) -> bool {
+        system_info::uses_twelve_hour_clock()
+    }
+
     fn shell_open(&self, target: &str) -> anyhow::Result<()> {
         system_info::shell_open(target)
     }

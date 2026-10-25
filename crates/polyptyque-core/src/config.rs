@@ -516,6 +516,10 @@ pub struct Settings {
     /// Lancer Polyptyque à l'ouverture de la session Windows (réduit), pour
     /// que les programmations survivent à un redémarrage.
     pub launch_at_startup: bool,
+    /// Langue de l'interface (voir « Langues et formats »).
+    pub language: LanguageChoice,
+    /// Heures affichées et saisies sur 24 h ou 12 h.
+    pub clock: ClockChoice,
     pub video: VideoSettings,
     pub audio: AudioSettings,
     pub microphone: MicrophoneSettings,
@@ -534,6 +538,8 @@ impl Default for Settings {
             open_windows_at_launch: true,
             close_browsers_at_exit: true,
             launch_at_startup: false,
+            language: LanguageChoice::Auto,
+            clock: ClockChoice::Auto,
             video: VideoSettings::default(),
             audio: AudioSettings::default(),
             microphone: MicrophoneSettings::default(),
@@ -548,6 +554,29 @@ impl Settings {
     pub fn update_channel(&self, version: &str) -> UpdateChannel {
         self.update_channel.unwrap_or_else(|| UpdateChannel::of_version(version))
     }
+}
+
+/// Langue de l'interface : celle de Windows (le français si Windows est en
+/// français, l'anglais sinon), ou imposée.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum LanguageChoice {
+    #[default]
+    Auto,
+    French,
+    English,
+}
+
+/// Horloge : celle du format régional de Windows, ou imposée.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ClockChoice {
+    #[default]
+    #[serde(rename = "auto")]
+    Auto,
+    #[serde(rename = "24h")]
+    H24,
+    #[serde(rename = "12h")]
+    H12,
 }
 
 /// Versions proposées par la recherche de mises à jour.

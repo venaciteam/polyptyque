@@ -7,6 +7,7 @@
 //! [`platform::Platform`] et implémentées ailleurs.
 
 pub mod browsers;
+pub mod clock;
 pub mod config;
 pub mod encoder;
 pub mod hotkeys;

@@ -10,11 +10,24 @@ use anyhow::{bail, Result};
 use windows::core::{w, HSTRING, PCWSTR};
 use windows::Win32::Foundation::ERROR_SUCCESS;
 use windows::Win32::Graphics::Dxgi::{CreateDXGIFactory1, IDXGIFactory1, DXGI_ADAPTER_FLAG_SOFTWARE};
-use windows::Win32::System::Registry::{RegGetValueW, HKEY_LOCAL_MACHINE, RRF_RT_REG_DWORD, RRF_RT_REG_SZ};
+use windows::Win32::System::Registry::{
+    RegGetValueW, HKEY, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, RRF_RT_REG_DWORD, RRF_RT_REG_SZ,
+};
 use windows::Win32::UI::Shell::ShellExecuteW;
 use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 
 const CURRENT_VERSION: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion";
+
+/// Format régional de Windows (Paramètres > Heure et langue > Langue et
+/// région) : heure courte sur 12 h (« h:mm tt ») ou 24 h (« HH:mm »).
+pub fn uses_twelve_hour_clock() -> bool {
+    const INTERNATIONAL: &str = r"Control Panel\International";
+    if let Some(format) = registry_string_in(HKEY_CURRENT_USER, INTERNATIONAL, "sShortTime") {
+        return format.contains('h') && !format.contains('H');
+    }
+    // Ancienne valeur : « 0 » pour 12 h, « 1 » pour 24 h.
+    registry_string_in(HKEY_CURRENT_USER, INTERNATIONAL, "iTime").is_some_and(|v| v.trim() == "0")
+}
 
 /// « Windows 11 Pro 24H2 (build 26100.2033) ».
 pub fn os_description() -> String {
@@ -79,16 +92,20 @@ pub fn reveal_file(path: &Path) -> Result<()> {
 }
 
 fn registry_string(path: &str, name: &str) -> Option<String> {
+    registry_string_in(HKEY_LOCAL_MACHINE, path, name)
+}
+
+fn registry_string_in(root: HKEY, path: &str, name: &str) -> Option<String> {
     let (path, name) = (HSTRING::from(path), HSTRING::from(name));
     let mut size = 0u32;
     unsafe {
-        if RegGetValueW(HKEY_LOCAL_MACHINE, &path, &name, RRF_RT_REG_SZ, None, None, Some(&mut size)) != ERROR_SUCCESS {
+        if RegGetValueW(root, &path, &name, RRF_RT_REG_SZ, None, None, Some(&mut size)) != ERROR_SUCCESS {
             return None;
         }
         let mut buffer = vec![0u16; size as usize / 2 + 1];
         let mut size = (buffer.len() * 2) as u32;
         if RegGetValueW(
-            HKEY_LOCAL_MACHINE,
+            root,
             &path,
             &name,
             RRF_RT_REG_SZ,

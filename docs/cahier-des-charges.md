@@ -738,7 +738,8 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 > - [x] Textes externalisés (interface et messages Rust, erreurs du moteur comprises), phrases recollées et pluriels réécrits, copy française au ton impersonnel
 > - [x] Lexique anglais de référence, validé avant de traduire ([[lexique-anglais]])
 > - [x] Catalogue anglais complet, écrit directement en anglais et relu sur captures du mode démonstration ; le test refuse désormais tout texte sans anglais
-> - [ ] Réglages « Langue » et « Horloge », appliqués immédiatement ; sélecteur de date dans la programmation
+> - [x] Réglages « Langue » et « Horloge » (Fichiers et interface), appliqués immédiatement ; heures, dates (nom du mois) et nombres (milliers) selon la langue et l'horloge ; saisie « 9:00 PM » acceptée
+> - [ ] Saisie de la date d'une programmation sans ambiguïté (le sélecteur de Slint commence la semaine le dimanche et écrit les mois en anglais : à trancher)
 > - [ ] README anglais en tête (`README.md`) et français (`README.fr.md`), fichier d'accompagnement de la version portable, description de l'exécutable et du dépôt GitHub
 > - [ ] Validation sur la machine de référence, en français et en anglais
 

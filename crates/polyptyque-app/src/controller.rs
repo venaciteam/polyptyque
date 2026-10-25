@@ -19,8 +19,8 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, Context, Result};
 use polyptyque_core::browsers::{classify_executable, is_tor_browser, program_name};
 use polyptyque_core::config::{
-    BrowserFamily, BrowserRef, Codec, Config, HardwarePreference, PasteError, Scene, Settings, Source, SourceKind,
-    UpdateChannel,
+    BrowserFamily, BrowserRef, ClockChoice, Codec, Config, HardwarePreference, LanguageChoice, PasteError, Scene,
+    Settings, Source, SourceKind, UpdateChannel,
 };
 use polyptyque_core::encoder::{bytes_per_hour, EncoderChoice};
 use polyptyque_core::hotkeys;
@@ -404,6 +404,7 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
     bridge.set_schedules(ModelRc::from(app.schedule_items.clone()));
     bridge.set_schedule_days(ModelRc::from(app.schedule_days.clone()));
     bridge.set_can_browse(cfg!(windows));
+    app.apply_language_and_clock();
     app.refresh_all();
     app.restart_previews();
     app.register_hotkeys();
@@ -781,7 +782,7 @@ impl App {
             video.height,
             video.fps,
             video.codec.label(),
-            video.bitrate_kbps
+            format::integer(u64::from(video.bitrate_kbps))
         );
         drop(config);
         self.with_bridge(|b| b.set_encoder_text(text.into()));
@@ -1156,7 +1157,7 @@ impl App {
                     video.width,
                     video.height,
                     video.fps,
-                    video.bitrate_kbps
+                    format::integer(u64::from(video.bitrate_kbps))
                 );
                 self.with_bridge(|b| {
                     b.set_recording(true);
@@ -1715,7 +1716,7 @@ impl App {
             .collect();
         let text = match &record {
             Some(r) => {
-                let (date, time) = (display_date(&r.date), r.time.clone());
+                let (date, time) = (display_date(&r.date), display_time(&r.time));
                 let cause = if r.ended_by_windows {
                     tr!(
                         "Windows s'est éteint, a redémarré ou a fermé la session pendant l'enregistrement commencé le {} à {} (scène « {} »).",
@@ -2769,6 +2770,16 @@ impl App {
             hotkey_index(&s.hotkeys.toggle_previews),
         );
         let hotkey_choices: Vec<SharedString> = hotkey_list.into_iter().map(Into::into).collect();
+        let language_index = match s.language {
+            LanguageChoice::Auto => 0,
+            LanguageChoice::French => 1,
+            LanguageChoice::English => 2,
+        };
+        let clock_index = match s.clock {
+            ClockChoice::Auto => 0,
+            ClockChoice::H24 => 1,
+            ClockChoice::H12 => 2,
+        };
         // Micros : celui de Windows par défaut, puis ceux qui sont branchés ;
         // un micro choisi mais débranché reste proposé.
         let mut mics: Vec<(String, String)> = vec![(String::new(), tr!("Micro par défaut de Windows"))];
@@ -2810,6 +2821,8 @@ impl App {
             b.set_settings_previews(values.10);
             b.set_settings_convert(values.11);
             b.set_settings_update_index(values.12);
+            b.set_settings_language_index(language_index);
+            b.set_settings_clock_index(clock_index);
             b.set_settings_open_windows(s_open_windows);
             b.set_settings_close_browsers(s_close_browsers);
             b.set_settings_startup(s_startup);
@@ -2849,7 +2862,13 @@ impl App {
             return;
         };
         let b = ui.global::<Bridge>();
-        let bitrate: u32 = match b.get_bitrate_text().trim().replace([' ', '\u{a0}'], "").parse() {
+        // Séparateurs de milliers acceptés : espaces, et virgule en anglais
+        // (« 12,000 » ; en français, la virgule n'a pas ce sens).
+        let mut separators = vec![' ', '\u{a0}', '\u{202f}'];
+        if crate::i18n::Language::current() == crate::i18n::Language::English {
+            separators.push(',');
+        }
+        let bitrate: u32 = match b.get_bitrate_text().trim().replace(separators.as_slice(), "").parse() {
             Ok(value) if (250..=500_000).contains(&value) => value,
             _ => {
                 b.set_settings_error(
@@ -2886,6 +2905,7 @@ impl App {
         let updates_before;
         let updates_after;
         let startup_changed;
+        let display_changed;
         {
             let mut config = self.config.borrow_mut();
             let s = &mut config.settings;
@@ -2926,6 +2946,19 @@ impl App {
             s.close_browsers_at_exit = b.get_settings_close_browsers();
             startup_changed = s.launch_at_startup != b.get_settings_startup();
             s.launch_at_startup = b.get_settings_startup();
+            let language = match b.get_settings_language_index() {
+                1 => LanguageChoice::French,
+                2 => LanguageChoice::English,
+                _ => LanguageChoice::Auto,
+            };
+            let clock = match b.get_settings_clock_index() {
+                1 => ClockChoice::H24,
+                2 => ClockChoice::H12,
+                _ => ClockChoice::Auto,
+            };
+            display_changed = (s.language, s.clock) != (language, clock);
+            s.language = language;
+            s.clock = clock;
             s.microphone.enabled = b.get_settings_mic();
             if let Some((id, name)) = self.mic_choices.borrow().get(b.get_mic_index().max(0) as usize) {
                 if *id != s.microphone.device_id {
@@ -2940,9 +2973,15 @@ impl App {
         }
         b.set_sheet("".into());
         self.save();
+        if display_changed {
+            self.apply_language_and_clock();
+        }
         self.refresh_all();
-        if previews_before != previews_after {
+        if previews_before != previews_after || display_changed {
             self.restart_previews();
+        }
+        if display_changed {
+            self.refresh_display_texts();
         }
         self.register_hotkeys();
         if startup_changed {
@@ -2957,6 +2996,38 @@ impl App {
             }
             self.check_for_updates();
         }
+    }
+
+    /// Langue et horloge des réglages, appliquées partout : textes de
+    /// l'interface, messages de toutes les crates, heures affichées.
+    fn apply_language_and_clock(&self) {
+        let (language, clock) = {
+            let config = self.config.borrow();
+            (config.settings.language, config.settings.clock)
+        };
+        let language = crate::i18n::Language::from_choice(language);
+        crate::i18n::set_language(language);
+        crate::i18n::apply_to_ui(language);
+        let twelve_hour = match clock {
+            ClockChoice::Auto => self.platform.uses_twelve_hour_clock(),
+            ClockChoice::H24 => false,
+            ClockChoice::H12 => true,
+        };
+        polyptyque_core::clock::set_twelve_hour(twelve_hour);
+        self.with_bridge(|b| b.set_twelve_hour(twelve_hour));
+    }
+
+    /// Après un changement de langue ou d'horloge : textes calculés en Rust
+    /// et déjà affichés, recalculés (l'interface Slint suit d'elle-même).
+    fn refresh_display_texts(&self) {
+        if !self.recording() {
+            self.refresh_encoder_text();
+            self.with_bridge(|b| b.set_mic_text(tr!("Micro").into()));
+        }
+        self.refresh_disk(true);
+        self.refresh_schedule_texts();
+        self.set_update_state(self.update_state.get());
+        self.apply_launch_at_startup(false);
     }
 
     fn open_output_folder(&self) {
@@ -3242,7 +3313,7 @@ impl App {
             &tr!("Reprendre l'enregistrement ?"),
             &tr!(
                 "L'enregistrement a été arrêté proprement à {}, juste avant la mise en veille de l'ordinateur. Le reprendre maintenant (dans de nouveaux fichiers) ?",
-                time
+                display_time(&time)
             ),
             &tr!("Reprendre"),
         );
@@ -3473,11 +3544,16 @@ fn report_text(report: &FileReport) -> String {
     }
 }
 
-/// « 2026-10-21 » → « 21/10/2026 ».
+/// Date d'un journal (« 2026-10-21 ») écrite avec le nom du mois :
+/// « mer. 21 oct. » (« Wed, Oct 21 »).
 fn display_date(date: &str) -> String {
-    let parts: Vec<&str> = date.split('-').collect();
-    match parts.as_slice() {
-        [year, month, day] => format!("{day}/{month}/{year}"),
-        _ => date.to_string(),
+    match chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d") {
+        Ok(date) => polyptyque_core::clock::date(date, chrono::Local::now().date_naive()),
+        Err(_) => date.to_string(),
     }
+}
+
+/// Heure d'un journal (« 14h32 ») selon l'horloge : « 14:32 », « 2:32 PM ».
+fn display_time(time: &str) -> String {
+    schedule::TimeOfDay::parse(time).map_or_else(|| time.to_string(), schedule::TimeOfDay::label)
 }

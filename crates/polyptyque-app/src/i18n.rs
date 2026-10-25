@@ -15,6 +15,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 
+use polyptyque_core::config::LanguageChoice;
 use polyptyque_core::i18n::{Catalog, French};
 
 /// Contenu du catalogue anglais, lu à la compilation.
@@ -44,6 +45,15 @@ impl Language {
         match sys_locale::get_locale() {
             Some(locale) if locale.to_ascii_lowercase().starts_with("fr") => Self::French,
             _ => Self::English,
+        }
+    }
+
+    /// Langue du réglage « Langue ».
+    pub fn from_choice(choice: LanguageChoice) -> Self {
+        match choice {
+            LanguageChoice::Auto => Self::system(),
+            LanguageChoice::French => Self::French,
+            LanguageChoice::English => Self::English,
         }
     }
 

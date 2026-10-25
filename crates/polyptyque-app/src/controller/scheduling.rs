@@ -483,6 +483,14 @@ impl App {
 
     /// Pastille de la barre du haut : prochain créneau, ou fin prévue de
     /// l'enregistrement programmé.
+    /// Textes de la programmation recalculés (changement de langue ou
+    /// d'horloge).
+    pub(super) fn refresh_schedule_texts(&self) {
+        let now = Utc::now();
+        self.refresh_schedule_pill(now);
+        self.refresh_schedule_list(now);
+    }
+
     fn refresh_schedule_pill(&self, now: DateTime<Utc>) {
         let owned = self.planner.borrow().owned().cloned();
         let (text, running) = match owned {
@@ -619,8 +627,8 @@ impl App {
         self.with_bridge(|b| {
             b.set_schedule_scene_choices(ModelRc::new(VecModel::from(names)));
             b.set_schedule_scene_index(scene_index);
-            b.set_schedule_start(start.to_string().into());
-            b.set_schedule_end(end.to_string().into());
+            b.set_schedule_start(start.label().into());
+            b.set_schedule_end(end.label().into());
             b.set_schedule_repeat_index(repeat_index);
             b.set_schedule_date(date.format("%d/%m/%Y").to_string().into());
             b.set_schedule_error(SharedString::new());
@@ -671,11 +679,11 @@ impl App {
             return;
         };
         let Some(start) = TimeOfDay::parse(&b.get_schedule_start()) else {
-            fail(&tr!("Heure de début invalide (exemple : 21:00)."));
+            fail(&tr!("Heure de début invalide (exemple : {}).", example(21, 0)));
             return;
         };
         let Some(end) = TimeOfDay::parse(&b.get_schedule_end()) else {
-            fail(&tr!("Heure de fin invalide (exemple : 22:30)."));
+            fail(&tr!("Heure de fin invalide (exemple : {}).", example(22, 30)));
             return;
         };
         let now = Utc::now();
@@ -801,6 +809,11 @@ impl App {
     pub(super) fn scene_schedule_count(&self, scene_id: &str) -> usize {
         self.config.borrow().schedules.iter().filter(|s| s.scene_id == scene_id).count()
     }
+}
+
+/// Heure d'exemple dans un message, selon l'horloge.
+fn example(hour: u32, minute: u32) -> String {
+    polyptyque_core::clock::time(hour, minute)
 }
 
 /// « 1 min 47 s », « 12 s ».

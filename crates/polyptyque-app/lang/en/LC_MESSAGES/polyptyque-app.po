@@ -41,7 +41,7 @@ msgstr "No sources in this scene"
 msgid "Ajouter un navigateur (son isolé grâce à un profil dédié) ou n'importe quelle application."
 msgstr "Add a browser (with its own profile, so its sound stays separate) or any app."
 
-#: polyptyque-app/ui/app.slint:358 polyptyque-app/ui/app.slint:637 polyptyque-app/ui/sheets.slint:15 polyptyque-app/src/controller.rs:2335
+#: polyptyque-app/ui/app.slint:358 polyptyque-app/ui/app.slint:637 polyptyque-app/ui/sheets.slint:15 polyptyque-app/src/controller.rs:2336
 msgid "Navigateur"
 msgstr "Browser"
 
@@ -65,7 +65,7 @@ msgstr "Rename scene"
 msgid "Dupliquer la scène"
 msgstr "Duplicate scene"
 
-#: polyptyque-app/ui/app.slint:503 polyptyque-app/src/controller.rs:2279
+#: polyptyque-app/ui/app.slint:503 polyptyque-app/src/controller.rs:2280
 msgid "Supprimer la scène"
 msgstr "Delete scene"
 
@@ -93,7 +93,7 @@ msgstr "Move source up"
 msgid "Descendre la source"
 msgstr "Move source down"
 
-#: polyptyque-app/ui/app.slint:683 polyptyque-app/src/controller.rs:2483
+#: polyptyque-app/ui/app.slint:683 polyptyque-app/src/controller.rs:2484
 msgid "Supprimer la source"
 msgstr "Remove source"
 
@@ -133,7 +133,7 @@ msgstr "Convert to MP4…"
 msgid "Aperçus en direct"
 msgstr "Live previews"
 
-#: polyptyque-app/ui/bridge.slint:87 polyptyque-app/ui/sheets.slint:432 polyptyque-app/src/controller.rs:1356 polyptyque-app/src/controller.rs:1948 polyptyque-app/src/controller.rs:1952 polyptyque-engine/src/session.rs:241
+#: polyptyque-app/ui/bridge.slint:87 polyptyque-app/ui/sheets.slint:432 polyptyque-app/src/controller.rs:1357 polyptyque-app/src/controller.rs:1949 polyptyque-app/src/controller.rs:1953 polyptyque-app/src/controller.rs:3025 polyptyque-engine/src/session.rs:241
 msgid "Micro"
 msgstr "Mic"
 
@@ -171,7 +171,7 @@ msgid_plural "{n} perdues"
 msgstr[0] "{n} dropped"
 msgstr[1] "{n} dropped"
 
-#: polyptyque-app/ui/components.slint:658 polyptyque-app/ui/sheets.slint:257 polyptyque-app/ui/sheets.slint:348 polyptyque-app/ui/sheets.slint:818
+#: polyptyque-app/ui/components.slint:658 polyptyque-app/ui/sheets.slint:257 polyptyque-app/ui/sheets.slint:348 polyptyque-app/ui/sheets.slint:833
 msgid "Fermer"
 msgstr "Close"
 
@@ -207,7 +207,7 @@ msgstr "Open now to sign in and set up tabs"
 msgid "Cette source a son propre profil : connexions et onglets sont conservés. Tout son joué dans ce profil, quel que soit l'onglet, sera enregistré dans son fichier."
 msgstr "This source has its own profile: sign-ins and tabs are kept. Any sound played in this profile, in any tab, is recorded in its file."
 
-#: polyptyque-app/ui/sheets.slint:51 polyptyque-app/ui/sheets.slint:129 polyptyque-app/ui/sheets.slint:170 polyptyque-app/ui/sheets.slint:201 polyptyque-app/ui/sheets.slint:321 polyptyque-app/ui/sheets.slint:609 polyptyque-app/ui/sheets.slint:956
+#: polyptyque-app/ui/sheets.slint:51 polyptyque-app/ui/sheets.slint:129 polyptyque-app/ui/sheets.slint:170 polyptyque-app/ui/sheets.slint:201 polyptyque-app/ui/sheets.slint:321 polyptyque-app/ui/sheets.slint:624 polyptyque-app/ui/sheets.slint:971
 msgid "Annuler"
 msgstr "Cancel"
 
@@ -371,234 +371,258 @@ msgstr "Windows mic permissions"
 msgid "Fichiers et interface"
 msgstr "Files and interface"
 
-#: polyptyque-app/ui/sheets.slint:491 polyptyque-app/src/controller.rs:2836
+#: polyptyque-app/ui/sheets.slint:491
+msgid "Langue"
+msgstr "Language"
+
+#: polyptyque-app/ui/sheets.slint:494
+msgid "Automatique (langue de Windows)"
+msgstr "Automatic (Windows language)"
+
+#: polyptyque-app/ui/sheets.slint:499
+msgid "Horloge"
+msgstr "Clock"
+
+#: polyptyque-app/ui/sheets.slint:501
+msgid "Automatique (comme Windows)"
+msgstr "Automatic (same as Windows)"
+
+#: polyptyque-app/ui/sheets.slint:501
+msgid "24 h (21:00)"
+msgstr "24-hour (21:00)"
+
+#: polyptyque-app/ui/sheets.slint:501
+msgid "12 h (9:00 PM)"
+msgstr "12-hour (9:00 PM)"
+
+#: polyptyque-app/ui/sheets.slint:506 polyptyque-app/src/controller.rs:2849
 msgid "Dossier des enregistrements"
 msgstr "Recordings folder"
 
-#: polyptyque-app/ui/sheets.slint:499
+#: polyptyque-app/ui/sheets.slint:514
 msgid "Parcourir…"
 msgstr "Browse…"
 
-#: polyptyque-app/ui/sheets.slint:507
+#: polyptyque-app/ui/sheets.slint:522
 msgid "Modèle de nom de fichier"
 msgstr "File name pattern"
 
-#: polyptyque-app/ui/sheets.slint:508
+#: polyptyque-app/ui/sheets.slint:523
 msgid "Variables : {{date}}, {{heure}}, {{scène}}, {{source}}."
 msgstr "Variables: {{date}}, {{time}}, {{scene}}, {{source}}."
 
-#: polyptyque-app/ui/sheets.slint:514
+#: polyptyque-app/ui/sheets.slint:529
 msgid "Aperçus en direct des sources"
 msgstr "Live source previews"
 
-#: polyptyque-app/ui/sheets.slint:521
+#: polyptyque-app/ui/sheets.slint:536
 msgid "Ouvrir les fenêtres de la scène au lancement"
 msgstr "Open the scene’s windows at launch"
 
-#: polyptyque-app/ui/sheets.slint:528
+#: polyptyque-app/ui/sheets.slint:543
 msgid "Fermer les navigateurs des sources en quittant"
 msgstr "Close source browsers on exit"
 
-#: polyptyque-app/ui/sheets.slint:535 polyptyque-app/ui/sheets.slint:805
+#: polyptyque-app/ui/sheets.slint:550 polyptyque-app/ui/sheets.slint:820
 msgid "Lancer Polyptyque au démarrage de Windows"
 msgstr "Start Polyptyque when Windows starts"
 
-#: polyptyque-app/ui/sheets.slint:542
+#: polyptyque-app/ui/sheets.slint:557
 msgid "Conversion pour le montage"
 msgstr "Conversion for editing"
 
-#: polyptyque-app/ui/sheets.slint:543
+#: polyptyque-app/ui/sheets.slint:558
 msgid "Copie MP4 sans perte de qualité, créée à côté du MKV, qui est conservé. Prévoir le double d'espace disque."
 msgstr "A lossless MP4 copy, created next to the MKV, which is kept. Plan for twice the disk space."
 
-#: polyptyque-app/ui/sheets.slint:545
+#: polyptyque-app/ui/sheets.slint:560
 msgid "Convertir en MP4 à la fin de l'enregistrement"
 msgstr "Convert to MP4 when recording ends"
 
-#: polyptyque-app/ui/sheets.slint:553
+#: polyptyque-app/ui/sheets.slint:568
 msgid "Mises à jour"
 msgstr "Updates"
 
-#: polyptyque-app/ui/sheets.slint:554
+#: polyptyque-app/ui/sheets.slint:569
 msgid "Revenir aux versions stables ne réinstalle pas une version plus ancienne : la bêta reste jusqu'à la prochaine version stable."
 msgstr "Switching back to stable versions doesn’t reinstall an older version: the beta stays until the next stable version."
 
-#: polyptyque-app/ui/sheets.slint:556
+#: polyptyque-app/ui/sheets.slint:571
 msgid "Versions stables"
 msgstr "Stable versions"
 
-#: polyptyque-app/ui/sheets.slint:556
+#: polyptyque-app/ui/sheets.slint:571
 msgid "Versions stables et bêta"
 msgstr "Stable and beta versions"
 
-#: polyptyque-app/ui/sheets.slint:556
+#: polyptyque-app/ui/sheets.slint:571
 msgid "Ne pas rechercher"
 msgstr "Don’t check"
 
-#: polyptyque-app/ui/sheets.slint:561
+#: polyptyque-app/ui/sheets.slint:576
 msgid "Raccourci : démarrer ou arrêter l'enregistrement"
 msgstr "Shortcut: start or stop recording"
 
-#: polyptyque-app/ui/sheets.slint:568
+#: polyptyque-app/ui/sheets.slint:583
 msgid "Raccourci : afficher ou réduire Polyptyque"
 msgstr "Shortcut: show or minimize Polyptyque"
 
-#: polyptyque-app/ui/sheets.slint:575
+#: polyptyque-app/ui/sheets.slint:590
 msgid "Raccourci : activer ou couper les aperçus"
 msgstr "Shortcut: turn previews on or off"
 
-#: polyptyque-app/ui/sheets.slint:600
+#: polyptyque-app/ui/sheets.slint:615
 msgid "Signaler un problème…"
 msgstr "Report a problem…"
 
-#: polyptyque-app/ui/sheets.slint:616 polyptyque-app/ui/sheets.slint:963
+#: polyptyque-app/ui/sheets.slint:631 polyptyque-app/ui/sheets.slint:978
 msgid "Enregistrer"
 msgstr "Save"
 
-#: polyptyque-app/ui/sheets.slint:720
+#: polyptyque-app/ui/sheets.slint:735
 msgid "Désactiver la programmation"
 msgstr "Turn off this scheduled recording"
 
-#: polyptyque-app/ui/sheets.slint:720
+#: polyptyque-app/ui/sheets.slint:735
 msgid "Activer la programmation"
 msgstr "Turn on this scheduled recording"
 
-#: polyptyque-app/ui/sheets.slint:748 polyptyque-app/ui/sheets.slint:874
+#: polyptyque-app/ui/sheets.slint:763 polyptyque-app/ui/sheets.slint:889
 msgid "Modifier la programmation"
 msgstr "Edit scheduled recording"
 
-#: polyptyque-app/ui/sheets.slint:757
+#: polyptyque-app/ui/sheets.slint:772
 msgid "Supprimer la programmation"
 msgstr "Delete scheduled recording"
 
-#: polyptyque-app/ui/sheets.slint:768
+#: polyptyque-app/ui/sheets.slint:783
 msgid "Programmations"
 msgstr "Scheduled recordings"
 
-#: polyptyque-app/ui/sheets.slint:775
+#: polyptyque-app/ui/sheets.slint:790
 msgid "Polyptyque lance et arrête lui-même l'enregistrement d'une scène aux heures prévues. Il doit rester ouvert pour cela ; tant qu'une programmation est active, l'ordinateur et l'écran ne se mettent pas en veille d'eux-mêmes."
 msgstr "Polyptyque starts and stops a scene’s recording on its own, at the planned times. It must stay open for that; while a scheduled recording is active, the computer and screen don’t go to sleep on their own."
 
-#: polyptyque-app/ui/sheets.slint:780
+#: polyptyque-app/ui/sheets.slint:795
 msgid "Aucune programmation pour l'instant."
 msgstr "No scheduled recordings yet."
 
-#: polyptyque-app/ui/sheets.slint:792 polyptyque-app/ui/sheets.slint:874
+#: polyptyque-app/ui/sheets.slint:807 polyptyque-app/ui/sheets.slint:889
 msgid "Nouvelle programmation"
 msgstr "New scheduled recording"
 
-#: polyptyque-app/ui/sheets.slint:802
+#: polyptyque-app/ui/sheets.slint:817
 msgid "Démarrage de Windows"
 msgstr "Windows startup"
 
-#: polyptyque-app/ui/sheets.slint:803
+#: polyptyque-app/ui/sheets.slint:818
 msgid "Sans cela, après un redémarrage de Windows (une mise à jour, par exemple), les programmations attendent la réouverture de Polyptyque. Lancé par Windows, il démarre réduit, sans ouvrir les fenêtres de la scène."
 msgstr "Without this, after Windows restarts (for an update, for example), scheduled recordings wait until Polyptyque is opened again. When Windows starts it, Polyptyque opens minimized, without opening the scene’s windows."
 
-#: polyptyque-app/ui/sheets.slint:864
+#: polyptyque-app/ui/sheets.slint:879
 msgctxt "Initiale du lundi"
 msgid "L"
 msgstr "M"
 
-#: polyptyque-app/ui/sheets.slint:865
+#: polyptyque-app/ui/sheets.slint:880
 msgctxt "Initiale du mardi"
 msgid "M"
 msgstr "T"
 
-#: polyptyque-app/ui/sheets.slint:866
+#: polyptyque-app/ui/sheets.slint:881
 msgctxt "Initiale du mercredi"
 msgid "M"
 msgstr "W"
 
-#: polyptyque-app/ui/sheets.slint:867
+#: polyptyque-app/ui/sheets.slint:882
 msgctxt "Initiale du jeudi"
 msgid "J"
 msgstr "T"
 
-#: polyptyque-app/ui/sheets.slint:868
+#: polyptyque-app/ui/sheets.slint:883
 msgctxt "Initiale du vendredi"
 msgid "V"
 msgstr "F"
 
-#: polyptyque-app/ui/sheets.slint:869
+#: polyptyque-app/ui/sheets.slint:884
 msgctxt "Initiale du samedi"
 msgid "S"
 msgstr "S"
 
-#: polyptyque-app/ui/sheets.slint:870
+#: polyptyque-app/ui/sheets.slint:885
 msgctxt "Initiale du dimanche"
 msgid "D"
 msgstr "S"
 
-#: polyptyque-app/ui/sheets.slint:872 polyptyque-core/src/schedule.rs:139
+#: polyptyque-app/ui/sheets.slint:887 polyptyque-core/src/schedule.rs:151
 msgid "lundi"
 msgstr "Monday"
 
-#: polyptyque-app/ui/sheets.slint:872 polyptyque-core/src/schedule.rs:140
+#: polyptyque-app/ui/sheets.slint:887 polyptyque-core/src/schedule.rs:152
 msgid "mardi"
 msgstr "Tuesday"
 
-#: polyptyque-app/ui/sheets.slint:872 polyptyque-core/src/schedule.rs:141
+#: polyptyque-app/ui/sheets.slint:887 polyptyque-core/src/schedule.rs:153
 msgid "mercredi"
 msgstr "Wednesday"
 
-#: polyptyque-app/ui/sheets.slint:872 polyptyque-core/src/schedule.rs:142
+#: polyptyque-app/ui/sheets.slint:887 polyptyque-core/src/schedule.rs:154
 msgid "jeudi"
 msgstr "Thursday"
 
-#: polyptyque-app/ui/sheets.slint:872 polyptyque-core/src/schedule.rs:143
+#: polyptyque-app/ui/sheets.slint:887 polyptyque-core/src/schedule.rs:155
 msgid "vendredi"
 msgstr "Friday"
 
-#: polyptyque-app/ui/sheets.slint:872 polyptyque-core/src/schedule.rs:144
+#: polyptyque-app/ui/sheets.slint:887 polyptyque-core/src/schedule.rs:156
 msgid "samedi"
 msgstr "Saturday"
 
-#: polyptyque-app/ui/sheets.slint:872 polyptyque-core/src/schedule.rs:145
+#: polyptyque-app/ui/sheets.slint:887 polyptyque-core/src/schedule.rs:157
 msgid "dimanche"
 msgstr "Sunday"
 
-#: polyptyque-app/ui/sheets.slint:881
+#: polyptyque-app/ui/sheets.slint:896
 msgid "Scène à enregistrer"
 msgstr "Scene to record"
 
-#: polyptyque-app/ui/sheets.slint:890
+#: polyptyque-app/ui/sheets.slint:905
 msgid "Début"
 msgstr "Start"
 
-#: polyptyque-app/ui/sheets.slint:901
+#: polyptyque-app/ui/sheets.slint:916
 msgid "Fin"
 msgstr "End"
 
-#: polyptyque-app/ui/sheets.slint:918
+#: polyptyque-app/ui/sheets.slint:933
 msgid "Répétition"
 msgstr "Repeat"
 
-#: polyptyque-app/ui/sheets.slint:920
+#: polyptyque-app/ui/sheets.slint:935
 msgid "Une seule fois"
 msgstr "Once"
 
-#: polyptyque-app/ui/sheets.slint:920 polyptyque-core/src/schedule.rs:355
+#: polyptyque-app/ui/sheets.slint:935 polyptyque-core/src/schedule.rs:372
 msgid "Tous les jours"
 msgstr "Every day"
 
-#: polyptyque-app/ui/sheets.slint:920
+#: polyptyque-app/ui/sheets.slint:935
 msgid "Certains jours de la semaine"
 msgstr "Specific days of the week"
 
-#: polyptyque-app/ui/sheets.slint:925
+#: polyptyque-app/ui/sheets.slint:940
 msgid "Date"
 msgstr "Date"
 
-#: polyptyque-app/ui/sheets.slint:926
+#: polyptyque-app/ui/sheets.slint:941
 msgid "Jour où le créneau commence."
 msgstr "Day the time slot starts."
 
-#: polyptyque-app/ui/sheets.slint:933
+#: polyptyque-app/ui/sheets.slint:948
 msgid "Jours où le créneau commence"
 msgstr "Days the time slot starts"
 
-#: polyptyque-app/ui/sheets.slint:948
+#: polyptyque-app/ui/sheets.slint:963
 msgid "Polyptyque doit être ouvert à l'heure prévue. S'il était fermé, ou l'ordinateur en veille, il demande à son retour s'il faut lancer l'enregistrement : sans réponse au bout de deux minutes, il le lance."
 msgstr "Polyptyque must be open at the planned time. If it was closed, or the computer was asleep, it asks when it’s back whether to start recording: with no answer after two minutes, it starts."
 
@@ -750,111 +774,111 @@ msgstr "Portable version: this is registered in Windows. Turn the option off bef
 msgid "scène supprimée"
 msgstr "deleted scene"
 
-#: polyptyque-app/src/controller/scheduling.rs:489
+#: polyptyque-app/src/controller/scheduling.rs:497
 msgid "Arrêt programmé à {}"
 msgstr "Scheduled stop at {}"
 
-#: polyptyque-app/src/controller/scheduling.rs:503
+#: polyptyque-app/src/controller/scheduling.rs:511
 msgid "{} · créneau jusqu'à {}"
 msgstr "{} · time slot until {}"
 
-#: polyptyque-app/src/controller/scheduling.rs:536
+#: polyptyque-app/src/controller/scheduling.rs:544
 msgid "Enregistre jusqu'à {}"
 msgstr "Recording until {}"
 
-#: polyptyque-app/src/controller/scheduling.rs:538
+#: polyptyque-app/src/controller/scheduling.rs:546
 msgid "Désactivée"
 msgstr "Off"
 
-#: polyptyque-app/src/controller/scheduling.rs:541
+#: polyptyque-app/src/controller/scheduling.rs:549
 msgid "Créneau en cours, sans enregistrement programmé (jusqu'à {})"
 msgstr "Time slot in progress, without a scheduled recording (until {})"
 
-#: polyptyque-app/src/controller/scheduling.rs:546
+#: polyptyque-app/src/controller/scheduling.rs:554
 msgid "Créneau en cours"
 msgstr "Time slot in progress"
 
-#: polyptyque-app/src/controller/scheduling.rs:549
+#: polyptyque-app/src/controller/scheduling.rs:557
 msgid "Prochain : {}"
 msgstr "Next: {}"
 
-#: polyptyque-app/src/controller/scheduling.rs:551 polyptyque-app/src/controller.rs:1491
+#: polyptyque-app/src/controller/scheduling.rs:559 polyptyque-app/src/controller.rs:1492
 msgid "Terminée"
 msgstr "Finished"
 
-#: polyptyque-app/src/controller/scheduling.rs:583 polyptyque-app/src/controller/scheduling.rs:664
+#: polyptyque-app/src/controller/scheduling.rs:591 polyptyque-app/src/controller/scheduling.rs:672
 msgid "Cette programmation enregistre en ce moment : modifiable une fois son créneau terminé."
 msgstr "This scheduled recording is recording right now: it can be edited once its time slot is over."
 
-#: polyptyque-app/src/controller/scheduling.rs:638
+#: polyptyque-app/src/controller/scheduling.rs:646
 msgid "Se termine le lendemain."
 msgstr "Ends the next day."
 
-#: polyptyque-app/src/controller/scheduling.rs:670
+#: polyptyque-app/src/controller/scheduling.rs:678
 msgid "Aucune scène choisie."
 msgstr "No scene selected."
 
-#: polyptyque-app/src/controller/scheduling.rs:674
-msgid "Heure de début invalide (exemple : 21:00)."
-msgstr "Invalid start time (example: 21:00)."
+#: polyptyque-app/src/controller/scheduling.rs:682
+msgid "Heure de début invalide (exemple : {})."
+msgstr "Invalid start time (example: {})."
 
-#: polyptyque-app/src/controller/scheduling.rs:678
-msgid "Heure de fin invalide (exemple : 22:30)."
-msgstr "Invalid end time (example: 22:30)."
+#: polyptyque-app/src/controller/scheduling.rs:686
+msgid "Heure de fin invalide (exemple : {})."
+msgstr "Invalid end time (example: {})."
 
-#: polyptyque-app/src/controller/scheduling.rs:687
+#: polyptyque-app/src/controller/scheduling.rs:695
 msgid "Date invalide (exemple : 25/10/2026)."
 msgstr "Invalid date (example: 25/10/2026)."
 
-#: polyptyque-app/src/controller/scheduling.rs:724
+#: polyptyque-app/src/controller/scheduling.rs:732
 msgid "Programmation enregistrée : son créneau a déjà commencé."
 msgstr "Scheduled recording saved: its time slot has already started."
 
-#: polyptyque-app/src/controller/scheduling.rs:725
+#: polyptyque-app/src/controller/scheduling.rs:733
 msgid "Programmation enregistrée : prochain créneau {}."
 msgstr "Scheduled recording saved: next time slot {}."
 
-#: polyptyque-app/src/controller/scheduling.rs:726
+#: polyptyque-app/src/controller/scheduling.rs:734
 msgid "Programmation enregistrée."
 msgstr "Scheduled recording saved."
 
-#: polyptyque-app/src/controller/scheduling.rs:743
+#: polyptyque-app/src/controller/scheduling.rs:751
 msgid "Impossible de l'activer : {}"
 msgstr "Couldn’t turn it on: {}"
 
-#: polyptyque-app/src/controller/scheduling.rs:760
+#: polyptyque-app/src/controller/scheduling.rs:768
 msgid "Cette programmation enregistre en ce moment : supprimable une fois son créneau terminé."
 msgstr "This scheduled recording is recording right now: it can be deleted once its time slot is over."
 
-#: polyptyque-app/src/controller/scheduling.rs:770
+#: polyptyque-app/src/controller/scheduling.rs:778
 msgid "Programmation supprimée."
 msgstr "Scheduled recording deleted."
 
-#: polyptyque-app/src/controller/scheduling.rs:781
+#: polyptyque-app/src/controller/scheduling.rs:789
 msgid "l'heure de fin doit être différente de l'heure de début."
 msgstr "the end time must differ from the start time."
 
-#: polyptyque-app/src/controller/scheduling.rs:782
+#: polyptyque-app/src/controller/scheduling.rs:790
 msgid "aucun jour choisi."
 msgstr "no day selected."
 
-#: polyptyque-app/src/controller/scheduling.rs:783
+#: polyptyque-app/src/controller/scheduling.rs:791
 msgid "ce créneau est déjà passé : choisir une autre date ou une autre heure."
 msgstr "this time slot is already over: choose another date or time."
 
-#: polyptyque-app/src/controller/scheduling.rs:787
+#: polyptyque-app/src/controller/scheduling.rs:795
 msgid "ce créneau chevauche la programmation « {} » ({}, {}) : un seul enregistrement à la fois."
 msgstr "this time slot overlaps the “{}” scheduled recording ({}, {}): only one recording at a time."
 
-#: polyptyque-app/src/controller/scheduling.rs:793
+#: polyptyque-app/src/controller/scheduling.rs:801
 msgid "ce créneau chevauche une autre programmation : un seul enregistrement à la fois."
 msgstr "this time slot overlaps another scheduled recording: only one recording at a time."
 
-#: polyptyque-app/src/controller/scheduling.rs:810
+#: polyptyque-app/src/controller/scheduling.rs:823
 msgid "{} min {} s"
 msgstr "{} min {} s"
 
-#: polyptyque-app/src/controller/scheduling.rs:812
+#: polyptyque-app/src/controller/scheduling.rs:825
 msgid "{} s"
 msgstr "{} s"
 
@@ -870,781 +894,781 @@ msgstr "creating the window"
 msgid "{} · portable"
 msgstr "{} · portable"
 
-#: polyptyque-app/src/controller.rs:422
+#: polyptyque-app/src/controller.rs:423
 msgid "Polyptyque a été mis à jour : version {}."
 msgstr "Polyptyque has been updated to version {}."
 
-#: polyptyque-app/src/controller.rs:445
+#: polyptyque-app/src/controller.rs:446
 msgid "boucle de l'interface"
 msgstr "interface loop"
 
-#: polyptyque-app/src/controller.rs:656
+#: polyptyque-app/src/controller.rs:657
 msgid "Impossible d'enregistrer la configuration : {}"
 msgstr "Couldn’t save the settings: {}"
 
-#: polyptyque-app/src/controller.rs:683
+#: polyptyque-app/src/controller.rs:684
 msgid "{} · {n} scènes"
 msgstr "{} · {n} scenes"
 
-#: polyptyque-app/src/controller.rs:700 polyptyque-app/src/controller.rs:1021
+#: polyptyque-app/src/controller.rs:701 polyptyque-app/src/controller.rs:1022
 msgid "Recherche…"
 msgstr "Searching…"
 
-#: polyptyque-app/src/controller.rs:700
+#: polyptyque-app/src/controller.rs:701
 msgid "En attente"
 msgstr "Waiting"
 
-#: polyptyque-app/src/controller.rs:704 polyptyque-app/src/controller.rs:1021
+#: polyptyque-app/src/controller.rs:705 polyptyque-app/src/controller.rs:1022
 msgid "Recherche de la fenêtre…"
 msgstr "Looking for the window…"
 
-#: polyptyque-app/src/controller.rs:704
+#: polyptyque-app/src/controller.rs:705
 msgid "Aperçu désactivé"
 msgstr "Preview off"
 
-#: polyptyque-app/src/controller.rs:778
+#: polyptyque-app/src/controller.rs:779
 msgid "{}x{} · {} i/s · {} · {} kb/s"
 msgstr "{}x{} · {} fps · {} · {} kbps"
 
-#: polyptyque-app/src/controller.rs:833
+#: polyptyque-app/src/controller.rs:834
 msgid "{} libres · ≈ {} d'enregistrement"
 msgstr "{} free · ≈ {} of recording"
 
-#: polyptyque-app/src/controller.rs:844
+#: polyptyque-app/src/controller.rs:845
 msgid "Disque presque plein : arrêt automatique."
 msgstr "Disk almost full: recording stopped automatically."
 
-#: polyptyque-app/src/controller.rs:1022
+#: polyptyque-app/src/controller.rs:1023
 msgid "Fenêtre trouvée"
 msgstr "Window found"
 
-#: polyptyque-app/src/controller.rs:1024
+#: polyptyque-app/src/controller.rs:1025
 msgid "Réduite"
 msgstr "Minimized"
 
-#: polyptyque-app/src/controller.rs:1024
+#: polyptyque-app/src/controller.rs:1025
 msgid "Fenêtre réduite : l'image est figée."
 msgstr "Window minimized: the image is frozen."
 
-#: polyptyque-app/src/controller.rs:1026
+#: polyptyque-app/src/controller.rs:1027
 msgid "Introuvable"
 msgstr "Not found"
 
-#: polyptyque-app/src/controller.rs:1026
+#: polyptyque-app/src/controller.rs:1027
 msgid "Fenêtre introuvable"
 msgstr "Window not found"
 
-#: polyptyque-app/src/controller.rs:1027
+#: polyptyque-app/src/controller.rs:1028
 msgid "Aperçu impossible"
 msgstr "Preview unavailable"
 
-#: polyptyque-app/src/controller.rs:1055
+#: polyptyque-app/src/controller.rs:1056
 msgid "Aperçus en direct activés."
 msgstr "Live previews on."
 
-#: polyptyque-app/src/controller.rs:1055
+#: polyptyque-app/src/controller.rs:1056
 msgid "Aperçus en direct coupés."
 msgstr "Live previews off."
 
-#: polyptyque-app/src/controller.rs:1084
+#: polyptyque-app/src/controller.rs:1085
 msgid "Ajouter d'abord au moins une source à cette scène."
 msgstr "Add at least one source to this scene first."
 
-#: polyptyque-app/src/controller.rs:1089
+#: polyptyque-app/src/controller.rs:1090
 msgid "Recherche du meilleur encodeur…"
 msgstr "Finding the best encoder…"
 
-#: polyptyque-app/src/controller.rs:1093
+#: polyptyque-app/src/controller.rs:1094
 msgid "erreur interne pendant la préparation (voir le journal)"
 msgstr "internal error while preparing (see the log)"
 
-#: polyptyque-app/src/controller.rs:1107 polyptyque-app/src/controller.rs:1203
+#: polyptyque-app/src/controller.rs:1108 polyptyque-app/src/controller.rs:1204
 msgid "Impossible de démarrer : {}"
 msgstr "Couldn’t start: {}"
 
-#: polyptyque-app/src/controller.rs:1153
+#: polyptyque-app/src/controller.rs:1154
 msgid "{} · {}x{} · {} i/s · {} kb/s"
 msgstr "{} · {}x{} · {} fps · {} kbps"
 
-#: polyptyque-app/src/controller.rs:1178
+#: polyptyque-app/src/controller.rs:1179
 msgid "Enregistrement démarré. {}"
 msgstr "Recording started. {}"
 
-#: polyptyque-app/src/controller.rs:1182
+#: polyptyque-app/src/controller.rs:1183
 msgid "Enregistrement de « {} » démarré."
 msgstr "Recording started for “{}”."
 
-#: polyptyque-app/src/controller.rs:1184
+#: polyptyque-app/src/controller.rs:1185
 msgid "Enregistrement démarré."
 msgstr "Recording started."
 
-#: polyptyque-app/src/controller.rs:1189
+#: polyptyque-app/src/controller.rs:1190
 msgid "Enregistrement démarré. Fenêtre introuvable : {}. Image noire en attendant son retour."
 msgid_plural "Enregistrement démarré. Fenêtres introuvables : {}. Image noire en attendant leur retour."
 msgstr[0] "Recording started. Window not found: {}. Black image until it comes back."
 msgstr[1] "Recording started. Windows not found: {}. Black image until they come back."
 
-#: polyptyque-app/src/controller.rs:1234 polyptyque-app/src/controller.rs:1490
+#: polyptyque-app/src/controller.rs:1235 polyptyque-app/src/controller.rs:1491
 msgid "Finalisation…"
 msgstr "Finalizing…"
 
-#: polyptyque-app/src/controller.rs:1238
+#: polyptyque-app/src/controller.rs:1239
 msgid "« {} » arrêtée : son fichier est finalisé, les autres sources continuent."
 msgstr "“{}” stopped: its file is finalized, the other sources keep recording."
 
-#: polyptyque-app/src/controller.rs:1252
+#: polyptyque-app/src/controller.rs:1253
 msgid "Préparation…"
 msgstr "Preparing…"
 
-#: polyptyque-app/src/controller.rs:1287
+#: polyptyque-app/src/controller.rs:1288
 msgid "« {} » enregistre (nouveau fichier)."
 msgstr "“{}” is recording (new file)."
 
-#: polyptyque-app/src/controller.rs:1290
+#: polyptyque-app/src/controller.rs:1291
 msgid "« {} » enregistre, mais sa fenêtre est introuvable : image noire en attendant."
 msgstr "“{}” is recording, but its window can’t be found: black image in the meantime."
 
-#: polyptyque-app/src/controller.rs:1301
+#: polyptyque-app/src/controller.rs:1302
 msgid "Impossible d'ajouter « {} » : {}"
 msgstr "Couldn’t add “{}”: {}"
 
-#: polyptyque-app/src/controller.rs:1328
+#: polyptyque-app/src/controller.rs:1329
 msgid "Arrêt : finalisation des fichiers…"
 msgstr "Stopping: finalizing the files…"
 
-#: polyptyque-app/src/controller.rs:1332
+#: polyptyque-app/src/controller.rs:1333
 msgid "Erreur interne pendant l'arrêt (voir le journal)."
 msgstr "Internal error while stopping (see the log)."
 
-#: polyptyque-app/src/controller.rs:1370 polyptyque-app/src/controller.rs:2105
+#: polyptyque-app/src/controller.rs:1371 polyptyque-app/src/controller.rs:2106
 msgid "{} : {}"
 msgstr "{}: {}"
 
-#: polyptyque-app/src/controller.rs:1381
+#: polyptyque-app/src/controller.rs:1382
 msgid "{n} fichier enregistré, {} au total, dans {}."
 msgid_plural "{n} fichiers enregistrés, {} au total, dans {}."
 msgstr[0] "{n} file saved, {} in total, in {}."
 msgstr[1] "{n} files saved, {} in total, in {}."
 
-#: polyptyque-app/src/controller.rs:1394
+#: polyptyque-app/src/controller.rs:1395
 msgid "Conversion MP4 lancée."
 msgstr "MP4 conversion started."
 
-#: polyptyque-app/src/controller.rs:1401
+#: polyptyque-app/src/controller.rs:1402
 msgid "{} Problèmes : {}"
 msgstr "{} Problems: {}"
 
-#: polyptyque-app/src/controller.rs:1473
+#: polyptyque-app/src/controller.rs:1474
 msgid "Fichier terminé"
 msgstr "File finished"
 
-#: polyptyque-app/src/controller.rs:1485
+#: polyptyque-app/src/controller.rs:1486
 msgid "Enregistre"
 msgstr "Recording"
 
-#: polyptyque-app/src/controller.rs:1486
+#: polyptyque-app/src/controller.rs:1487
 msgid "Réduite (image figée)"
 msgstr "Minimized (frozen image)"
 
-#: polyptyque-app/src/controller.rs:1487
+#: polyptyque-app/src/controller.rs:1488
 msgid "En attente de la fenêtre"
 msgstr "Waiting for the window"
 
-#: polyptyque-app/src/controller.rs:1488
+#: polyptyque-app/src/controller.rs:1489
 msgid "Fenêtre perdue"
 msgstr "Window lost"
 
-#: polyptyque-app/src/controller.rs:1489
+#: polyptyque-app/src/controller.rs:1490
 msgid "Erreur"
 msgstr "Error"
 
-#: polyptyque-app/src/controller.rs:1504
+#: polyptyque-app/src/controller.rs:1505
 msgid "L'encodeur prend du retard ({} s)"
 msgstr "The encoder is falling behind ({} s)"
 
-#: polyptyque-app/src/controller.rs:1506
+#: polyptyque-app/src/controller.rs:1507
 msgid "Encodeur relancé : partie {} en cours"
 msgstr "Encoder restarted: part {} in progress"
 
-#: polyptyque-app/src/controller.rs:1569
+#: polyptyque-app/src/controller.rs:1570
 msgid "La fenêtre de « {} » a disparu : réouverture automatique."
 msgstr "The window of “{}” disappeared: reopening it automatically."
 
-#: polyptyque-app/src/controller.rs:1651
+#: polyptyque-app/src/controller.rs:1652
 msgid "Fichiers à réparer"
 msgstr "Files to repair"
 
-#: polyptyque-app/src/controller.rs:1652
+#: polyptyque-app/src/controller.rs:1653
 msgid "{n} fichier n'a pas été fermé correctement (encodeur arrêté de force). Il se lit, mais sans durée ni index. Le réparer maintenant, sans perte de qualité ?"
 msgid_plural "{n} fichiers n'ont pas été fermés correctement (encodeur arrêté de force). Ils se lisent, mais sans durée ni index. Les réparer maintenant, sans perte de qualité ?"
 msgstr[0] "{n} file wasn’t closed properly (the encoder was force-stopped). It plays, but without duration or index. Repair it now, with no loss of quality?"
 msgstr[1] "{n} files weren’t closed properly (the encoder was force-stopped). They play, but without duration or index. Repair them now, with no loss of quality?"
 
-#: polyptyque-app/src/controller.rs:1657
+#: polyptyque-app/src/controller.rs:1658
 msgid "Réparer"
 msgstr "Repair"
 
-#: polyptyque-app/src/controller.rs:1720
+#: polyptyque-app/src/controller.rs:1721
 msgid "Windows s'est éteint, a redémarré ou a fermé la session pendant l'enregistrement commencé le {} à {} (scène « {} »)."
 msgstr "Windows shut down, restarted or signed out during the recording started on {} at {} (scene “{}”)."
 
-#: polyptyque-app/src/controller.rs:1727
+#: polyptyque-app/src/controller.rs:1728
 msgid "Polyptyque s'est fermé pendant l'enregistrement commencé le {} à {} (scène « {} »)."
 msgstr "Polyptyque closed during the recording started on {} at {} (scene “{}”)."
 
-#: polyptyque-app/src/controller.rs:1735
+#: polyptyque-app/src/controller.rs:1736
 msgid "Aucun fichier n'avait encore été écrit."
 msgstr "No file had been written yet."
 
-#: polyptyque-app/src/controller.rs:1737
+#: polyptyque-app/src/controller.rs:1738
 msgid "État des fichiers :"
 msgstr "File status:"
 
-#: polyptyque-app/src/controller.rs:1741
+#: polyptyque-app/src/controller.rs:1742
 msgid "Polyptyque s'est fermé pendant un enregistrement, mais son journal est illisible : vérifier les fichiers dans le dossier d'enregistrement."
 msgstr "Polyptyque closed during a recording, but its log can’t be read: check the files in the recordings folder."
 
-#: polyptyque-app/src/controller.rs:1781
+#: polyptyque-app/src/controller.rs:1782
 msgid "Réparation de {n} fichier lancée."
 msgid_plural "Réparation de {n} fichiers lancée."
 msgstr[0] "Repairing {n} file."
 msgstr[1] "Repairing {n} files."
 
-#: polyptyque-app/src/controller.rs:1821
+#: polyptyque-app/src/controller.rs:1822
 msgid "Polyptyque {} est disponible : un clic sur la pastille en haut l'installe."
 msgstr "Polyptyque {} is available: click the badge at the top to install it."
 
-#: polyptyque-app/src/controller.rs:1836
+#: polyptyque-app/src/controller.rs:1837
 msgid "Version {} disponible"
 msgstr "Version {} available"
 
-#: polyptyque-app/src/controller.rs:1837
+#: polyptyque-app/src/controller.rs:1838
 msgid "Téléchargement de la mise à jour…"
 msgstr "Downloading the update…"
 
-#: polyptyque-app/src/controller.rs:1838
+#: polyptyque-app/src/controller.rs:1839
 msgid "Redémarrer pour passer à la version {}"
 msgstr "Restart to update to {}"
 
-#: polyptyque-app/src/controller.rs:1850
+#: polyptyque-app/src/controller.rs:1851
 msgid "La mise à jour pourra être installée une fois l'enregistrement arrêté."
 msgstr "The update can be installed once recording has stopped."
 
-#: polyptyque-app/src/controller.rs:1852
+#: polyptyque-app/src/controller.rs:1853
 msgid "La mise à jour pourra être installée une fois la conversion MP4 terminée."
 msgstr "The update can be installed once the MP4 conversion is done."
 
-#: polyptyque-app/src/controller.rs:1870
+#: polyptyque-app/src/controller.rs:1871
 msgid "Mettre à jour Polyptyque"
 msgstr "Update Polyptyque"
 
-#: polyptyque-app/src/controller.rs:1871
+#: polyptyque-app/src/controller.rs:1872
 msgid "Télécharger la version {} ({}) puis redémarrer Polyptyque ? Scènes, réglages et connexions des navigateurs sont conservés."
 msgstr "Download version {} ({}) and restart Polyptyque? Scenes, settings and browser sign-ins are kept."
 
-#: polyptyque-app/src/controller.rs:1876
+#: polyptyque-app/src/controller.rs:1877
 msgid "Mettre à jour"
 msgstr "Update"
 
-#: polyptyque-app/src/controller.rs:1894
+#: polyptyque-app/src/controller.rs:1895
 msgid "Téléchargement de la mise à jour · {} %"
 msgstr "Downloading the update · {}%"
 
-#: polyptyque-app/src/controller.rs:1902
+#: polyptyque-app/src/controller.rs:1903
 msgid "erreur interne"
 msgstr "internal error"
 
-#: polyptyque-app/src/controller.rs:1914
+#: polyptyque-app/src/controller.rs:1915
 msgid "Mise à jour téléchargée : un clic sur la pastille l'installe une fois l'enregistrement terminé ; sinon, elle s'installera au prochain démarrage."
 msgstr "Update downloaded: click the badge to install it once recording is done; otherwise, it installs the next time Polyptyque starts."
 
-#: polyptyque-app/src/controller.rs:1922
+#: polyptyque-app/src/controller.rs:1923
 msgid "Téléchargement de la mise à jour impossible (détail dans le journal)."
 msgstr "Couldn’t download the update (details in the log)."
 
-#: polyptyque-app/src/controller.rs:1940
+#: polyptyque-app/src/controller.rs:1941
 msgid "Installation de la mise à jour impossible (détail dans le journal)."
 msgstr "Couldn’t install the update (details in the log)."
 
-#: polyptyque-app/src/controller.rs:1949
+#: polyptyque-app/src/controller.rs:1950
 msgid "Micro : ouverture…"
 msgstr "Mic: opening…"
 
-#: polyptyque-app/src/controller.rs:1950
+#: polyptyque-app/src/controller.rs:1951
 msgid "Micro indisponible"
 msgstr "Mic unavailable"
 
-#: polyptyque-app/src/controller.rs:1951
+#: polyptyque-app/src/controller.rs:1952
 msgid "Micro : erreur"
 msgstr "Mic: error"
 
-#: polyptyque-app/src/controller.rs:1965
+#: polyptyque-app/src/controller.rs:1966
 msgid "Micro : {}"
 msgstr "Mic: {}"
 
-#: polyptyque-app/src/controller.rs:1972
+#: polyptyque-app/src/controller.rs:1973
 msgid "Impossible d'ouvrir les paramètres de Windows : {}"
 msgstr "Couldn’t open Windows Settings: {}"
 
-#: polyptyque-app/src/controller.rs:1993
+#: polyptyque-app/src/controller.rs:1994
 msgid "Ces fichiers sont en cours d'enregistrement : ils pourront être convertis une fois l'enregistrement arrêté."
 msgstr "These files are still being recorded: they can be converted once recording has stopped."
 
-#: polyptyque-app/src/controller.rs:2001
+#: polyptyque-app/src/controller.rs:2002
 msgid "{n} fichier en cours d'enregistrement a été ignoré."
 msgid_plural "{n} fichiers en cours d'enregistrement ont été ignorés."
 msgstr[0] "{n} file still being recorded was skipped."
 msgstr[1] "{n} files still being recorded were skipped."
 
-#: polyptyque-app/src/controller.rs:2015
+#: polyptyque-app/src/controller.rs:2016
 msgid "Fichiers à convertir en MP4"
 msgstr "Files to convert to MP4"
 
-#: polyptyque-app/src/controller.rs:2016
+#: polyptyque-app/src/controller.rs:2017
 msgid "Enregistrements Polyptyque (MKV, MKA)"
 msgstr "Polyptyque recordings (MKV, MKA)"
 
-#: polyptyque-app/src/controller.rs:2037
+#: polyptyque-app/src/controller.rs:2038
 msgid "Aucun fichier MKV à convertir dans le dossier des enregistrements."
 msgstr "No MKV files to convert in the recordings folder."
 
-#: polyptyque-app/src/controller.rs:2049
+#: polyptyque-app/src/controller.rs:2050
 msgid "La conversion n'est pas disponible (voir le journal)."
 msgstr "Conversion isn’t available (see the log)."
 
-#: polyptyque-app/src/controller.rs:2074
+#: polyptyque-app/src/controller.rs:2075
 msgid "Réparation en cours…"
 msgstr "Repairing…"
 
-#: polyptyque-app/src/controller.rs:2093
+#: polyptyque-app/src/controller.rs:2094
 msgid "Réparé : prêt pour le montage"
 msgstr "Repaired: ready for editing"
 
-#: polyptyque-app/src/controller.rs:2094
+#: polyptyque-app/src/controller.rs:2095
 msgid "Échec de la réparation : {}"
 msgstr "Repair failed: {}"
 
-#: polyptyque-app/src/controller.rs:2119
+#: polyptyque-app/src/controller.rs:2120
 msgid "Réparation"
 msgstr "Repair"
 
-#: polyptyque-app/src/controller.rs:2121
+#: polyptyque-app/src/controller.rs:2122
 msgid "Conversion MP4"
 msgstr "MP4 conversion"
 
-#: polyptyque-app/src/controller.rs:2123
+#: polyptyque-app/src/controller.rs:2124
 msgid "Conversion et réparation"
 msgstr "Conversion and repair"
 
-#: polyptyque-app/src/controller.rs:2128
+#: polyptyque-app/src/controller.rs:2129
 msgid "{} : annulée, {n} fichier traité avant l'arrêt."
 msgid_plural "{} : annulée, {n} fichiers traités avant l'arrêt."
 msgstr[0] "{}: canceled, {n} file processed before stopping."
 msgstr[1] "{}: canceled, {n} files processed before stopping."
 
-#: polyptyque-app/src/controller.rs:2137
+#: polyptyque-app/src/controller.rs:2138
 msgid "{} : terminée, {n} fichier prêt pour le montage."
 msgid_plural "{} : terminée, {n} fichiers prêts pour le montage."
 msgstr[0] "{}: done, {n} file ready for editing."
 msgstr[1] "{}: done, {n} files ready for editing."
 
-#: polyptyque-app/src/controller.rs:2147
+#: polyptyque-app/src/controller.rs:2148
 msgid "{} : {}, {}. {}"
 msgstr "{}: {}, {}. {}"
 
-#: polyptyque-app/src/controller.rs:2150
+#: polyptyque-app/src/controller.rs:2151
 msgid "{n} réussite"
 msgid_plural "{n} réussites"
 msgstr[0] "{n} succeeded"
 msgstr[1] "{n} succeeded"
 
-#: polyptyque-app/src/controller.rs:2151
+#: polyptyque-app/src/controller.rs:2152
 msgid "{n} échec"
 msgid_plural "{n} échecs"
 msgstr[0] "{n} failed"
 msgstr[1] "{n} failed"
 
-#: polyptyque-app/src/controller.rs:2168
+#: polyptyque-app/src/controller.rs:2169
 msgid "Annuler la conversion"
 msgstr "Cancel conversion"
 
-#: polyptyque-app/src/controller.rs:2169
+#: polyptyque-app/src/controller.rs:2170
 msgid "Arrêter la conversion MP4 ({n} fichier restant) ? Le fichier en cours de conversion est effacé ; les MKV d'origine ne sont pas touchés."
 msgid_plural "Arrêter la conversion MP4 ({n} fichiers restants) ? Le fichier en cours de conversion est effacé ; les MKV d'origine ne sont pas touchés."
 msgstr[0] "Stop the MP4 conversion ({n} file left)? The file being converted is deleted; the original MKVs aren’t touched."
 msgstr[1] "Stop the MP4 conversion ({n} files left)? The file being converted is deleted; the original MKVs aren’t touched."
 
-#: polyptyque-app/src/controller.rs:2174
+#: polyptyque-app/src/controller.rs:2175
 msgid "Arrêter la conversion"
 msgstr "Stop conversion"
 
-#: polyptyque-app/src/controller.rs:2200
+#: polyptyque-app/src/controller.rs:2201
 msgid "{} (copie)"
 msgstr "{} (copy)"
 
-#: polyptyque-app/src/controller.rs:2217
+#: polyptyque-app/src/controller.rs:2218
 msgid "Nom de scène manquant."
 msgstr "Scene name missing."
 
-#: polyptyque-app/src/controller.rs:2259
+#: polyptyque-app/src/controller.rs:2260
 msgid "La scène « {} » sera supprimée."
 msgstr "Scene “{}” will be deleted."
 
-#: polyptyque-app/src/controller.rs:2261
+#: polyptyque-app/src/controller.rs:2262
 msgid "La scène « {} » sera supprimée. Ses sources restent dans les autres scènes."
 msgstr "Scene “{}” will be deleted. Its sources stay in the other scenes."
 
-#: polyptyque-app/src/controller.rs:2263
+#: polyptyque-app/src/controller.rs:2264
 msgid "La scène « {} » et ses sources seront supprimées."
 msgstr "Scene “{}” and its sources will be deleted."
 
-#: polyptyque-app/src/controller.rs:2265
+#: polyptyque-app/src/controller.rs:2266
 msgid "La scène « {} » sera supprimée, ainsi que la source qui n'est dans aucune autre scène."
 msgid_plural "La scène « {} » sera supprimée, ainsi que les {n} sources qui ne sont dans aucune autre scène."
 msgstr[0] "Scene “{}” will be deleted, along with the source that isn’t in any other scene."
 msgstr[1] "Scene “{}” will be deleted, along with the {n} sources that aren’t in any other scene."
 
-#: polyptyque-app/src/controller.rs:2274
+#: polyptyque-app/src/controller.rs:2275
 msgid "Sa programmation aussi."
 msgid_plural "Ses {n} programmations aussi."
 msgstr[0] "Its scheduled recording too."
 msgstr[1] "Its {n} scheduled recordings too."
 
-#: polyptyque-app/src/controller.rs:2276
+#: polyptyque-app/src/controller.rs:2277
 msgid "Les profils de navigateur restent sur le disque."
 msgstr "Browser profiles stay on disk."
 
-#: polyptyque-app/src/controller.rs:2281
+#: polyptyque-app/src/controller.rs:2282
 msgctxt "Bouton : supprimer une scène"
 msgid "Supprimer"
 msgstr "Delete"
 
-#: polyptyque-app/src/controller.rs:2290
+#: polyptyque-app/src/controller.rs:2291
 msgid "Autre navigateur…"
 msgstr "Other browser…"
 
-#: polyptyque-app/src/controller.rs:2295
+#: polyptyque-app/src/controller.rs:2296
 msgid "Navigateur {}"
 msgstr "Browser {}"
 
-#: polyptyque-app/src/controller.rs:2324
+#: polyptyque-app/src/controller.rs:2325
 msgid "Ce fichier de navigateur n'existe pas."
 msgstr "This browser file doesn’t exist."
 
-#: polyptyque-app/src/controller.rs:2329
+#: polyptyque-app/src/controller.rs:2330
 msgid "Tor Browser s'ajoute comme source application (il efface tout à la fermeture)."
 msgstr "Add Tor Browser as an app source (it erases everything when it closes)."
 
-#: polyptyque-app/src/controller.rs:2341 polyptyque-app/src/controller.rs:2427
+#: polyptyque-app/src/controller.rs:2342 polyptyque-app/src/controller.rs:2428
 msgid "Nom de source manquant."
 msgstr "Source name missing."
 
-#: polyptyque-app/src/controller.rs:2361
+#: polyptyque-app/src/controller.rs:2362
 msgid "« {} » ajoutée : les connexions et les onglets préparés dans ce navigateur seront conservés."
 msgstr "“{}” added: sign-ins and tabs set up in this browser will be kept."
 
-#: polyptyque-app/src/controller.rs:2368
+#: polyptyque-app/src/controller.rs:2369
 msgid "« {} » ajoutée, mais le navigateur ne s'ouvre pas : {}"
 msgstr "“{}” added, but the browser won’t open: {}"
 
-#: polyptyque-app/src/controller.rs:2371 polyptyque-app/src/controller.rs:2438
+#: polyptyque-app/src/controller.rs:2372 polyptyque-app/src/controller.rs:2439
 msgid "« {} » ajoutée."
 msgstr "“{}” added."
 
-#: polyptyque-app/src/controller.rs:2464
+#: polyptyque-app/src/controller.rs:2465
 msgid "« {} »"
 msgstr "“{}”"
 
-#: polyptyque-app/src/controller.rs:2468
+#: polyptyque-app/src/controller.rs:2469
 msgid "La source « {} » sera supprimée."
 msgstr "Source “{}” will be removed."
 
-#: polyptyque-app/src/controller.rs:2470
+#: polyptyque-app/src/controller.rs:2471
 msgid "Son profil de navigateur reste sur le disque."
 msgstr "Its browser profile stays on disk."
 
-#: polyptyque-app/src/controller.rs:2475
+#: polyptyque-app/src/controller.rs:2476
 msgid "La source « {} » sera retirée de cette scène seulement : elle reste dans {}."
 msgstr "Source “{}” will only be removed from this scene: it stays in {}."
 
-#: polyptyque-app/src/controller.rs:2485
+#: polyptyque-app/src/controller.rs:2486
 msgctxt "Bouton : retirer une source"
 msgid "Supprimer"
 msgstr "Remove"
 
-#: polyptyque-app/src/controller.rs:2498
+#: polyptyque-app/src/controller.rs:2499
 msgid "« {} » copiée, prête à être collée dans une autre scène (Ctrl+V)."
 msgstr "“{}” copied, ready to paste into another scene (Ctrl+V)."
 
-#: polyptyque-app/src/controller.rs:2515
+#: polyptyque-app/src/controller.rs:2516
 msgid "Impossible de coller une source pendant un enregistrement."
 msgstr "Can’t paste a source during a recording."
 
-#: polyptyque-app/src/controller.rs:2522
+#: polyptyque-app/src/controller.rs:2523
 msgid "Copier d'abord une source (Ctrl+C), puis la coller ici (Ctrl+V)."
 msgstr "Copy a source first (Ctrl+C), then paste it here (Ctrl+V)."
 
-#: polyptyque-app/src/controller.rs:2537
+#: polyptyque-app/src/controller.rs:2538
 msgid "« {} » collée dans « {} » : c'est la même source, partagée."
 msgstr "“{}” pasted into “{}”: it’s the same source, shared."
 
-#: polyptyque-app/src/controller.rs:2540
+#: polyptyque-app/src/controller.rs:2541
 msgid "« {} » est déjà dans cette scène : une même source n'y figure qu'une fois."
 msgstr "“{}” is already in this scene: a source can only appear once per scene."
 
-#: polyptyque-app/src/controller.rs:2545
+#: polyptyque-app/src/controller.rs:2546
 msgid "La source copiée a été supprimée entre-temps."
 msgstr "The copied source has been deleted in the meantime."
 
-#: polyptyque-app/src/controller.rs:2582
+#: polyptyque-app/src/controller.rs:2583
 msgid "Programme introuvable ({}) : la fenêtre est à ouvrir à la main."
 msgstr "Program not found ({}): open the window manually."
 
-#: polyptyque-app/src/controller.rs:2589 polyptyque-app/src/controller.rs:3394
+#: polyptyque-app/src/controller.rs:2590 polyptyque-app/src/controller.rs:3465
 msgid "Ouverture de « {} »…"
 msgstr "Opening “{}”…"
 
-#: polyptyque-app/src/controller.rs:2591
+#: polyptyque-app/src/controller.rs:2592
 msgid "« {} » est déjà en train de s'ouvrir (ou de se fermer) : patienter quelques secondes."
 msgstr "“{}” is already opening (or closing): wait a few seconds."
 
-#: polyptyque-app/src/controller.rs:2597
+#: polyptyque-app/src/controller.rs:2598
 msgid "Impossible d'ouvrir « {} » : {}"
 msgstr "Couldn’t open “{}”: {}"
 
-#: polyptyque-app/src/controller.rs:2608
+#: polyptyque-app/src/controller.rs:2609
 msgid "Les fenêtres de la scène sont déjà en train de s'ouvrir."
 msgstr "The scene’s windows are already opening."
 
-#: polyptyque-app/src/controller.rs:2617
+#: polyptyque-app/src/controller.rs:2618
 msgid "Aucune fenêtre à ouvrir : seuls les navigateurs, et les applications avec « Relancer », s'ouvrent depuis Polyptyque."
 msgstr "No windows to open: only browsers, and apps set to “Relaunch”, open from Polyptyque."
 
-#: polyptyque-app/src/controller.rs:2632
+#: polyptyque-app/src/controller.rs:2633
 msgid "Ouverture des fenêtres de la scène…"
 msgstr "Opening the scene’s windows…"
 
-#: polyptyque-app/src/controller.rs:2653
+#: polyptyque-app/src/controller.rs:2654
 msgid "Impossible d'ouvrir : {} (programme introuvable ? voir le journal)."
 msgstr "Couldn’t open: {} (program not found? see the log)."
 
-#: polyptyque-app/src/controller.rs:2658
+#: polyptyque-app/src/controller.rs:2659
 msgid "Fenêtre toujours absente après 30 s : {}."
 msgid_plural "Fenêtres toujours absentes après 30 s : {}."
 msgstr[0] "Window still missing after 30 s: {}."
 msgstr[1] "Windows still missing after 30 s: {}."
 
-#: polyptyque-app/src/controller.rs:2667
+#: polyptyque-app/src/controller.rs:2668
 msgid "{n} fenêtre ouverte."
 msgid_plural "{n} fenêtres ouvertes."
 msgstr[0] "{n} window opened."
 msgstr[1] "{n} windows opened."
 
-#: polyptyque-app/src/controller.rs:2669
+#: polyptyque-app/src/controller.rs:2670
 msgid "Toutes les fenêtres de la scène sont déjà ouvertes."
 msgstr "All the scene’s windows are already open."
 
-#: polyptyque-app/src/controller.rs:2695
+#: polyptyque-app/src/controller.rs:2696
 msgid "fenêtre introuvable"
 msgstr "window not found"
 
-#: polyptyque-app/src/controller.rs:2700
+#: polyptyque-app/src/controller.rs:2701
 msgid "Fenêtre de « {} » rétablie."
 msgstr "Window of “{}” restored."
 
-#: polyptyque-app/src/controller.rs:2702
+#: polyptyque-app/src/controller.rs:2703
 msgid "Impossible de rétablir « {} » : {}"
 msgstr "Couldn’t restore “{}”: {}"
 
-#: polyptyque-app/src/controller.rs:2716
+#: polyptyque-app/src/controller.rs:2717
 msgid "{} × {} (personnalisée)"
 msgstr "{} × {} (custom)"
 
-#: polyptyque-app/src/controller.rs:2720
+#: polyptyque-app/src/controller.rs:2721
 msgid "{} i/s"
 msgstr "{} fps"
 
-#: polyptyque-app/src/controller.rs:2724
+#: polyptyque-app/src/controller.rs:2725
 msgid "{} i/s (personnalisé)"
 msgstr "{} fps (custom)"
 
-#: polyptyque-app/src/controller.rs:2729
+#: polyptyque-app/src/controller.rs:2730
 msgid "Aucun"
 msgstr "None"
 
-#: polyptyque-app/src/controller.rs:2742
+#: polyptyque-app/src/controller.rs:2743
 msgid "{} kb/s"
 msgstr "{} kbps"
 
-#: polyptyque-app/src/controller.rs:2746
+#: polyptyque-app/src/controller.rs:2747
 msgid "{} kb/s (personnalisé)"
 msgstr "{} kbps (custom)"
 
-#: polyptyque-app/src/controller.rs:2774
+#: polyptyque-app/src/controller.rs:2785
 msgid "Micro par défaut de Windows"
 msgstr "Windows default mic"
 
-#: polyptyque-app/src/controller.rs:2780
+#: polyptyque-app/src/controller.rs:2791
 msgid "{} (débranché)"
 msgstr "{} (unplugged)"
 
-#: polyptyque-app/src/controller.rs:2798
+#: polyptyque-app/src/controller.rs:2809
 msgid "H.264 : compatibilité maximale (recommandé)"
 msgstr "H.264: best compatibility (recommended)"
 
-#: polyptyque-app/src/controller.rs:2799
+#: polyptyque-app/src/controller.rs:2810
 msgid "HEVC : fichiers plus légers"
 msgstr "HEVC: smaller files"
 
-#: polyptyque-app/src/controller.rs:2856
+#: polyptyque-app/src/controller.rs:2875
 msgid "Débit vidéo invalide : un nombre entre 250 et 500 000 kb/s est attendu."
 msgstr "Invalid video bitrate: enter a number between 250 and 500,000 kbps."
 
-#: polyptyque-app/src/controller.rs:2863
+#: polyptyque-app/src/controller.rs:2882
 msgid "Dossier des enregistrements manquant."
 msgstr "Recordings folder missing."
 
-#: polyptyque-app/src/controller.rs:2881
+#: polyptyque-app/src/controller.rs:2900
 msgid "Un même raccourci ne peut servir qu'à une seule action."
 msgstr "The same shortcut can’t be used for two actions."
 
-#: polyptyque-app/src/controller.rs:2951
+#: polyptyque-app/src/controller.rs:2990
 msgid "Réglages enregistrés."
 msgstr "Settings saved."
 
-#: polyptyque-app/src/controller.rs:2965
+#: polyptyque-app/src/controller.rs:3036
 msgid "Impossible de créer {} : {}"
 msgstr "Couldn’t create {}: {}"
 
-#: polyptyque-app/src/controller.rs:2970
+#: polyptyque-app/src/controller.rs:3041
 msgid "Impossible d'ouvrir le dossier : {}"
 msgstr "Couldn’t open the folder: {}"
 
-#: polyptyque-app/src/controller.rs:3089
+#: polyptyque-app/src/controller.rs:3160
 msgid "Opération en cours : Polyptyque pourra être fermé dans un instant."
 msgstr "Operation in progress: Polyptyque can be closed in a moment."
 
-#: polyptyque-app/src/controller.rs:3096
+#: polyptyque-app/src/controller.rs:3167
 msgid "Un enregistrement programmé est en cours (jusqu'à {}). L'arrêter et quitter Polyptyque ? Les fichiers seront finalisés proprement, et il ne sera pas relancé dans ce créneau."
 msgstr "A scheduled recording is in progress (until {}). Stop it and quit Polyptyque? The files will be finalized properly, and it won’t restart in this time slot."
 
-#: polyptyque-app/src/controller.rs:3100
+#: polyptyque-app/src/controller.rs:3171
 msgid "Arrêter l'enregistrement et quitter Polyptyque ? Les fichiers seront finalisés proprement."
 msgstr "Stop recording and quit Polyptyque? The files will be finalized properly."
 
-#: polyptyque-app/src/controller.rs:3104
+#: polyptyque-app/src/controller.rs:3175
 msgid "Les programmations ne se lancent pas tant que Polyptyque est fermé."
 msgstr "Scheduled recordings don’t start while Polyptyque is closed."
 
-#: polyptyque-app/src/controller.rs:3106
+#: polyptyque-app/src/controller.rs:3177
 msgid "Enregistrement en cours"
 msgstr "Recording in progress"
 
-#: polyptyque-app/src/controller.rs:3106
+#: polyptyque-app/src/controller.rs:3177
 msgid "Arrêter et quitter"
 msgstr "Stop and quit"
 
-#: polyptyque-app/src/controller.rs:3111
+#: polyptyque-app/src/controller.rs:3182
 msgid "Programmation active"
 msgstr "Scheduled recordings active"
 
-#: polyptyque-app/src/controller.rs:3111 polyptyque-app/src/controller.rs:3120
+#: polyptyque-app/src/controller.rs:3182 polyptyque-app/src/controller.rs:3191
 msgid "Quitter quand même"
 msgstr "Quit anyway"
 
-#: polyptyque-app/src/controller.rs:3118
+#: polyptyque-app/src/controller.rs:3189
 msgid "Conversion en cours"
 msgstr "Conversion in progress"
 
-#: polyptyque-app/src/controller.rs:3119
+#: polyptyque-app/src/controller.rs:3190
 msgid "Quitter maintenant interrompt la conversion MP4. Les fichiers MKV d'origine sont conservés : ils pourront être convertis plus tard."
 msgstr "Quitting now interrupts the MP4 conversion. The original MKV files are kept: they can be converted later."
 
-#: polyptyque-app/src/controller.rs:3230
+#: polyptyque-app/src/controller.rs:3301
 msgid "Mise en veille de l'ordinateur : enregistrement arrêté."
 msgstr "Computer going to sleep: recording stopped."
 
-#: polyptyque-app/src/controller.rs:3242
+#: polyptyque-app/src/controller.rs:3313
 msgid "Reprendre l'enregistrement ?"
 msgstr "Resume recording?"
 
-#: polyptyque-app/src/controller.rs:3243
+#: polyptyque-app/src/controller.rs:3314
 msgid "L'enregistrement a été arrêté proprement à {}, juste avant la mise en veille de l'ordinateur. Le reprendre maintenant (dans de nouveaux fichiers) ?"
 msgstr "Recording was stopped properly at {}, just before the computer went to sleep. Resume it now (in new files)?"
 
-#: polyptyque-app/src/controller.rs:3247
+#: polyptyque-app/src/controller.rs:3318
 msgid "Reprendre"
 msgstr "Resume"
 
-#: polyptyque-app/src/controller.rs:3347
+#: polyptyque-app/src/controller.rs:3418
 msgid "Raccourci déjà utilisé par un autre programme : {}"
 msgid_plural "Raccourcis déjà utilisés par un autre programme : {}"
 msgstr[0] "Shortcut already used by another program: {}"
 msgstr[1] "Shortcuts already used by another program: {}"
 
-#: polyptyque-app/src/controller.rs:3368 polyptyque-app/src/convert.rs:153
+#: polyptyque-app/src/controller.rs:3439 polyptyque-app/src/convert.rs:153
 msgid "FFmpeg introuvable : ffmpeg.exe doit se trouver à côté de polyptyque.exe"
 msgstr "FFmpeg not found: ffmpeg.exe must be next to polyptyque.exe"
 
-#: polyptyque-app/src/controller.rs:3371
+#: polyptyque-app/src/controller.rs:3442
 msgid "aucun encodeur {} utilisable avec le réglage « {} ». Essayer un autre matériel ou le format H.264."
 msgstr "no usable {} encoder with the “{}” setting. Try another hardware option or the H.264 format."
 
-#: polyptyque-app/src/controller.rs:3385
+#: polyptyque-app/src/controller.rs:3456
 msgid "impossible d'écrire dans {} ni dans {}"
 msgstr "can’t write to {} or {}"
 
-#: polyptyque-app/src/controller.rs:3388
+#: polyptyque-app/src/controller.rs:3459
 msgid "Dossier {} inaccessible : enregistrement dans {}."
 msgstr "Folder {} unavailable: recording to {}."
 
-#: polyptyque-app/src/controller.rs:3391
+#: polyptyque-app/src/controller.rs:3462
 msgid "Ouverture des fenêtres…"
 msgstr "Opening windows…"
 
-#: polyptyque-app/src/controller.rs:3426
+#: polyptyque-app/src/controller.rs:3497
 msgid "Réparation · {} sur {} · {} %"
 msgstr "Repair · {} of {} · {}%"
 
-#: polyptyque-app/src/controller.rs:3427
+#: polyptyque-app/src/controller.rs:3498
 msgid "Réparation · {} %"
 msgstr "Repair · {}%"
 
-#: polyptyque-app/src/controller.rs:3428
+#: polyptyque-app/src/controller.rs:3499
 msgid "MP4 · {} sur {} · {} %"
 msgstr "MP4 · {} of {} · {}%"
 
-#: polyptyque-app/src/controller.rs:3429
+#: polyptyque-app/src/controller.rs:3500
 msgid "MP4 · {} %"
 msgstr "MP4 · {}%"
 
-#: polyptyque-app/src/controller.rs:3434
+#: polyptyque-app/src/controller.rs:3505
 msgid "{n} fichier ajouté à la conversion MP4."
 msgid_plural "{n} fichiers ajoutés à la conversion MP4."
 msgstr[0] "{n} file added to the MP4 conversion."
 msgstr[1] "{n} files added to the MP4 conversion."
 
-#: polyptyque-app/src/controller.rs:3447
+#: polyptyque-app/src/controller.rs:3518
 msgid "FFmpeg introuvable"
 msgstr "FFmpeg not found"
 
-#: polyptyque-app/src/controller.rs:3462
+#: polyptyque-app/src/controller.rs:3533
 msgid "Introuvable : déplacé ou supprimé ?"
 msgstr "Not found: moved or deleted?"
 
-#: polyptyque-app/src/controller.rs:3463
+#: polyptyque-app/src/controller.rs:3534
 msgid "Vide : rien n'avait été écrit"
 msgstr "Empty: nothing had been written"
 
-#: polyptyque-app/src/controller.rs:3465
+#: polyptyque-app/src/controller.rs:3536
 msgid "Complet · {} · {}"
 msgstr "Complete · {} · {}"
 
-#: polyptyque-app/src/controller.rs:3471
+#: polyptyque-app/src/controller.rs:3542
 msgid "Interrompu, lisible, à réparer · {}"
 msgstr "Interrupted, playable, needs repair · {}"
 
-#: polyptyque-app/src/controller.rs:3472
+#: polyptyque-app/src/controller.rs:3543
 msgid "Illisible : {}"
 msgstr "Unreadable: {}"
 
@@ -1656,27 +1680,27 @@ msgstr "file unavailable: {}"
 msgid "espace disque insuffisant pour la copie"
 msgstr "not enough disk space for the copy"
 
-#: polyptyque-app/src/format.rs:22
+#: polyptyque-app/src/format.rs:40
 msgid "{} Go"
 msgstr "{} GB"
 
-#: polyptyque-app/src/format.rs:24
+#: polyptyque-app/src/format.rs:42
 msgid "{} Mo"
 msgstr "{} MB"
 
-#: polyptyque-app/src/format.rs:26
+#: polyptyque-app/src/format.rs:44
 msgid "{} Ko"
 msgstr "{} KB"
 
-#: polyptyque-app/src/format.rs:39
+#: polyptyque-app/src/format.rs:57
 msgid "{} h"
 msgstr "{} h"
 
-#: polyptyque-app/src/format.rs:41
+#: polyptyque-app/src/format.rs:59
 msgid "{} min"
 msgstr "{} min"
 
-#: polyptyque-app/src/format.rs:69
+#: polyptyque-app/src/format.rs:87
 msgid "{} et {}"
 msgid_plural "{} et {}"
 msgstr[0] "{} and {}"
@@ -1701,6 +1725,157 @@ msgstr "Polyptyque wasn’t installed by its installer ({})"
 #: polyptyque-app/src/update.rs:68
 msgid "erreur interne pendant le téléchargement"
 msgstr "internal error while downloading"
+
+#: polyptyque-core/src/clock.rs:79
+msgctxt "Jour abrégé dans une date"
+msgid "lun."
+msgstr "Mon"
+
+#: polyptyque-core/src/clock.rs:80
+msgctxt "Jour abrégé dans une date"
+msgid "mar."
+msgstr "Tue"
+
+#: polyptyque-core/src/clock.rs:81
+msgctxt "Jour abrégé dans une date"
+msgid "mer."
+msgstr "Wed"
+
+#: polyptyque-core/src/clock.rs:82
+msgctxt "Jour abrégé dans une date"
+msgid "jeu."
+msgstr "Thu"
+
+#: polyptyque-core/src/clock.rs:83
+msgctxt "Jour abrégé dans une date"
+msgid "ven."
+msgstr "Fri"
+
+#: polyptyque-core/src/clock.rs:84
+msgctxt "Jour abrégé dans une date"
+msgid "sam."
+msgstr "Sat"
+
+#: polyptyque-core/src/clock.rs:85
+msgctxt "Jour abrégé dans une date"
+msgid "dim."
+msgstr "Sun"
+
+#: polyptyque-core/src/clock.rs:92
+msgctxt "Mois abrégé"
+msgid "janv."
+msgstr "Jan"
+
+#: polyptyque-core/src/clock.rs:93
+msgctxt "Mois abrégé"
+msgid "févr."
+msgstr "Feb"
+
+#: polyptyque-core/src/clock.rs:94
+msgctxt "Mois abrégé"
+msgid "mars"
+msgstr "Mar"
+
+#: polyptyque-core/src/clock.rs:95
+msgctxt "Mois abrégé"
+msgid "avr."
+msgstr "Apr"
+
+#: polyptyque-core/src/clock.rs:96
+msgctxt "Mois abrégé"
+msgid "mai"
+msgstr "May"
+
+#: polyptyque-core/src/clock.rs:97
+msgctxt "Mois abrégé"
+msgid "juin"
+msgstr "Jun"
+
+#: polyptyque-core/src/clock.rs:98
+msgctxt "Mois abrégé"
+msgid "juil."
+msgstr "Jul"
+
+#: polyptyque-core/src/clock.rs:99
+msgctxt "Mois abrégé"
+msgid "août"
+msgstr "Aug"
+
+#: polyptyque-core/src/clock.rs:100
+msgctxt "Mois abrégé"
+msgid "sept."
+msgstr "Sep"
+
+#: polyptyque-core/src/clock.rs:101
+msgctxt "Mois abrégé"
+msgid "oct."
+msgstr "Oct"
+
+#: polyptyque-core/src/clock.rs:102
+msgctxt "Mois abrégé"
+msgid "nov."
+msgstr "Nov"
+
+#: polyptyque-core/src/clock.rs:103
+msgctxt "Mois abrégé"
+msgid "déc."
+msgstr "Dec"
+
+#: polyptyque-core/src/clock.rs:110
+msgid "janvier"
+msgstr "January"
+
+#: polyptyque-core/src/clock.rs:111
+msgid "février"
+msgstr "February"
+
+#: polyptyque-core/src/clock.rs:112
+msgid "mars"
+msgstr "March"
+
+#: polyptyque-core/src/clock.rs:113
+msgid "avril"
+msgstr "April"
+
+#: polyptyque-core/src/clock.rs:114
+msgid "mai"
+msgstr "May"
+
+#: polyptyque-core/src/clock.rs:115
+msgid "juin"
+msgstr "June"
+
+#: polyptyque-core/src/clock.rs:116
+msgid "juillet"
+msgstr "July"
+
+#: polyptyque-core/src/clock.rs:117
+msgid "août"
+msgstr "August"
+
+#: polyptyque-core/src/clock.rs:118
+msgid "septembre"
+msgstr "September"
+
+#: polyptyque-core/src/clock.rs:119
+msgid "octobre"
+msgstr "October"
+
+#: polyptyque-core/src/clock.rs:120
+msgid "novembre"
+msgstr "November"
+
+#: polyptyque-core/src/clock.rs:121
+msgid "décembre"
+msgstr "December"
+
+#: polyptyque-core/src/clock.rs:130
+msgid "{weekday} {day} {month}"
+msgstr "{weekday}, {month} {day}"
+
+#: polyptyque-core/src/clock.rs:133
+msgid "{weekday} {day} {month} {year}"
+msgstr "{weekday}, {month} {day}, {year}"
 
 #: polyptyque-core/src/config.rs:47 polyptyque-core/src/config.rs:115
 msgid "Scène principale"
@@ -1740,15 +1915,15 @@ msgctxt "Type de source"
 msgid "Application {}"
 msgstr "{} app"
 
-#: polyptyque-core/src/config.rs:661
+#: polyptyque-core/src/config.rs:690
 msgid "Automatique (carte graphique si disponible)"
 msgstr "Automatic (graphics card if available)"
 
-#: polyptyque-core/src/config.rs:662
+#: polyptyque-core/src/config.rs:691
 msgid "Carte graphique"
 msgstr "Graphics card"
 
-#: polyptyque-core/src/config.rs:663 polyptyque-core/src/encoder.rs:25
+#: polyptyque-core/src/config.rs:692 polyptyque-core/src/encoder.rs:25
 msgid "Processeur"
 msgstr "CPU"
 
@@ -1764,75 +1939,75 @@ msgstr "{date}_{time}_{scene}_{source}"
 msgid "%Hh%M"
 msgstr "%H-%M"
 
-#: polyptyque-core/src/platform.rs:83 polyptyque-core/src/platform.rs:90 polyptyque-core/src/platform.rs:150 polyptyque-core/src/platform.rs:155
+#: polyptyque-core/src/platform.rs:83 polyptyque-core/src/platform.rs:90 polyptyque-core/src/platform.rs:155 polyptyque-core/src/platform.rs:160
 msgid "non disponible sur ce système"
 msgstr "not available on this system"
 
-#: polyptyque-core/src/schedule.rs:96
+#: polyptyque-core/src/schedule.rs:108
 msgid "heure invalide : « {} »"
 msgstr "invalid time: “{}”"
 
-#: polyptyque-core/src/schedule.rs:152
+#: polyptyque-core/src/schedule.rs:164
 msgid "Lun"
 msgstr "Mon"
 
-#: polyptyque-core/src/schedule.rs:153
+#: polyptyque-core/src/schedule.rs:165
 msgid "Mar"
 msgstr "Tue"
 
-#: polyptyque-core/src/schedule.rs:154
+#: polyptyque-core/src/schedule.rs:166
 msgid "Mer"
 msgstr "Wed"
 
-#: polyptyque-core/src/schedule.rs:155
+#: polyptyque-core/src/schedule.rs:167
 msgid "Jeu"
 msgstr "Thu"
 
-#: polyptyque-core/src/schedule.rs:156
+#: polyptyque-core/src/schedule.rs:168
 msgid "Ven"
 msgstr "Fri"
 
-#: polyptyque-core/src/schedule.rs:157
+#: polyptyque-core/src/schedule.rs:169
 msgid "Sam"
 msgstr "Sat"
 
-#: polyptyque-core/src/schedule.rs:158
+#: polyptyque-core/src/schedule.rs:170
 msgid "Dim"
 msgstr "Sun"
 
-#: polyptyque-core/src/schedule.rs:339
+#: polyptyque-core/src/schedule.rs:351
 msgid "{} → {} (lendemain)"
 msgstr "{} → {} (next day)"
 
-#: polyptyque-core/src/schedule.rs:349
+#: polyptyque-core/src/schedule.rs:366
 msgid "Une fois, le {}"
 msgstr "Once, on {}"
 
-#: polyptyque-core/src/schedule.rs:356
+#: polyptyque-core/src/schedule.rs:373
 msgid "Du lundi au vendredi"
 msgstr "Weekdays"
 
-#: polyptyque-core/src/schedule.rs:357
+#: polyptyque-core/src/schedule.rs:374
 msgid "Le week-end"
 msgstr "Weekends"
 
-#: polyptyque-core/src/schedule.rs:358
+#: polyptyque-core/src/schedule.rs:375
 msgid "Chaque {}"
 msgstr "Every {}"
 
-#: polyptyque-core/src/schedule.rs:397
+#: polyptyque-core/src/schedule.rs:414
 msgid "aujourd'hui à {}"
 msgstr "today at {}"
 
-#: polyptyque-core/src/schedule.rs:398
+#: polyptyque-core/src/schedule.rs:415
 msgid "demain à {}"
 msgstr "tomorrow at {}"
 
-#: polyptyque-core/src/schedule.rs:399
+#: polyptyque-core/src/schedule.rs:416
 msgid "{} à {}"
 msgstr "{} at {}"
 
-#: polyptyque-core/src/schedule.rs:400
+#: polyptyque-core/src/schedule.rs:417
 msgid "le {} à {}"
 msgstr "on {} at {}"
 
@@ -2064,7 +2239,7 @@ msgstr "can’t register to start with Windows (code {})"
 msgid "modification du démarrage de Windows impossible (code {})"
 msgstr "can’t change starting with Windows (code {})"
 
-#: polyptyque-windows/src/system_info.rs:70
+#: polyptyque-windows/src/system_info.rs:83
 msgid "ouverture impossible (code {})"
 msgstr "can’t open (code {})"
 

@@ -23,7 +23,9 @@ use std::io::ErrorKind;
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use chrono::{DateTime, Datelike, Duration, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, Offset, TimeZone, Utc};
+use chrono::{
+    DateTime, Datelike, Duration, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, Offset, TimeZone, Timelike, Utc,
+};
 use serde::{Deserialize, Serialize};
 use tr::tr;
 
@@ -68,6 +70,10 @@ impl TimeOfDay {
     /// « 21 », « 9:05 », « 21.30 ».
     pub fn parse(text: &str) -> Option<Self> {
         let text = text.trim().to_lowercase().replace(' ', "");
+        // « 9:05 PM », « 9 pm » : horloge sur 12 h.
+        if text.replace('.', "").ends_with("am") || text.replace('.', "").ends_with("pm") {
+            return crate::clock::parse_time(&text).and_then(|(h, m)| Self::new(h, m));
+        }
         let (hour, minute) = match text.split_once([':', 'h', '.']) {
             Some((hour, minute)) => (hour, if minute.is_empty() { "0" } else { minute }),
             None => (text.as_str(), "0"),
@@ -76,6 +82,12 @@ impl TimeOfDay {
             return None;
         }
         Self::new(hour.parse().ok()?, minute.parse().ok()?)
+    }
+
+    /// Heure affichée, selon l'horloge du réglage : « 21:00 » ou « 9:00 PM ».
+    /// Le texte enregistré dans les réglages reste « 21:00 » (`Display`).
+    pub fn label(self) -> String {
+        crate::clock::time(self.hour(), self.minute())
     }
 
     fn naive(self) -> NaiveTime {
@@ -336,17 +348,22 @@ impl Schedule {
     /// « 21:00 → 22:00 », « 22:00 → 02:00 (lendemain) ».
     pub fn times_label(&self) -> String {
         if self.crosses_midnight() {
-            tr!("{} → {} (lendemain)", self.start, self.end)
+            tr!("{} → {} (lendemain)", self.start.label(), self.end.label())
         } else {
-            format!("{} → {}", self.start, self.end)
+            format!("{} → {}", self.start.label(), self.end.label())
         }
     }
 
     /// « Tous les jours », « Du lundi au vendredi », « Lun, mer, ven »,
     /// « Une fois, le 25/10/2026 ».
     pub fn repeat_label(&self) -> String {
+        self.repeat_label_at(chrono::Local::now().date_naive())
+    }
+
+    /// Idem, l'année n'étant écrite que si ce n'est pas celle de `today`.
+    pub fn repeat_label_at(&self, today: NaiveDate) -> String {
         match &self.repeat {
-            Repeat::Once { date } => tr!("Une fois, le {}", date.format("%d/%m/%Y")),
+            Repeat::Once { date } => tr!("Une fois, le {}", crate::clock::date(*date, today)),
             Repeat::Weekly { days } => {
                 let mut days: Vec<u8> = days.iter().copied().filter(|d| (1..=7).contains(d)).collect();
                 days.sort_unstable();
@@ -392,18 +409,19 @@ pub fn any_active<Tz: TimeZone>(schedules: &[Schedule], now: DateTime<Utc>, tz: 
 pub fn when_label<Tz: TimeZone>(at: DateTime<Utc>, now: DateTime<Utc>, tz: &Tz) -> String {
     let at = at.with_timezone(tz).naive_local();
     let today = now.with_timezone(tz).date_naive();
-    let time = at.format("%H:%M").to_string();
+    let time = crate::clock::time(at.hour(), at.minute());
     match (at.date() - today).num_days() {
         0 => tr!("aujourd'hui à {}", time),
         1 => tr!("demain à {}", time),
         2..=6 => tr!("{} à {}", day_name(at.weekday().number_from_monday() as u8), time),
-        _ => tr!("le {} à {}", at.format("%d/%m"), time),
+        _ => tr!("le {} à {}", crate::clock::date(at.date(), today), time),
     }
 }
 
 /// Heure locale d'un instant : « 22:00 ».
 pub fn clock_label<Tz: TimeZone>(at: DateTime<Utc>, tz: &Tz) -> String {
-    at.with_timezone(tz).naive_local().format("%H:%M").to_string()
+    let at = at.with_timezone(tz).naive_local();
+    crate::clock::time(at.hour(), at.minute())
 }
 
 fn default_true() -> bool {
@@ -685,6 +703,8 @@ mod tests {
         assert_eq!(time("9").to_string(), "09:00");
         assert_eq!(time("9:5").to_string(), "09:05");
         assert_eq!(time("21.45").to_string(), "21:45");
+        assert_eq!(time("9:05 PM").to_string(), "21:05");
+        assert_eq!(time("12 am").to_string(), "00:00");
         for bad in ["", "24:00", "12:60", "abc", "123:00", "12:000", "h30"] {
             assert_eq!(TimeOfDay::parse(bad), None, "{bad}");
         }
@@ -822,13 +842,16 @@ mod tests {
         assert_eq!(weekly("21:00", "22:00", &[6, 7]).repeat_label(), "Le week-end");
         assert_eq!(weekly("21:00", "22:00", &[3]).repeat_label(), "Chaque mercredi");
         assert_eq!(weekly("21:00", "22:00", &[1, 3, 5]).repeat_label(), "Lun, Mer, Ven");
-        assert_eq!(once("21:00", "22:00", date(2026, 10, 25)).repeat_label(), "Une fois, le 25/10/2026");
+        assert_eq!(
+            once("21:00", "22:00", date(2026, 10, 25)).repeat_label_at(date(2026, 10, 1)),
+            "Une fois, le dim. 25 oct."
+        );
         assert_eq!(weekly("22:00", "02:00", &ALL).times_label(), "22:00 → 02:00 (lendemain)");
         let now = paris(2026, 10, 23, 12, 0);
         assert_eq!(when_label(paris(2026, 10, 23, 21, 0), now, &Paris), "aujourd'hui à 21:00");
         assert_eq!(when_label(paris(2026, 10, 24, 21, 0), now, &Paris), "demain à 21:00");
         assert_eq!(when_label(paris(2026, 10, 26, 21, 0), now, &Paris), "lundi à 21:00");
-        assert_eq!(when_label(paris(2026, 11, 2, 21, 0), now, &Paris), "le 02/11 à 21:00");
+        assert_eq!(when_label(paris(2026, 11, 2, 21, 0), now, &Paris), "le lun. 2 nov. à 21:00");
     }
 
     // ----- Planificateur ---------------------------------------------------

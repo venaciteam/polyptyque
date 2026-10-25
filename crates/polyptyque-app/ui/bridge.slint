@@ -193,6 +193,12 @@ export global Bridge {
     in-out property <bool> settings-convert;
     // Mises à jour : 0 versions stables, 1 stables et bêta, 2 ne pas rechercher.
     in-out property <int> settings-update-index;
+    // Langue : 0 automatique, 1 français, 2 anglais. Horloge : 0 automatique,
+    // 1 24 h, 2 12 h.
+    in-out property <int> settings-language-index;
+    in-out property <int> settings-clock-index;
+    // Horloge en vigueur (exemples d'heures dans la programmation).
+    in property <bool> twelve-hour;
     in-out property <bool> settings-open-windows;
     in-out property <bool> settings-close-browsers;
     in-out property <bool> settings-startup;
