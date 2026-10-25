@@ -5,8 +5,8 @@ import { Theme } from "theme.slint";
 import { Bridge, IncidentFile, SceneItem, ScheduleItem, SourceItem, SourceCard, WindowItem } from "bridge.slint";
 import { ActionButton, IconButton, LevelMeter, ListRow, Panel, SourceCardView, Toggle } from "components.slint";
 import {
-    AddApplicationSheet, AddBrowserSheet, BusyOverlay, ConfirmSheet, IncidentSheet, ReportSheet, SceneNameSheet,
-    ScheduleEditorSheet, SchedulePrompt, SchedulesSheet, SettingsSheet, Toast,
+    AddApplicationSheet, AddBrowserSheet, BusyOverlay, CloseSchedulesSheet, ConfirmSheet, IncidentSheet, ReportSheet,
+    SceneNameSheet, ScheduleEditorSheet, SchedulePrompt, SchedulesSheet, SettingsSheet, Toast,
 } from "sheets.slint";
 
 export { Bridge, IncidentFile, SceneItem, ScheduleItem, SourceItem, SourceCard, WindowItem }
@@ -863,6 +863,10 @@ export component AppWindow inherits Window {
         height: root.height;
     }
     if Bridge.sheet == "confirm": ConfirmSheet {
+        width: root.width;
+        height: root.height;
+    }
+    if Bridge.sheet == "close-schedules": CloseSchedulesSheet {
         width: root.width;
         height: root.height;
     }

@@ -244,9 +244,18 @@ Au lancement de Polyptyque (réglage « Ouvrir les fenêtres de la scène au lan
 - **Accès** : pastille de la barre du haut, qui affiche « Programmer », le prochain créneau (« Podcast · aujourd'hui à 21:00 ») ou la fin prévue de l'enregistrement programmé (« Arrêt programmé à 22:00 »). Un clic ouvre la liste des programmations (avec le prochain créneau de chacune), d'où l'on crée et modifie.
 - **Polyptyque doit être ouvert** : il n'y a pas encore de lancement par Windows à l'heure prévue.
 	- Tant qu'une programmation est **active** (un créneau en cours ou à venir), la mise en veille automatique et l'extinction de l'écran sont empêchées, par le même mécanisme que pendant l'enregistrement mais indépendamment de lui (la fin d'un enregistrement ne lève pas cette protection). Une mise en veille demandée (capot, bouton) reste possible.
-	- Quitter Polyptyque alors qu'une programmation doit encore lancer un enregistrement demande confirmation.
+	- Fermer la fenêtre alors qu'une programmation doit encore lancer un enregistrement (ou arrêter celui en cours) : voir **Arrière-plan** ci-dessous.
+- **Arrière-plan** : fenêtre cachée (absente de la barre des tâches), icône de Polyptyque dans la zone de notification, près de l'horloge (sous la flèche « ^ » si Windows l'y range). Les programmations, les raccourcis globaux, l'anti-veille et l'enregistrement en cours continuent ; les aperçus et les niveaux sonores des cartes s'arrêtent jusqu'au retour de la fenêtre.
+	- Icône : un clic fait revenir la fenêtre ; clic droit : « Afficher Polyptyque », « Quitter Polyptyque ». Info-bulle : « Polyptyque », « Enregistrement en cours » le cas échéant, et le texte de la pastille de la programmation (« Podcast · demain à 07:00 »). L'icône n'existe que pendant l'arrière-plan ; elle est reposée si l'Explorateur redémarre.
+	- La fenêtre revient aussi avec le raccourci « Afficher / réduire Polyptyque », un second lancement de Polyptyque (raccourci du bureau, menu Démarrer) et toute question qui doit se voir (démarrage manqué).
+	- **Fermer la fenêtre** (croix, <kbd>Alt</kbd> + <kbd>F4</kbd>, « Fermer la fenêtre » de la barre des tâches) alors qu'une programmation a encore besoin de Polyptyque, selon le réglage « Fermer la fenêtre avec une programmation prévue » (Fichiers et interface) :
+		- **Demander à chaque fois** (par défaut) : fenêtre « Programmation active » (« « Podcast » est programmé demain à 07:00 : Polyptyque doit rester ouvert pour le lancer. Il peut continuer en arrière-plan, avec son icône près de l'horloge. »), boutons Annuler / Quitter quand même / **Continuer en arrière-plan**, case « Se souvenir de mon choix » (« Modifiable ensuite dans les réglages. ») qui enregistre le choix dans le réglage ;
+		- **Continuer en arrière-plan** : directement, sans question, y compris pendant un enregistrement (rien n'est interrompu) ;
+		- **Quitter Polyptyque** : sans avertissement pour les programmations.
+	- Sans programmation qui attend, la croix ferme Polyptyque comme avant, quel que soit le réglage. Un enregistrement ou une conversion en cours demande toujours confirmation avant de quitter, quel que soit le réglage (sauf « Continuer en arrière-plan », qui ne quitte pas).
+	- **« Quitter Polyptyque »** (icône) : quitte pour de bon. Une programmation qui attend demande confirmation (« … Quitter quand même ? »), sauf réglage « Quitter Polyptyque » ; la fenêtre revient pour toute confirmation.
 - **Lancer Polyptyque au démarrage de Windows** (option, dans les programmations et dans les réglages, désactivée par défaut) : sans elle, les programmations ne survivent pas à un redémarrage (mise à jour de Windows).
-	- Inscription dans la liste « Applications au démarrage » de l'utilisateur (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`), sans droits administrateur. Lancé ainsi, Polyptyque démarre **réduit**, sans ouvrir les fenêtres de la scène : elles s'ouvrent au début du créneau, comme pour tout enregistrement.
+	- Inscription dans la liste « Applications au démarrage » de l'utilisateur (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`), sans droits administrateur. Lancé ainsi, Polyptyque démarre **en arrière-plan** (icône près de l'horloge), sans ouvrir les fenêtres de la scène : elles s'ouvrent au début du créneau, comme pour tout enregistrement.
 	- L'emplacement inscrit est remis à jour à chaque lancement (version portable déplacée) ; l'inscription est retirée à la désinstallation.
 	- Désactivé par l'utilisateur dans les Paramètres de Windows (Applications > Démarrage) : signalé dans la fenêtre des programmations. Réactiver l'option dans Polyptyque lève cette désactivation.
 	- Version portable : seule exception à « rien n'est écrit ailleurs sur le PC », signalée sous l'option.
@@ -257,7 +266,7 @@ Au lancement de Polyptyque (réglage « Ouvrir les fenêtres de la scène au lan
 | Situation | Comportement |
 |---|---|
 | Début d'un créneau, rien n'enregistre | La scène du créneau devient la scène en cours et s'enregistre. Message : « Enregistrement programmé : arrêt prévu à 22:00 » |
-| **Démarrage manqué** : Polyptyque fermé ou ordinateur en veille à l'heure prévue, ouvert pendant le créneau | Fenêtre « Enregistrement programmé » : lancer maintenant, jusqu'à la fin du créneau ? Compte à rebours de **deux minutes** ; sans réponse, l'enregistrement démarre (Polyptyque relancé seul après une mise à jour de Windows, sans personne devant). La fenêtre réduite revient à l'écran. Sans objet si le créneau se termine avant |
+| **Démarrage manqué** : Polyptyque fermé ou ordinateur en veille à l'heure prévue, ouvert pendant le créneau | Fenêtre « Enregistrement programmé » : lancer maintenant, jusqu'à la fin du créneau ? Compte à rebours de **deux minutes** ; sans réponse, l'enregistrement démarre (Polyptyque relancé seul après une mise à jour de Windows, sans personne devant). La fenêtre réduite ou en arrière-plan revient à l'écran. Sans objet si le créneau se termine avant |
 | Créneau commencé il y a moins de 30 s (Polyptyque ouvert juste après l'heure) | Démarrage direct, sans question |
 | Programmation créée, modifiée ou activée pendant son propre créneau | Question du démarrage manqué, plutôt qu'un démarrage d'office |
 | **Enregistrement lancé à la main** pendant un créneau (bouton, raccourci, carte d'une source) | Fenêtre : « Arrêter automatiquement cet enregistrement à 22:00 ? » Compte à rebours de deux minutes ; sans réponse, **pas d'arrêt automatique** (le lancement peut n'avoir rien à voir avec la programmation). Dans les deux cas, la programmation ne lance plus rien dans ce créneau |
@@ -658,6 +667,7 @@ La session simulée (`polyptyque-engine/tests`) rejoue des enregistrements compl
 | Encodage et MKV | [[FFmpeg]] 8.1 (version GPL) : un processus par source, alimenté par deux tubes nommés (image NV12, son flottant), surveillé et relancé si besoin | NVENC, AMF, Quick Sync, x264 ; une panne d'encodeur n'affecte qu'une source |
 | Conversion MP4 | [[FFmpeg]] en recopie sans réencodage (`-c copy`) | Vérification des pistes et de la durée |
 | Fermeture de session | `ShutdownBlockReasonCreate`, messages `WM_QUERYENDSESSION` et `WM_ENDSESSION` sur la fenêtre principale | |
+| Arrière-plan | `Shell_NotifyIconW` (version 4), messages reçus par la fenêtre principale cachée ; menu `TrackPopupMenu` ; message `TaskbarCreated` ; second lancement : message enregistré `Polyptyque.Afficher` | Boucle de l'interface maintenue fenêtre cachée (`run_event_loop_until_quit` de Slint) |
 | Programmation | Heure locale du système par `chrono` (changements d'heure compris) ; anti-veille `SetThreadExecutionState` sur un fil dédié ; lancement au démarrage par la clé `Run` de l'utilisateur | Vérifiée par des tests avec le vrai fuseau Europe/Paris (`chrono-tz`) |
 | Conversion d'image | Processeur vidéo Direct3D 11 de la carte graphique | Mise à l'échelle et conversion NV12 BT.709 sans passer par le processeur |
 | Interface | [[Slint]] | Apparence décrite dans des fichiers `.slint` séparés de la logique ; compatible GPL v3 ; accessibilité via AccessKit ; aperçus par tampons d'image |
@@ -751,6 +761,14 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 > - [ ] Page pré-remplie vue une fois, connecté à GitHub (la page « nouvelle issue » exige une connexion)
 > - [ ] Validation sur la machine de référence
 
+> [!todo] Étape 3 septies - Arrière-plan ([[#Programmation des enregistrements]]), écrite le 2026-10-25
+> - [x] Icône dans la zone de notification pendant l'arrière-plan : clic, menu Afficher / Quitter, info-bulle, Explorateur redémarré
+> - [x] Lancement au démarrage de Windows directement en arrière-plan (au lieu de la fenêtre réduite)
+> - [x] Fermeture avec une programmation prévue : Continuer en arrière-plan / Quitter quand même, « Se souvenir de mon choix », réglage « Fermer la fenêtre avec une programmation prévue »
+> - [x] Fenêtre qui revient : raccourci, second lancement, question du démarrage manqué ; aperçus et niveaux arrêtés en arrière-plan
+> - [x] Vérifié en mode démonstration (question, choix retenu, réglage, français et anglais) ; icône et menu non vérifiables hors Windows
+> - [ ] Validation sur la machine de référence ([[protocole-test-programmation#G - Arrière-plan]])
+
 > [!todo] Étape 4 - Publication
 > - [ ] Dépôt public, première version publiée
 > - [ ] FFmpeg compilé par le projet (plus léger, signable)
@@ -837,6 +855,8 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 | 2026-10-25 | Date d'une programmation saisie dans **trois listes** jour, mois (en toutes lettres), année, dans l'ordre de la langue (« 25 octobre 2026 », « October 25, 2026 »), à la place du sélecteur de date de Slint : sa semaine commence le dimanche, sans réglage, et il écrit les mois en anglais même en français. Liste des jours ajustée au mois choisi ; années proposées : l'année en cours et la suivante ; jour de la semaine rappelé sous les listes |
 | 2026-10-25 | Publication bilingue : `README.md` en anglais (en tête) et `README.fr.md`, captures du mode démonstration dans les deux langues (données d'exemple dans la langue du système) ; `README.txt` anglais livré avec `LISEZMOI.txt` ; description des exécutables réduite au nom (« Polyptyque », affichée par le Gestionnaire des tâches) et ressources Windows en langue neutre ; titre des pages de version en anglais (« Polyptyque 1.0 beta 5 »), notes en anglais puis en français |
 | 2026-10-25 | Publication de la 1.0.0-beta.5 (préversion) : version anglaise complète (réglages « Langue » et « Horloge »), signalement d'un problème, date des programmations en trois listes |
+| 2026-10-25 | Démarrage à l'heure prévue confirmé sans question : la fenêtre au compte à rebours de deux minutes ne concerne que le démarrage manqué (rien à anticiper, Polyptyque n'était pas ouvert ou l'ordinateur dormait) |
+| 2026-10-25 | **Arrière-plan dans la zone de notification** (pas une fenêtre réduite) : sinon, le choix « arrière-plan » retenu ne laisserait plus aucun moyen de quitter par la croix ; l'icône donne « Quitter Polyptyque ». Lancement au démarrage de Windows directement en arrière-plan. Fermer avec une programmation prévue : question avec « Continuer en arrière-plan », « Se souvenir de mon choix » et réglage (Demander / Continuer en arrière-plan / Quitter). Le choix ne joue que si une programmation attend ; « Quitter » retenu ne saute que l'avertissement des programmations, jamais celui d'un enregistrement ou d'une conversion ; « arrière-plan » retenu s'applique aussi pendant un enregistrement |
 
 ---
 

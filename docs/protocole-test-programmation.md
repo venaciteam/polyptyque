@@ -10,7 +10,7 @@ type: guide
 # Polyptyque - Tests de la programmation
 
 > [!abstract] Résumé
-> Tests à mener sur la machine de référence pour la programmation des enregistrements : créneaux, démarrage et arrêt à l'heure, démarrage manqué, enregistrements lancés à la main pendant un créneau, anti-veille, lancement au démarrage de Windows, session verrouillée, changement d'heure.
+> Tests à mener sur la machine de référence pour la programmation des enregistrements : créneaux, démarrage et arrêt à l'heure, démarrage manqué, enregistrements lancés à la main pendant un créneau, anti-veille, lancement au démarrage de Windows, session verrouillée, changement d'heure, arrière-plan (icône près de l'horloge).
 > Chaque test indique quoi faire et ce qui est attendu. Cocher au fur et à mesure, noter tout écart.
 > Comportement de référence : [[cahier-des-charges#Programmation des enregistrements]].
 
@@ -23,7 +23,8 @@ type: guide
 5. [[#D - Veille et démarrage de Windows]]
 6. [[#E - Changement d'heure]]
 7. [[#F - Non-régression]]
-8. [[#G - À me renvoyer]]
+8. [[#G - Arrière-plan]]
+9. [[#H - À me renvoyer]]
 
 > [!warning] Sans enjeu
 > Créneaux courts (deux ou trois minutes), sur une scène de test. Le plus simple : programmer le début deux minutes plus tard, la fin cinq minutes plus tard.
@@ -96,8 +97,8 @@ type: guide
 	- Faire : pendant un enregistrement programmé, cliquer « Tout arrêter ». Annuler, puis recommencer avec <kbd>Ctrl</kbd> + <kbd>Maj</kbd> + <kbd>F9</kbd> et confirmer.
 	- Attendu : confirmation « Créneau d'enregistrement en cours » à chaque fois ; après confirmation, arrêt. Fermer puis rouvrir Polyptyque pendant le même créneau : **aucune** question, rien ne redémarre. Le créneau suivant (le lendemain, ou une autre programmation) reste prévu.
 - [ ] **C6 - Quitter**
-	- Faire : une programmation à venir, rien n'enregistre : fermer Polyptyque.
-	- Attendu : confirmation « Programmation active : … est programmé aujourd'hui à … ». Pendant un enregistrement programmé : la confirmation habituelle précise « jusqu'à … » et que les programmations ne se lancent pas Polyptyque fermé.
+	- Faire : une programmation à venir, rien n'enregistre, réglage « Fermer la fenêtre avec une programmation prévue » sur « Demander à chaque fois » : fermer Polyptyque.
+	- Attendu : fenêtre « Programmation active : … est programmé aujourd'hui à … », avec Annuler / Quitter quand même / Continuer en arrière-plan (suite en [[#G - Arrière-plan]]). Pendant un enregistrement programmé : la confirmation habituelle précise « jusqu'à … » et que les programmations ne se lancent pas Polyptyque fermé.
 - [ ] **C7 - Plantage pendant un enregistrement programmé**
 	- Faire : pendant un enregistrement programmé, coller dans un terminal (<kbd>Windows</kbd> + <kbd>R</kbd>, `cmd`, Entrée) :
 	  ```
@@ -121,10 +122,10 @@ type: guide
 	- Attendu : au réveil, **pas** la fenêtre « Reprendre l'enregistrement ? », mais la question du démarrage manqué (compte à rebours, reprise sans réponse).
 - [ ] **D3 - Lancement au démarrage**
 	- Faire : activer « Lancer Polyptyque au démarrage de Windows » (dans les programmations). Redémarrer Windows et ouvrir la session.
-	- Attendu : Polyptyque s'ouvre seul, **réduit** dans la barre des tâches, sans ouvrir les fenêtres de la scène. Gestionnaire des tâches > Applications de démarrage : une entrée pour Polyptyque, activée.
+	- Attendu : Polyptyque se lance seul, **en arrière-plan** : aucune fenêtre ni bouton dans la barre des tâches (au plus un éclair d'une fraction de seconde), icône près de l'horloge (éventuellement sous la flèche « ^ »), fenêtres de la scène non ouvertes. Un clic sur l'icône affiche Polyptyque. Gestionnaire des tâches > Applications de démarrage : une entrée pour Polyptyque, activée.
 - [ ] **D4 - Redémarrage pendant un créneau**
 	- Faire : option D3 activée, programmation en cours d'enregistrement : redémarrer Windows (accepter l'arrêt malgré l'enregistrement), ouvrir la session pendant le créneau.
-	- Attendu : Polyptyque lancé réduit, puis la question du démarrage manqué (la fenêtre revient à l'écran) ; sans réponse, l'enregistrement reprend au bout de deux minutes.
+	- Attendu : Polyptyque lancé en arrière-plan, puis la question du démarrage manqué (la fenêtre revient à l'écran) ; sans réponse, l'enregistrement reprend au bout de deux minutes.
 - [ ] **D5 - Désactivé dans Windows**
 	- Faire : Paramètres > Applications > Démarrage : désactiver Polyptyque. Rouvrir les programmations.
 	- Attendu : note orange « Windows empêche ce lancement… ». Couper puis remettre l'option dans Polyptyque : la note disparaît, et Polyptyque est de nouveau activé dans les Paramètres.
@@ -158,7 +159,45 @@ type: guide
 
 ---
 
-## G - À me renvoyer
+## G - Arrière-plan
+
+> [!info] Où est l'icône
+> Près de l'horloge. Windows 11 range souvent les nouvelles icônes derrière la flèche « ^ » : elle peut se glisser à côté de l'horloge pour rester visible.
+
+- [ ] **G1 - Question à la fermeture**
+	- Faire : une programmation à venir, réglage sur « Demander à chaque fois », rien n'enregistre : fermer la fenêtre (croix). Cliquer « Annuler ».
+	- Attendu : fenêtre « Programmation active » (scène et heure du prochain créneau), case « Se souvenir de mon choix » décochée. Annuler : rien ne change.
+- [ ] **G2 - Continuer en arrière-plan**
+	- Faire : fermer de nouveau, « Continuer en arrière-plan » (case décochée). Survoler l'icône, puis cliquer dessus. Refermer la fenêtre.
+	- Attendu : la fenêtre disparaît, **barre des tâches comprise** ; icône de Polyptyque près de l'horloge, info-bulle « Polyptyque » + « Podcast · aujourd'hui à … ». Un clic : la fenêtre revient au premier plan, les aperçus reprennent, l'icône disparaît. Refermer : la question revient (rien n'a été retenu).
+- [ ] **G3 - Menu de l'icône**
+	- Faire : en arrière-plan, clic droit sur l'icône : « Afficher Polyptyque ». Repasser en arrière-plan, clic droit : « Quitter Polyptyque », Annuler ; puis de nouveau « Quitter Polyptyque », « Quitter quand même ».
+	- Attendu : « Afficher » fait revenir la fenêtre. « Quitter » : la fenêtre revient avec « … Quitter quand même ? » ; Annuler la laisse affichée ; après confirmation, Polyptyque se ferme et l'icône disparaît (pas d'icône fantôme au survol), plus de `polyptyque.exe` dans le Gestionnaire des tâches. Un clic ailleurs ferme le menu sans rien faire.
+- [ ] **G4 - Choix retenu : arrière-plan**
+	- Faire : fermer, cocher « Se souvenir de mon choix », « Continuer en arrière-plan ». Rouvrir la fenêtre, la refermer. Ouvrir les réglages.
+	- Attendu : la seconde fermeture passe directement en arrière-plan, sans question. Réglages > « Fermer la fenêtre avec une programmation prévue » : « Continuer en arrière-plan ».
+- [ ] **G5 - Choix retenu : quitter**
+	- Faire : réglage remis sur « Demander à chaque fois », fermer, cocher la case, « Quitter quand même ». Relancer Polyptyque, fermer.
+	- Attendu : la seconde fois, Polyptyque se ferme directement. Réglage sur « Quitter Polyptyque » ; le remettre sur « Demander à chaque fois » : la question revient.
+- [ ] **G6 - Pendant un enregistrement**
+	- Faire : réglage « Continuer en arrière-plan », un enregistrement en cours (programmé ou lancé à la main) : fermer la fenêtre. Puis réglage « Quitter Polyptyque », fermer pendant un enregistrement.
+	- Attendu : arrière-plan sans question, l'enregistrement continue (info-bulle « Enregistrement en cours », fichiers qui grossissent). Avec « Quitter Polyptyque » : la confirmation « Enregistrement en cours… Arrêter et quitter » est **toujours** posée.
+- [ ] **G7 - Retour de la fenêtre**
+	- Faire : en arrière-plan : <kbd>Ctrl</kbd> + <kbd>Maj</kbd> + <kbd>F10</kbd>. Repasser en arrière-plan, double-cliquer sur le raccourci Polyptyque du bureau.
+	- Attendu : la fenêtre revient les deux fois, au premier plan ; aucune seconde copie de Polyptyque.
+- [ ] **G8 - Question en arrière-plan**
+	- Faire : en arrière-plan, mettre l'ordinateur en veille avant le début d'un créneau, le réveiller pendant le créneau.
+	- Attendu : la fenêtre revient d'elle-même avec la question du démarrage manqué.
+- [ ] **G9 - Explorateur redémarré**
+	- Faire : en arrière-plan, Gestionnaire des tâches > « Explorateur Windows » > Redémarrer.
+	- Attendu : une fois la barre des tâches revenue, l'icône de Polyptyque est de nouveau là et répond au clic.
+- [ ] **G10 - Sans programmation**
+	- Faire : réglage « Continuer en arrière-plan », toutes les programmations désactivées : fermer la fenêtre.
+	- Attendu : Polyptyque se ferme, sans question ni arrière-plan.
+
+---
+
+## H - À me renvoyer
 
 - Les tests cochés, et pour chaque écart : ce qui s'est passé, et une capture si possible.
 - Le dernier `polyptyque_….log` des journaux (`%LOCALAPPDATA%\Polyptyque\journaux`, ou `données\journaux` pour la version portable) : chaque décision de la programmation y est notée (« créneau … », « question … », « anti-veille »…).

@@ -73,10 +73,9 @@ impl App {
             Action::AskMissed(slot) => {
                 log::info!("créneau « {} » commencé sans Polyptyque : question posée", self.slot_scene(&slot));
                 *self.prompt.borrow_mut() = Some(Prompt::Missed { slot, deadline: now + PROMPT_COUNTDOWN });
-                // La question doit se voir : la fenêtre réduite revient.
-                if let Some(ui) = self.ui.upgrade() {
-                    ui.window().set_minimized(false);
-                }
+                // La question doit se voir : la fenêtre réduite ou cachée
+                // (arrière-plan) revient.
+                self.show_from_background();
                 self.show_prompt(now);
             }
             Action::ManualRunning(slot) => {
@@ -358,18 +357,26 @@ impl App {
         }
     }
 
-    /// Texte de l'avertissement avant de quitter, si une programmation doit
-    /// encore lancer un enregistrement.
-    pub(super) fn quit_schedule_warning(&self) -> Option<String> {
+    /// Une programmation a encore besoin de Polyptyque : un enregistrement à
+    /// lancer, ou celui en cours à arrêter à la fin de son créneau.
+    pub(super) fn schedules_need_polyptyque(&self) -> bool {
+        self.planner.borrow().owned().is_some() || self.quit_schedule_next().is_some()
+    }
+
+    /// Prochain enregistrement qu'une programmation doit lancer : nom de sa
+    /// scène, et quand (« demain à 7:00 »).
+    pub(super) fn quit_schedule_next(&self) -> Option<(String, String)> {
         let now = Utc::now();
         let config = self.config.borrow();
         let slot = schedule::next_slot(&config.schedules, now, &Local)?;
         let scene = config.scene(&slot.scene_id).map(|s| s.name.clone()).unwrap_or_default();
-        Some(tr!(
-            "« {} » est programmé {} : Polyptyque doit rester ouvert pour le lancer. Quitter quand même ?",
-            scene,
-            when_label(slot.start, now, &Local)
-        ))
+        Some((scene, when_label(slot.start, now, &Local)))
+    }
+
+    /// Avertissement avant de quitter pour de bon (« Quitter Polyptyque »
+    /// sur l'icône de la zone de notification).
+    pub(super) fn quit_schedule_warning(&self, (scene, when): &(String, String)) -> String {
+        tr!("« {} » est programmé {} : Polyptyque doit rester ouvert pour le lancer. Quitter quand même ?", scene, when)
     }
 
     /// Mise en veille : l'enregistrement programmé interrompu sera proposé

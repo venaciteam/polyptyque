@@ -516,6 +516,9 @@ pub struct Settings {
     /// Lancer Polyptyque à l'ouverture de la session Windows (réduit), pour
     /// que les programmations survivent à un redémarrage.
     pub launch_at_startup: bool,
+    /// Fermeture de la fenêtre alors qu'une programmation doit encore
+    /// lancer un enregistrement.
+    pub close_with_schedules: CloseChoice,
     /// Langue de l'interface (voir « Langues et formats »).
     pub language: LanguageChoice,
     /// Heures affichées et saisies sur 24 h ou 12 h.
@@ -538,6 +541,7 @@ impl Default for Settings {
             open_windows_at_launch: true,
             close_browsers_at_exit: true,
             launch_at_startup: false,
+            close_with_schedules: CloseChoice::Ask,
             language: LanguageChoice::Auto,
             clock: ClockChoice::Auto,
             video: VideoSettings::default(),
@@ -577,6 +581,21 @@ pub enum ClockChoice {
     H24,
     #[serde(rename = "12h")]
     H12,
+}
+
+/// Fermeture de la fenêtre alors qu'une programmation doit encore lancer
+/// un enregistrement : Polyptyque doit rester ouvert pour cela.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CloseChoice {
+    /// Poser la question à chaque fois.
+    #[default]
+    Ask,
+    /// Continuer en arrière-plan, dans la zone de notification.
+    Background,
+    /// Quitter, sans autre avertissement que ceux d'un enregistrement ou
+    /// d'une conversion en cours.
+    Quit,
 }
 
 /// Versions proposées par la recherche de mises à jour.
@@ -960,7 +979,17 @@ mod tests {
         assert_eq!(config.settings.hotkeys.toggle_recording, "Ctrl+Maj+F9");
         assert_eq!(config.settings.update_channel, None);
         assert!(!config.settings.launch_at_startup);
+        assert_eq!(config.settings.close_with_schedules, CloseChoice::Ask);
         assert!(config.schedules.is_empty());
+    }
+
+    #[test]
+    fn close_choice_is_written_in_words() {
+        let mut settings = Settings { close_with_schedules: CloseChoice::Background, ..Settings::default() };
+        let text = toml::to_string(&settings).unwrap();
+        assert!(text.contains("close_with_schedules = \"background\""));
+        settings = toml::from_str(&text.replace("\"background\"", "\"quit\"")).unwrap();
+        assert_eq!(settings.close_with_schedules, CloseChoice::Quit);
     }
 
     #[test]

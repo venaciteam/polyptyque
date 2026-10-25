@@ -16,6 +16,7 @@ pub mod single_instance;
 pub mod startup;
 mod system;
 mod system_info;
+pub mod tray;
 mod video;
 mod windows_list;
 

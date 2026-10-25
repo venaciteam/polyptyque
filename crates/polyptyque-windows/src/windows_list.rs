@@ -33,7 +33,17 @@ pub fn list(own_pid: u32) -> Vec<WindowInfo> {
     unsafe {
         let _ = EnumWindows(Some(collect), LPARAM(&mut handles as *mut Vec<HWND> as isize));
     }
-    handles.into_iter().filter_map(describe).filter(|w| w.pid != own_pid).collect()
+    handles.into_iter().filter_map(|w| describe(w, false)).filter(|w| w.pid != own_pid).collect()
+}
+
+/// Fenêtres principales, y compris cachées (Polyptyque dans la zone de
+/// notification).
+pub(crate) fn list_including_hidden(own_pid: u32) -> Vec<WindowInfo> {
+    let mut handles: Vec<HWND> = Vec::new();
+    unsafe {
+        let _ = EnumWindows(Some(collect), LPARAM(&mut handles as *mut Vec<HWND> as isize));
+    }
+    handles.into_iter().filter_map(|w| describe(w, true)).filter(|w| w.pid != own_pid).collect()
 }
 
 unsafe extern "system" fn collect(window: HWND, lparam: LPARAM) -> BOOL {
@@ -42,9 +52,9 @@ unsafe extern "system" fn collect(window: HWND, lparam: LPARAM) -> BOOL {
     TRUE
 }
 
-fn describe(window: HWND) -> Option<WindowInfo> {
+fn describe(window: HWND, include_hidden: bool) -> Option<WindowInfo> {
     unsafe {
-        if !IsWindowVisible(window).as_bool() || is_cloaked(window) {
+        if !include_hidden && (!IsWindowVisible(window).as_bool() || is_cloaked(window)) {
             return None;
         }
         let ex_style = GetWindowLongW(window, GWL_EXSTYLE) as u32;

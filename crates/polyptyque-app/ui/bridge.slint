@@ -183,6 +183,11 @@ export global Bridge {
     // Action destructrice (bouton rouge) ou non.
     in property <bool> confirm-danger: true;
 
+    // Fermeture de la fenêtre alors qu'une programmation est prévue :
+    // arrière-plan ou quitter, choix retenu si la case est cochée.
+    in property <string> close-text;
+    in-out property <bool> close-remember;
+
     // Réglages.
     in property <[string]> resolution-choices;
     in-out property <int> resolution-index;
@@ -212,6 +217,9 @@ export global Bridge {
     in-out property <bool> settings-open-windows;
     in-out property <bool> settings-close-browsers;
     in-out property <bool> settings-startup;
+    // Fermeture avec une programmation prévue : 0 demander, 1 arrière-plan,
+    // 2 quitter.
+    in-out property <int> settings-close-index;
     in-out property <bool> settings-mic;
     in property <[string]> mic-choices;
     in-out property <int> mic-index;
@@ -282,6 +290,8 @@ export global Bridge {
     callback request-cancel-conversion();
     callback close-sheet();
     callback confirm-accepted();
+    callback close-to-background();
+    callback close-anyway();
     callback dismiss-toast();
 
     // Programmation.

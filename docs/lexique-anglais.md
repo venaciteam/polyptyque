@@ -137,6 +137,11 @@ type: doc
 | Une seule fois / Tous les jours / Certains jours de la semaine | Once / Every day / Specific days of the week |
 | Du lundi au vendredi / Le week-end / Chaque lundi | Weekdays / Weekends / Every Monday |
 | aujourd'hui à… / demain à… | today at… / tomorrow at… |
+| arrière-plan (Continuer en arrière-plan) | background (Keep running in the background) |
+| icône près de l'horloge (zone de notification) | icon next to the clock (*notification area* : terme évité, Windows 11 dit aussi *system tray*) |
+| Afficher Polyptyque / Quitter Polyptyque (menu de l'icône) | Show Polyptyque / Quit Polyptyque |
+| Se souvenir de mon choix | Remember my choice |
+| Demander à chaque fois | Ask every time |
 | Se termine le lendemain. | Ends the next day. |
 | Lancer Polyptyque au démarrage de Windows | Start Polyptyque when Windows starts |
 

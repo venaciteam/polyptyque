@@ -214,6 +214,54 @@ export component ConfirmSheet inherits Sheet {
     }
 }
 
+// Fermeture de la fenêtre alors qu'une programmation est prévue.
+export component CloseSchedulesSheet inherits Sheet {
+    title: @tr("Programmation active");
+    sheet-width: 560px;
+    close => {
+        Bridge.close-sheet();
+    }
+
+    Text {
+        text: Bridge.close-text;
+        color: Theme.text-muted;
+        wrap: word-wrap;
+    }
+    CheckBox {
+        text: @tr("Se souvenir de mon choix");
+        checked <=> Bridge.close-remember;
+    }
+    Text {
+        text: @tr("Modifiable ensuite dans les réglages.");
+        color: Theme.text-muted;
+        font-size: Theme.font-small;
+        wrap: word-wrap;
+    }
+    Footer {
+        ActionButton {
+            text: @tr("Annuler");
+            kind: "ghost";
+            clicked => {
+                Bridge.close-sheet();
+            }
+        }
+        ActionButton {
+            text: @tr("Quitter quand même");
+            kind: "danger";
+            clicked => {
+                Bridge.close-anyway();
+            }
+        }
+        ActionButton {
+            text: @tr("Continuer en arrière-plan");
+            kind: "primary";
+            clicked => {
+                Bridge.close-to-background();
+            }
+        }
+    }
+}
+
 // Bilan d'un enregistrement interrompu, au lancement suivant.
 export component IncidentSheet inherits Sheet {
     title: @tr("Enregistrement interrompu");
@@ -554,6 +602,14 @@ export component SettingsSheet inherits Sheet {
                     }
                 }
                 Field {
+                    label: @tr("Fermer la fenêtre avec une programmation prévue");
+                    hint: @tr("Polyptyque doit rester ouvert pour lancer les programmations. En arrière-plan, son icône reste près de l'horloge : un clic l'affiche, un clic droit permet de le quitter.");
+                    ComboBox {
+                        model: [@tr("Demander à chaque fois"), @tr("Continuer en arrière-plan"), @tr("Quitter Polyptyque")];
+                        current-index <=> Bridge.settings-close-index;
+                    }
+                }
+                Field {
                     label: @tr("Conversion pour le montage");
                     hint: @tr("Copie MP4 sans perte de qualité, créée à côté du MKV, qui est conservé. Prévoir le double d'espace disque.");
                     Toggle {
@@ -815,7 +871,7 @@ export component SchedulesSheet inherits Sheet {
     }
     Field {
         label: @tr("Démarrage de Windows");
-        hint: @tr("Sans cela, après un redémarrage de Windows (une mise à jour, par exemple), les programmations attendent la réouverture de Polyptyque. Lancé par Windows, il démarre réduit, sans ouvrir les fenêtres de la scène.");
+        hint: @tr("Sans cela, après un redémarrage de Windows (une mise à jour, par exemple), les programmations attendent la réouverture de Polyptyque. Lancé par Windows, il démarre en arrière-plan (icône près de l'horloge), sans ouvrir les fenêtres de la scène.");
         Toggle {
             text: @tr("Lancer Polyptyque au démarrage de Windows");
             checked: Bridge.startup-enabled;

@@ -19,8 +19,8 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, Context, Result};
 use polyptyque_core::browsers::{classify_executable, is_tor_browser, program_name};
 use polyptyque_core::config::{
-    BrowserFamily, BrowserRef, ClockChoice, Codec, Config, HardwarePreference, LanguageChoice, PasteError, Scene,
-    Settings, Source, SourceKind, UpdateChannel,
+    BrowserFamily, BrowserRef, ClockChoice, CloseChoice, Codec, Config, HardwarePreference, LanguageChoice, PasteError,
+    Scene, Settings, Source, SourceKind, UpdateChannel,
 };
 use polyptyque_core::encoder::{bytes_per_hour, EncoderChoice};
 use polyptyque_core::hotkeys;
@@ -44,6 +44,7 @@ use crate::preview::{self, PreviewManager, PreviewState};
 use crate::update;
 use crate::{AppWindow, Bridge, IncidentFile, SceneItem, ScheduleItem, SourceCard, SourceItem, WindowItem};
 
+mod background;
 mod report;
 mod scheduling;
 use scheduling::Prompt;
@@ -249,9 +250,16 @@ pub struct App {
     schedule_days: Rc<VecModel<bool>>,
     /// Années de la liste « Année » du formulaire.
     schedule_years: RefCell<Vec<i32>>,
-    /// Lancé par Windows à l'ouverture de session : la fenêtre est réduite
-    /// dès qu'elle existe.
-    minimize_pending: Cell<bool>,
+    /// Lancé par Windows à l'ouverture de session : la fenêtre passe en
+    /// arrière-plan dès qu'elle existe.
+    hide_pending: Cell<bool>,
+    /// Fenêtre cachée, icône dans la zone de notification.
+    in_background: Cell<bool>,
+    /// Info-bulle de cette icône.
+    tray_tip: RefCell<String>,
+    /// Les actions sur cette icône sont reçues.
+    #[cfg(windows)]
+    tray_watch: Cell<bool>,
 }
 
 /// Enregistrement interrompu trouvé au lancement.
@@ -307,8 +315,8 @@ pub struct Paths {
     pub schedule_state: PathBuf,
 }
 
-/// `at_startup` : lancé par Windows à l'ouverture de session (réduit, sans
-/// ouvrir les fenêtres de la scène).
+/// `at_startup` : lancé par Windows à l'ouverture de session (en
+/// arrière-plan, sans ouvrir les fenêtres de la scène).
 pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, at_startup: bool) -> Result<()> {
     let ui = AppWindow::new().context(tr!("création de la fenêtre"))?;
     crate::i18n::apply_to_ui(crate::i18n::Language::current());
@@ -388,7 +396,11 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
         schedule_scene_ids: RefCell::new(Vec::new()),
         schedule_days: Rc::new(VecModel::from(vec![false; 7])),
         schedule_years: RefCell::new(Vec::new()),
-        minimize_pending: Cell::new(at_startup),
+        hide_pending: Cell::new(at_startup),
+        in_background: Cell::new(false),
+        tray_tip: RefCell::new(String::new()),
+        #[cfg(windows)]
+        tray_watch: Cell::new(false),
     });
     APP.with(|a| *a.borrow_mut() = Some(app.clone()));
     *app.converter.borrow_mut() =
@@ -426,8 +438,12 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
         app.toast(&tr!("Polyptyque a été mis à jour : version {}.", version), 1);
     }
 
-    ui.window()
-        .on_close_requested(|| with_app(|app| app.close_requested()).unwrap_or(CloseRequestResponse::HideWindow));
+    ui.window().on_close_requested(|| {
+        with_app(|app| app.close_requested()).unwrap_or_else(|| {
+            let _ = slint::quit_event_loop();
+            CloseRequestResponse::HideWindow
+        })
+    });
 
     let status_timer = Timer::default();
     status_timer.start(TimerMode::Repeated, Duration::from_millis(500), || {
@@ -446,7 +462,11 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
         with_app(|app| app.check_for_updates());
     });
 
-    ui.run().context(tr!("boucle de l'interface"))?;
+    // La boucle continue fenêtre cachée (Polyptyque en arrière-plan) :
+    // seule une fermeture voulue l'arrête (`slint::quit_event_loop`).
+    ui.show().context(tr!("boucle de l'interface"))?;
+    slint::run_event_loop_until_quit().context(tr!("boucle de l'interface"))?;
+    app.leave_background();
 
     app.previews.borrow_mut().stop();
     app.meters.borrow_mut().stop();
@@ -592,6 +612,12 @@ fn install_callbacks(ui: &AppWindow) {
     });
     b.on_confirm_accepted(|| {
         with_app(|a| a.confirm_accepted());
+    });
+    b.on_close_to_background(|| {
+        with_app(|a| a.close_to_background());
+    });
+    b.on_close_anyway(|| {
+        with_app(|a| a.close_anyway());
     });
     b.on_dismiss_toast(|| {
         with_app(|a| a.dismiss_toast());
@@ -886,7 +912,9 @@ impl App {
             let config = self.config.borrow();
             let mut previews = self.previews.borrow_mut();
             previews.stop();
-            if config.settings.previews {
+            // En arrière-plan, personne ne les regarde : ils reprennent
+            // quand la fenêtre revient.
+            if config.settings.previews && !self.in_background.get() {
                 *previews = PreviewManager::start(&self.platform, &config.active_sources(), self.preview_size.get());
             }
         }
@@ -900,6 +928,9 @@ impl App {
         let config = self.config.borrow();
         let mut meters = self.meters.borrow_mut();
         meters.stop();
+        if self.in_background.get() {
+            return;
+        }
         *meters = SourceMeters::start(&self.platform, &config.active_sources(), |id| self.engine_listens(id));
     }
 
@@ -1007,6 +1038,9 @@ impl App {
     }
 
     fn tick_previews(&self) {
+        // Ici plutôt qu'au rythme de la barre d'état : la fenêtre ouverte
+        // par Slint au lancement doit disparaître au plus vite.
+        self.hide_at_startup();
         let previews = self.previews.borrow();
         for worker in previews.workers() {
             let (frame, state) = worker.take_update();
@@ -1418,27 +1452,11 @@ impl App {
         self.show_next_deferred();
     }
 
-    /// Lancé par Windows à l'ouverture de session : la fenêtre est réduite
-    /// dès qu'elle existe (Slint ne peut pas la créer réduite).
-    fn minimize_at_startup(&self) {
-        if !self.minimize_pending.get() {
-            return;
-        }
-        #[cfg(windows)]
-        if self.main_window().is_none() {
-            return;
-        }
-        self.minimize_pending.set(false);
-        if let Some(ui) = self.ui.upgrade() {
-            ui.window().set_minimized(true);
-        }
-    }
-
     fn tick_status(&self) {
         self.update_preview_size();
         self.watch_session_end();
-        self.minimize_at_startup();
         self.tick_schedule();
+        self.tick_background();
         self.tick_mic_test();
         let statuses: (Vec<SourceStatus>, Vec<PathBuf>) = {
             let mut session = self.session.borrow_mut();
@@ -2802,6 +2820,11 @@ impl App {
         let s_open_windows = s.open_windows_at_launch;
         let s_close_browsers = s.close_browsers_at_exit;
         let s_startup = s.launch_at_startup;
+        let s_close = match s.close_with_schedules {
+            CloseChoice::Ask => 0,
+            CloseChoice::Background => 1,
+            CloseChoice::Quit => 2,
+        };
         let mic_labels: Vec<SharedString> = mics.iter().map(|(_, name)| name.as_str().into()).collect();
         *self.mic_choices.borrow_mut() = mics;
         drop(config);
@@ -2832,6 +2855,7 @@ impl App {
             b.set_settings_open_windows(s_open_windows);
             b.set_settings_close_browsers(s_close_browsers);
             b.set_settings_startup(s_startup);
+            b.set_settings_close_index(s_close);
             b.set_settings_mic(mic_enabled);
             b.set_mic_choices(ModelRc::new(VecModel::from(mic_labels)));
             b.set_mic_index(mic_index as i32);
@@ -2952,6 +2976,11 @@ impl App {
             s.close_browsers_at_exit = b.get_settings_close_browsers();
             startup_changed = s.launch_at_startup != b.get_settings_startup();
             s.launch_at_startup = b.get_settings_startup();
+            s.close_with_schedules = match b.get_settings_close_index() {
+                1 => CloseChoice::Background,
+                2 => CloseChoice::Quit,
+                _ => CloseChoice::Ask,
+            };
             let language = match b.get_settings_language_index() {
                 1 => LanguageChoice::French,
                 2 => LanguageChoice::English,
@@ -3131,9 +3160,7 @@ impl App {
             Some(Confirm::QuitWithSchedules) => {
                 self.quit_with_schedules.set(true);
                 // La suite comme une fermeture normale (conversion en cours…).
-                if matches!(self.close_requested(), CloseRequestResponse::HideWindow) {
-                    let _ = slint::quit_event_loop();
-                }
+                self.close_requested();
             }
             Some(Confirm::CancelConversion) => {
                 if let Some(converter) = self.converter.borrow().as_ref() {
@@ -3164,8 +3191,26 @@ impl App {
         }
     }
 
+    /// Croix de la fenêtre (ou Alt+F4, ou « Fermer la fenêtre » de la barre
+    /// des tâches).
     fn close_requested(&self) -> CloseRequestResponse {
+        self.quit_requested(false)
+    }
+
+    /// Fermeture demandée par la croix de la fenêtre, ou par « Quitter
+    /// Polyptyque » sur l'icône de la zone de notification (`from_tray`).
+    /// Une programmation prévue fait passer en arrière-plan ou demande quoi
+    /// faire, selon le réglage ; un enregistrement ou une conversion en
+    /// cours demande toujours confirmation (la fenêtre revient pour cela).
+    fn quit_requested(&self, from_tray: bool) -> CloseRequestResponse {
+        let choice = self.config.borrow().settings.close_with_schedules;
+        let schedules = !self.quit_with_schedules.get() && self.schedules_need_polyptyque();
+        if !from_tray && schedules && choice == CloseChoice::Background {
+            self.hide_to_background();
+            return CloseRequestResponse::KeepWindowShown;
+        }
         if self.busy.get() {
+            self.show_from_background();
             self.toast(&tr!("Opération en cours : Polyptyque pourra être fermé dans un instant."), 2);
             return CloseRequestResponse::KeepWindowShown;
         }
@@ -3183,16 +3228,30 @@ impl App {
                 text.push(' ');
                 text.push_str(&tr!("Les programmations ne se lancent pas tant que Polyptyque est fermé."));
             }
+            self.show_from_background();
             self.ask(Confirm::QuitWhileRecording, &tr!("Enregistrement en cours"), &text, &tr!("Arrêter et quitter"));
             return CloseRequestResponse::KeepWindowShown;
         }
-        if !self.quit_with_schedules.get() {
-            if let Some(text) = self.quit_schedule_warning() {
-                self.ask(Confirm::QuitWithSchedules, &tr!("Programmation active"), &text, &tr!("Quitter quand même"));
+        // « Quitter » retenu : plus d'avertissement pour les programmations.
+        if schedules && choice != CloseChoice::Quit {
+            if let Some(next) = self.quit_schedule_next() {
+                self.show_from_background();
+                if from_tray {
+                    let text = self.quit_schedule_warning(&next);
+                    self.ask(
+                        Confirm::QuitWithSchedules,
+                        &tr!("Programmation active"),
+                        &text,
+                        &tr!("Quitter quand même"),
+                    );
+                } else {
+                    self.ask_close_with_schedules(&next);
+                }
                 return CloseRequestResponse::KeepWindowShown;
             }
         }
         if self.with_bridge_value(|b| b.get_converting()) {
+            self.show_from_background();
             self.ask(
                 Confirm::QuitWhileConverting,
                 &tr!("Conversion en cours"),
@@ -3204,6 +3263,7 @@ impl App {
         self.previews.borrow_mut().stop();
         self.meters.borrow_mut().stop();
         self.mic_meter.borrow_mut().take();
+        let _ = slint::quit_event_loop();
         CloseRequestResponse::HideWindow
     }
 
@@ -3391,12 +3451,14 @@ impl App {
         log::info!("raccourci : {action:?}");
         match action {
             HotkeyAction::ToggleRecording => self.start_stop(),
-            HotkeyAction::ShowWindow => {
-                if let Some(ui) = self.ui.upgrade() {
+            HotkeyAction::ShowWindow => match self.ui.upgrade() {
+                Some(_) if self.in_background.get() => self.show_from_background(),
+                Some(ui) => {
                     let window = ui.window();
                     window.set_minimized(!window.is_minimized());
                 }
-            }
+                None => {}
+            },
             HotkeyAction::TogglePreviews => self.toggle_previews(),
         }
     }
