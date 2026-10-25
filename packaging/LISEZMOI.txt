@@ -4,6 +4,8 @@ POLYPTYQUE 1.0 BÊTA 4
 Polyptyque enregistre plusieurs fenêtres en même temps, chacune dans son
 propre fichier, avec uniquement le son de cette fenêtre.
 
+(In English: README.txt)
+
 Installation
 ------------
 Polyptyque-Setup.exe installe Polyptyque sans question ni droits
@@ -31,14 +33,21 @@ Contenu
                            réglages, mêmes scènes)
 - ffmpeg.exe             : l'encodeur vidéo utilisé par Polyptyque (doit
                            rester à côté)
-- LICENSE.txt    : licence de Polyptyque (GPL v3)
-- FFMPEG-LICENSE.txt : licence de FFmpeg
+- LISEZMOI.txt           : ce fichier (README.txt : en anglais)
+- LICENSE.txt            : licence de Polyptyque (GPL v3)
+- FFMPEG-LICENSE.txt     : licence de FFmpeg
 
 Prérequis
 ---------
 - Windows 10 version 2004 ou plus récent, ou Windows 11 (64 bits).
 - Carte NVIDIA : pilote 570 ou plus récent. Les cartes AMD et Intel, ou
   l'encodage par le processeur, fonctionnent aussi.
+
+Langue
+------
+Polyptyque s'affiche en français si Windows est en français, en anglais
+sinon ; les heures suivent le format régional de Windows (24 h ou 12 h).
+Réglages > « Langue » et « Horloge » pour les changer.
 
 Premier lancement
 -----------------
@@ -56,7 +65,7 @@ Utilisation
 3. Sources → « Application » : choisir une fenêtre ouverte (Discord, jeu,
    Tor Browser…).
 4. Au lancement, Polyptyque ouvre seul les fenêtres de la scène en cours
-   (navigateurs, et applications avec « Relancer ») ; le bouton « Ouvrir les
+   (navigateurs, et applications à relancer) ; le bouton « Ouvrir les
    fenêtres » le fait à la demande. Réglable dans les réglages.
 5. « Démarrer l'enregistrement ». Polyptyque retrouve ou rouvre les fenêtres,
    puis affiche l'état de chaque source. « Tout arrêter » finalise les
@@ -83,7 +92,7 @@ double la place occupée sur le disque.
 
 Micro
 -----
-Désactivé par défaut. Dans les réglages : « Enregistrer mon micro dans un
+Désactivé par défaut. Dans les réglages : « Enregistrer le micro dans un
 fichier séparé », puis choisir le micro. Le son du micro est enregistré
 dans « …_Micro.mka » (converti en .m4a pour le montage). Windows doit
 autoriser l'accès au micro pour les applications de bureau : Paramètres >
@@ -140,6 +149,9 @@ démarrage de Windows » le relance (réduit) après un redémarrage.
 
 En cas de problème
 ------------------
+Réglages > « Signaler un problème… » prépare un rapport (dossier personnel
+et nom du compte masqués) et ouvre la page GitHub où le joindre. Rien
+n'est envoyé automatiquement.
 Les journaux sont dans :
   %LOCALAPPDATA%\Polyptyque\journaux
 (copier ce chemin dans la barre d'adresse de l'Explorateur), ou dans

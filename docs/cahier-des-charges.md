@@ -380,11 +380,11 @@ Inspirée d'[[OBS Studio]], volontairement allégée, thème sombre.
 - **Grille d'aperçus** de toutes les sources de la scène, en basse définition pour ne pas pénaliser l'enregistrement, désactivable. Chaque aperçu a sa propre capture, indépendante de l'enregistrement (environ 10 images par seconde) : il fonctionne aussi hors enregistrement. Sa définition suit la taille réelle des cartes à l'écran : 640 × 360 au minimum, 960 × 540 ou 1280 × 720 pour de grandes cartes. Les fichiers enregistrés ne sont jamais concernés.
 
 > [!example]- Captures de l'interface (mode démonstration)
-> ![Aperçus](captures/interface-apercus.png)
-> ![Enregistrement](captures/interface-enregistrement.png)
-> ![Réglages](captures/interface-reglages.png)
-> ![Ajout d'une source navigateur](captures/interface-ajout-navigateur.png)
-> ![Ajout d'une source application](captures/interface-ajout-application.png)
+> ![Aperçus](captures/fr/interface-apercus.png)
+> ![Enregistrement](captures/fr/interface-enregistrement.png)
+> ![Réglages](captures/fr/interface-reglages.png)
+> ![Ajout d'une source navigateur](captures/fr/interface-ajout-navigateur.png)
+> ![Ajout d'une source application](captures/fr/interface-ajout-application.png)
 - Par source : nom, état, cadence réelle, indicateur de niveau sonore, durée, taille du fichier, bouton d'enregistrement individuel.
 - **Ordre des sources** : le même dans la liste des sources et dans la grille des aperçus, propre à chaque scène. Il se change :
 	- avec les flèches du panneau des sources (seul moyen au clavier ou avec un lecteur d'écran) ;
@@ -740,7 +740,7 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 > - [x] Catalogue anglais complet, écrit directement en anglais et relu sur captures du mode démonstration ; le test refuse désormais tout texte sans anglais
 > - [x] Réglages « Langue » et « Horloge » (Fichiers et interface), appliqués immédiatement ; heures, dates (nom du mois) et nombres (milliers) selon la langue et l'horloge ; saisie « 9:00 PM » acceptée
 > - [x] Saisie de la date d'une programmation sans ambiguïté : trois listes jour, mois, année dans l'ordre de la langue
-> - [ ] README anglais en tête (`README.md`) et français (`README.fr.md`), fichier d'accompagnement de la version portable, description de l'exécutable et du dépôt GitHub
+> - [x] README anglais en tête (`README.md`) et français (`README.fr.md`), captures dans les deux langues (`docs/captures/en`, `docs/captures/fr`), `README.txt` à côté du `LISEZMOI.txt` de la version portable, description de l'exécutable et du dépôt GitHub
 > - [ ] Validation sur la machine de référence, en français et en anglais
 
 > [!todo] Étape 3 sexies - Signalement d'un problème ([[#Signalement d'un problème]]), écrite le 2026-10-24
@@ -834,6 +834,7 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 | 2026-10-24 | Détails d'erreur venus d'autres logiciels (FFmpeg, Velopack…) jamais affichés : message dans la langue de l'interface, « (détail dans le journal) » |
 | 2026-10-24 | Signalement d'un problème : bouton dans les réglages et dans le bilan d'incident ; rapport texte masqué (dossier personnel, nom du compte) dans le dossier des journaux, page « nouvelle issue » pré-remplie, deux formulaires GitHub (anglais, français). Rien n'est envoyé par Polyptyque |
 | 2026-10-25 | Date d'une programmation saisie dans **trois listes** jour, mois (en toutes lettres), année, dans l'ordre de la langue (« 25 octobre 2026 », « October 25, 2026 »), à la place du sélecteur de date de Slint : sa semaine commence le dimanche, sans réglage, et il écrit les mois en anglais même en français. Liste des jours ajustée au mois choisi ; années proposées : l'année en cours et la suivante ; jour de la semaine rappelé sous les listes |
+| 2026-10-25 | Publication bilingue : `README.md` en anglais (en tête) et `README.fr.md`, captures du mode démonstration dans les deux langues (données d'exemple dans la langue du système) ; `README.txt` anglais livré avec `LISEZMOI.txt` ; description des exécutables réduite au nom (« Polyptyque », affichée par le Gestionnaire des tâches) et ressources Windows en langue neutre ; titre des pages de version en anglais (« Polyptyque 1.0 beta 5 »), notes en anglais puis en français |
 
 ---
 

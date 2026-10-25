@@ -1,236 +1,258 @@
 <p align="center">
-  <img src="assets/logo/polyptyque-512.png" alt="Logo de Polyptyque" width="112">
+  <img src="assets/logo/polyptyque-512.png" alt="Polyptyque logo" width="112">
 </p>
 
 <h1 align="center">Polyptyque</h1>
 
 <p align="center">
-  <strong>Enregistrez plusieurs fenêtres en même temps, chacune dans son propre fichier, avec son propre son.</strong><br>
-  Pour le montage multi-angle et l'archivage, sur des sessions qui peuvent durer douze heures.
+  <strong>Record several windows at once, each in its own file, with its own sound.</strong><br>
+  Built for multi-angle editing and archiving, over sessions that can run for twelve hours.
 </p>
 
 <p align="center">
-  <img src="docs/captures/interface-enregistrement.png" alt="Polyptyque pendant un enregistrement : trois sources, chacune avec son aperçu, son niveau sonore et la taille de son fichier" width="860">
+  <strong>English</strong> · <a href="README.fr.md">Français</a>
+</p>
+
+<p align="center">
+  <img src="docs/captures/en/recording.png" alt="Polyptyque during a recording: three sources, each with its preview, sound level and file size" width="860">
 </p>
 
 <!--
-  Liens épinglés sur la bêta : releases/latest/download/ ignore les préversions
-  et renvoie 404 tant qu'aucune version stable n'est publiée. À chaque nouvelle
-  bêta, mettre à jour l'étiquette et la ligne de version. À la sortie de la
-  1.0.0 stable, passer aux adresses permanentes :
+  Links pinned to the current beta: releases/latest/download/ ignores
+  pre-releases and returns 404 until a stable version is published. For each
+  new beta, update the tag and the version line (here and in README.fr.md).
+  When 1.0.0 stable is out, switch to the permanent addresses:
   https://github.com/venaciteam/polyptyque/releases/latest/download/Polyptyque-Setup.exe
   https://github.com/venaciteam/polyptyque/releases/latest/download/Polyptyque-portable.zip
 -->
 
-## Télécharger
+## Download
 
-**Windows 10 et 11** (64 bits), version 1.0 bêta 4 :
+**Windows 10 and 11** (64-bit), version 1.0 beta 4:
 
-- **[Télécharger l'installateur](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.4/Polyptyque-Setup.exe)** : la version classique, qui s'installe comme un logiciel habituel. Dans le doute, choisir celle-ci.
-- **[Télécharger la version portable](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.4/Polyptyque-portable.zip)** : sans installation, à décompresser dans le dossier de son choix, même sur une clé USB.
+- **[Download the installer](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.4/Polyptyque-Setup.exe)**: the standard version, installed like any other program. If in doubt, choose this one.
+- **[Download the portable version](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.4/Polyptyque-portable.zip)**: no installation, unzip it to any folder, even on a USB stick.
 
-macOS et Linux : pas encore disponibles.
+macOS and Linux: not available yet.
 
-Configuration requise et message de Windows au premier lancement : voir [Installation](#installation).
+Requirements and the Windows warning on first launch: see [Installation](#installation).
 
 ---
 
-## Sommaire
+## Contents
 
-- [Pourquoi Polyptyque](#pourquoi-polyptyque)
-- [Ses atouts](#ses-atouts)
-- [Léger par conception](#léger-par-conception)
+- [Why Polyptyque](#why-polyptyque)
+- [Highlights](#highlights)
+- [Lightweight by design](#lightweight-by-design)
 - [Installation](#installation)
-- [Prise en main](#prise-en-main)
-- [Pour le montage](#pour-le-montage)
-- [Limites connues](#limites-connues)
-- [Pour les développeurs](#pour-les-développeurs)
-- [Licence](#licence)
+- [Getting started](#getting-started)
+- [For editing](#for-editing)
+- [Known limitations](#known-limitations)
+- [Reporting a problem](#reporting-a-problem)
+- [For developers](#for-developers)
+- [License](#license)
 
-## Pourquoi Polyptyque
+## Why Polyptyque
 
-Les logiciels d'enregistrement classiques composent une seule image à partir de plusieurs sources, et l'enregistrent dans **un seul fichier** avec **un seul mélange sonore**. Pour monter ensuite chaque source séparément, il faut des extensions fragiles, et le son reste mélangé : deux fenêtres de navigateur jouent dans le même programme, donc dans la même piste.
+Typical recording software composites several sources into a single picture and saves it as **one file** with **one audio mix**. Editing each source separately afterwards takes fragile plugins, and the sound stays mixed: two browser windows play through the same program, so they land on the same track.
 
-Polyptyque fait l'inverse : **chaque fenêtre est enregistrée à part**, dans son propre fichier, avec **uniquement son propre son**. Trois fenêtres donnent trois fichiers, calés sur la même horloge, prêts à être superposés dans un logiciel de montage.
+Polyptyque works the other way around: **each window is recorded on its own**, in its own file, with **only its own sound**. Three windows make three files, on the same clock, ready to stack in a video editor.
 
-## Ses atouts
+## Highlights
 
-**Le son de chaque fenêtre, et rien d'autre**
-- Chaque source navigateur a son propre profil : le son d'un onglet de Firefox ne se mélange pas avec celui d'un autre Firefox, ni avec Chrome ou Discord.
-- Le son d'une application (Discord, un jeu, Tor Browser…) est capté à la source, sans le reste du système.
-- Micro en option, dans un fichier séparé, et testable dans les réglages avant d'enregistrer.
+**Each window’s sound, and nothing else**
+- Every browser source has its own profile: sound from one Firefox tab doesn’t mix with another Firefox, or with Chrome or Discord.
+- An app’s sound (Discord, a game, Tor Browser…) is captured at the source, without the rest of the system.
+- Optional mic, in a separate file, which can be tested in Settings before recording.
 
-**Des fichiers prêts pour le montage**
-- Un fichier par source, toutes sur une horloge commune : l'image et le son restent alignés d'un fichier à l'autre.
-- Cadence d'images constante, attendue par les logiciels de montage, même quand une fenêtre ne bouge pas.
-- Conversion en MP4 sans perte de qualité, pour Premiere Pro et les autres logiciels qui gèrent mal le MKV.
+**Files ready for editing**
+- One file per source, all on a shared clock: picture and sound stay aligned from one file to the next.
+- Constant frame rate, as video editors expect, even when a window doesn’t change.
+- Lossless conversion to MP4, for Premiere Pro and other editors that struggle with MKV.
 
-**Pensé pour les longues sessions**
-- Testé sur 14 h 15 d'enregistrement continu avec trois sources : aucune coupure, fichiers calés à quelques millisecondes près, mémoire stable.
-- Fichiers écrits au fil de l'eau : un plantage ne fait perdre qu'environ une seconde, et un fichier coupé net (panne de courant) reste lisible.
-- Espace disque surveillé, avec arrêt propre s'il vient à manquer.
-- Mise en veille automatique empêchée. Une mise en veille demandée (capot fermé, bouton) ne peut pas l'être : l'enregistrement est alors arrêté proprement, et sa reprise proposée au réveil.
-- Si Windows s'éteint ou se déconnecte pendant un enregistrement, il le signale et laisse annuler ; sinon, les fichiers sont finalisés avant la fermeture.
+**Built for long sessions**
+- Tested over 14 h 15 min of continuous recording with three sources: no dropouts, files aligned to within a few milliseconds, stable memory use.
+- Files are written as they go: a crash only loses about one second, and a file cut off abruptly (power outage) stays playable.
+- Disk space is monitored, with a clean stop if it runs out.
+- Automatic sleep is blocked. Sleep that’s requested (closing the lid, power button) can’t be: the recording is then stopped cleanly, and Polyptyque offers to resume it on wake.
+- If Windows shuts down or signs out during a recording, it says so and lets you cancel; otherwise the files are finalized before closing.
 
-**Enregistrements programmés**
-- Début et fin à heure fixe, une seule fois ou certains jours de la semaine : chaque programmation lance une scène, y compris la nuit (créneaux qui passent minuit) et aux changements d'heure.
-- Tant qu'une programmation est active, l'ordinateur et l'écran ne se mettent pas en veille d'eux-mêmes. Polyptyque peut se lancer au démarrage de Windows (réduit), pour que les programmations survivent à un redémarrage.
-- Démarrage manqué (Polyptyque fermé ou ordinateur en veille à l'heure prévue) : à son retour pendant le créneau, Polyptyque demande s'il faut lancer l'enregistrement, et le lance seul au bout de deux minutes sans réponse.
-- La programmation n'arrête que ce qu'elle a lancé : un enregistrement lancé à la main pendant un créneau n'est arrêté à l'heure de fin que si on l'accepte. Arrêter à la main un enregistrement programmé demande confirmation.
+**Scheduled recordings**
+- Start and end at set times, once or on specific days of the week: each scheduled recording starts a scene, including overnight (time slots that cross midnight) and across daylight saving time changes.
+- While a scheduled recording is active, the computer and screen don’t go to sleep on their own. Polyptyque can start with Windows (minimized), so scheduled recordings survive a restart.
+- Missed start (Polyptyque closed or computer asleep at the set time): when it’s back during the time slot, Polyptyque asks whether to start recording, and starts on its own after two minutes without an answer.
+- A scheduled recording only stops what it started: a recording started by hand during a time slot is only stopped at the end time if you agree. Stopping a scheduled recording by hand asks for confirmation.
 
-**Résistant aux incidents**
-- Après un plantage ou une coupure de courant, Polyptyque fait le bilan des fichiers au lancement suivant, propose de réparer ceux qui ont été coupés net (sans perte de qualité) et de reprendre l'enregistrement.
-- Si l'encodeur s'arrête ou se fige, Polyptyque le relance seul, dans un nouveau fichier, sans interrompre les autres sources.
-- Une fenêtre fermée ou plantée donne une image noire, puis est rattachée automatiquement dès qu'elle revient. Un navigateur fermé par erreur est rouvert tout seul ; une fenêtre réduite revient d'un clic, même si son écran a été débranché.
-- Disque externe débranché en cours de route : la suite est enregistrée dans `Vidéos\Polyptyque`.
-- Réglages protégés : version précédente et sauvegarde quotidienne, restaurées automatiquement si le fichier est abîmé.
+**Recovers from incidents**
+- After a crash or power outage, Polyptyque checks the files at the next launch, offers to repair those that were cut off (losslessly) and to resume recording.
+- If the encoder stops or freezes, Polyptyque restarts it on its own, in a new file, without interrupting the other sources.
+- A window that’s closed or crashes turns black, then is reattached automatically as soon as it’s back. A browser closed by mistake reopens on its own; a minimized window comes back in one click, even if its screen was unplugged.
+- External drive unplugged mid-recording: the rest is saved to `Videos\Polyptyque`.
+- Settings are protected: previous version and daily backup, restored automatically if the file is damaged.
 
-**Il retrouve vos fenêtres**
-- Les navigateurs sont reconnus par leur profil, pas par leur titre qui change à chaque onglet.
-- Au lancement, Polyptyque ouvre les fenêtres de la scène en cours (désactivable dans les réglages). Le bouton « Ouvrir les fenêtres » les ouvre à la demande, celui de chaque carte une seule.
-- En quittant Polyptyque, les navigateurs des sources se ferment avec lui et retrouvent leurs onglets au lancement suivant (désactivable dans les réglages). Les applications restent ouvertes.
-- Au démarrage d'un enregistrement, Polyptyque rouvre les fenêtres absentes : chaque navigateur revient sur ses onglets, connexions conservées.
+**It finds your windows**
+- Browsers are recognized by their profile, not by their title, which changes with every tab.
+- At launch, Polyptyque opens the current scene’s windows (can be turned off in Settings). The “Open windows” button opens them on demand, and each card’s button opens just one.
+- When you quit Polyptyque, the source browsers close with it and get their tabs back at the next launch (can be turned off in Settings). Apps stay open.
+- When a recording starts, Polyptyque reopens any missing windows: each browser comes back to its tabs, still signed in.
 
-**Simple à utiliser**
-- Scènes (groupes de sources), aperçus en direct de chaque source, raccourcis clavier globaux.
-- Une même source dans plusieurs scènes : copier, coller (clic droit, ou <kbd>Ctrl</kbd> + <kbd>C</kbd> / <kbd>Ctrl</kbd> + <kbd>V</kbd>), ou dupliquer toute une scène. C'est la même fenêtre et, pour un navigateur, les mêmes connexions : rien à reconfigurer.
-- Sources réordonnées par glisser-déposer, dans la liste ou directement dans la grille des aperçus (ou avec les flèches).
-- Niveau sonore de chaque source affiché en permanence, même sans enregistrer : une source muette se repère avant de lancer l'enregistrement.
-- Un bouton pour tout enregistrer, ou un bouton par source pour enregistrer une source seule.
-- Encodage par la carte graphique (NVIDIA, AMD, Intel) quand elle est disponible, ou par le processeur. Si la carte refuse un encodage de plus (limite des cartes GeForce, autres logiciels compris), la source passe seule sur le processeur.
+**Simple to use**
+- Scenes (groups of sources), live previews of each source, global keyboard shortcuts.
+- The same source in several scenes: copy and paste it (right-click, or <kbd>Ctrl</kbd> + <kbd>C</kbd> / <kbd>Ctrl</kbd> + <kbd>V</kbd>), or duplicate a whole scene. It’s the same window and, for a browser, the same sign-ins: nothing to set up again.
+- Reorder sources by drag and drop, in the list or right in the preview grid (or with the arrows).
+- Each source’s sound level is always shown, even when not recording: a silent source stands out before you start.
+- One button to record everything, or one button per source to record a single source.
+- Encoding on the graphics card (NVIDIA, AMD, Intel) when available, or on the CPU. If the card refuses one more encode (a GeForce limit, other software included), that source alone switches to the CPU.
+- In English and French: Polyptyque follows the Windows display language (French if Windows is in French, English otherwise), and its clock follows the Windows regional format (12-hour or 24-hour). Both can be changed in Settings.
 
-## Léger par conception
+## Lightweight by design
 
-Polyptyque doit tourner pendant des heures à côté d'un jeu, d'un appel vidéo ou de plusieurs navigateurs, sans les ralentir.
+Polyptyque has to run for hours alongside a game, a video call or several browsers, without slowing them down.
 
-- **Programme natif**, écrit en [Rust](https://www.rust-lang.org) : pas de navigateur embarqué ni de moteur web pour l'interface. L'interface ([Slint](https://slint.dev)) est dessinée directement.
-- **La carte graphique fait le gros du travail** :
-  - la capture des fenêtres ;
-  - la mise à l'échelle et la conversion des couleurs ;
-  - l'encodage vidéo (NVENC, AMF, Quick Sync).
-- **Rien n'est recalculé inutilement** : une image n'est traitée que si la fenêtre a changé, et une image répétée ne coûte aucune copie en mémoire.
-- **Aperçus mesurés** : environ dix images par seconde, une définition adaptée à leur taille à l'écran, et un raccourci pour les couper.
-- **Un encodeur par source** : chacun travaille de son côté, et une panne reste limitée à sa source.
+- **Native program**, written in [Rust](https://www.rust-lang.org): no embedded browser or web engine for the interface. The interface ([Slint](https://slint.dev)) is drawn directly.
+- **The graphics card does the heavy lifting**:
+  - window capture;
+  - scaling and color conversion;
+  - video encoding (NVENC, AMF, Quick Sync).
+- **Nothing is recomputed for no reason**: a frame is only processed if the window has changed, and a repeated frame costs no memory copy.
+- **Measured previews**: about ten frames per second, at a resolution matched to their size on screen, and a shortcut to turn them off.
+- **One encoder per source**: each works independently, and a failure stays confined to its source.
 
 ## Installation
 
-**Configuration requise**
-- Windows 10 (version 2004 ou plus récente) ou Windows 11, 64 bits.
-- Carte NVIDIA : pilote 570 ou plus récent. Les cartes AMD et Intel, ou l'encodage par le processeur, fonctionnent aussi.
+**Requirements**
+- Windows 10 (version 2004 or later) or Windows 11, 64-bit.
+- NVIDIA graphics card: driver 570 or later. AMD and Intel cards, or CPU encoding, work too.
 
-**Installer**
-1. Télécharger `Polyptyque-Setup.exe` depuis la page des [versions](https://github.com/venaciteam/Polyptyque/releases).
-2. Le lancer : aucune question, aucun droit administrateur. Polyptyque s'ouvre à la fin, avec un raccourci sur le Bureau et dans le menu Démarrer.
+**Install**
+1. Download `Polyptyque-Setup.exe` from the [releases page](https://github.com/venaciteam/polyptyque/releases).
+2. Run it: no questions, no administrator rights. Polyptyque opens when it’s done, with a shortcut on the desktop and in the Start menu.
 
 > [!TIP]
-> Pour les longues sessions, régler les « heures d'activité » de Windows Update (dans ses options avancées) sur la plage où l'on enregistre : Windows ne redémarre pas de lui-même pendant ces heures, sauf mise à jour imposée par une entreprise. Avec des enregistrements programmés, activer aussi « Lancer Polyptyque au démarrage de Windows ».
+> For long sessions, set the “active hours” of Windows Update (in its advanced options) to the time range when you record: Windows won’t restart on its own during those hours, unless an organization enforces an update. With scheduled recordings, also turn on “Start Polyptyque when Windows starts”.
 
 > [!NOTE]
-> Polyptyque n'est pas encore signé numériquement. Windows peut afficher « Windows a protégé votre ordinateur » : cliquer sur « Informations complémentaires », puis « Exécuter quand même ».
+> Polyptyque isn’t digitally signed yet. Windows may show “Windows protected your PC”: click “More info”, then “Run anyway”.
 
-**Mises à jour**
+**Updates**
 
-Polyptyque vérifie au démarrage, puis toutes les six heures, si une nouvelle version existe et la propose d'un clic, jamais pendant un enregistrement. Dans les réglages, « Mises à jour » permet de choisir :
-- **Versions stables** ;
-- **Versions stables et bêta** : les nouveautés plus tôt, avec plus de risques ;
-- **Ne pas rechercher**.
+Polyptyque checks for a new version at startup, then every six hours, and offers it in one click, never during a recording. In Settings, “Updates” lets you choose:
+- **Stable versions**;
+- **Stable and beta versions**: new features sooner, with more risk;
+- **Don’t check**.
 
-Une copie bêta reçoit par défaut les bêtas suivantes, puis la version stable. Revenir aux versions stables ne réinstalle pas une version plus ancienne : la bêta reste jusqu'à la prochaine version stable.
+A beta copy gets the following betas by default, then the stable version. Switching back to stable versions doesn’t reinstall an older version: the beta stays until the next stable version.
 
-**Désinstaller**
+**Uninstall**
 
-Paramètres de Windows > Applications. Les scènes, les réglages et les connexions des navigateurs sont conservés.
+Windows Settings > Apps. Scenes, settings and browser sign-ins are kept.
 
-**Version portable**
+**Portable version**
 
-`Polyptyque-portable.zip` s'utilise sans installation : décompresser où l'on veut (disque, clé USB), puis lancer `Polyptyque.exe` à la racine du dossier.
-- Scènes, réglages, connexions des navigateurs et journaux sont rangés dans le sous-dossier `données`. Rien n'est écrit ailleurs sur le PC : déplacer le dossier, ou le copier sur un autre PC, emporte tout.
-- Les enregistrements vont dans le dossier choisi dans les réglages, ou dans `Vidéos\Polyptyque` si ce dossier n'existe pas sur ce PC.
+`Polyptyque-portable.zip` runs without installation: unzip it anywhere (drive, USB stick), then run `Polyptyque.exe` at the root of the folder.
+- Scenes, settings, browser sign-ins and logs are stored in the `données` subfolder (French for “data”). Nothing is written anywhere else on the PC: moving the folder, or copying it to another PC, takes everything with it.
+- Recordings go to the folder chosen in Settings, or to `Videos\Polyptyque` if that folder doesn’t exist on this PC.
 
-## Prise en main
+**Language and clock**
 
-1. **Ajouter une source navigateur** : choisir le navigateur, un nom, éventuellement une adresse. Polyptyque l'ouvre avec un profil qui lui est propre : s'y connecter, préparer ses onglets. Tout est conservé pour les fois suivantes.
-2. **Ajouter une source application** : choisir une fenêtre ouverte (Discord, un jeu, Tor Browser…).
-3. **Réutiliser une source dans une autre scène** : clic droit sur la source > « Copier » (ou <kbd>Ctrl</kbd> + <kbd>C</kbd>), choisir l'autre scène, puis « Coller » (ou <kbd>Ctrl</kbd> + <kbd>V</kbd>). C'est la même source dans les deux scènes, avec les mêmes connexions ; la supprimer d'une scène ne la retire pas de l'autre. Le bouton « Dupliquer la scène » fait de même pour toutes les sources d'une scène.
-4. **Ouvrir les fenêtres** : au lancement, Polyptyque ouvre seul les fenêtres de la scène en cours (navigateurs, et applications avec « Relancer »). Le bouton « Ouvrir les fenêtres » du panneau des sources le fait à la demande, et celui de chaque carte ouvre une seule source. L'ouverture au lancement se désactive dans les réglages, comme la fermeture des navigateurs en quittant Polyptyque.
-5. **Démarrer l'enregistrement** : Polyptyque retrouve ou rouvre les fenêtres manquantes, puis affiche l'état de chaque source.
-6. **Tout arrêter** : les fichiers sont finalisés proprement. Le bouton rond de chaque aperçu démarre ou arrête une seule source.
-7. **Programmer** : la pastille « Programmer », en haut, ouvre les programmations. Pour chacune : la scène, l'heure de début et de fin, une seule fois ou certains jours. La pastille affiche ensuite le prochain créneau. Polyptyque doit rester ouvert ; l'option « Lancer Polyptyque au démarrage de Windows » s'y trouve aussi.
-8. **Fichiers** : par défaut dans `Vidéos\Polyptyque` (dossier modifiable dans les réglages), un fichier MKV par source, nommés par défaut `date_heure_scène_source.mkv`. Le bouton « Fichiers » ouvre ce dossier.
+Polyptyque is in English and French, in a single version. It uses French if Windows is in French, and English for any other language; times follow the Windows regional format (12-hour or 24-hour). Settings > “Language” and “Clock” change them right away, without restarting.
 
-**Raccourcis clavier**, actifs même quand Polyptyque est en arrière-plan et modifiables dans les réglages :
+## Getting started
 
-| Raccourci | Action |
+1. **Add a browser source**: pick the browser, a name, and optionally an address. Polyptyque opens it with a profile of its own: sign in and set up your tabs. Everything is kept for next time.
+2. **Add an app source**: pick an open window (Discord, a game, Tor Browser…).
+3. **Reuse a source in another scene**: right-click the source > “Copy”, pick the other scene, then “Paste”. It’s the same source in both scenes, with the same sign-ins; removing it from one scene doesn’t remove it from the other. The “Duplicate scene” button does the same for all of a scene’s sources.
+4. **Open windows**: at launch, Polyptyque opens the current scene’s windows by itself (browsers, and apps set to relaunch). The “Open windows” button in the sources panel does it on demand, and each card’s button opens a single source. Opening at launch can be turned off in Settings, as can closing browsers when you quit Polyptyque.
+5. **Start recording**: Polyptyque finds or reopens any missing windows, then shows the status of each source.
+6. **Stop all**: files are finalized cleanly. The round button on each preview starts or stops a single source.
+7. **Schedule**: the “Schedule” button at the top opens scheduled recordings. For each one: the scene, the start and end times, once or on specific days. The button then shows the next time slot. Polyptyque has to stay open; the “Start Polyptyque when Windows starts” option is there too.
+8. **Files**: by default in `Videos\Polyptyque` (the folder can be changed in Settings), one MKV file per source, named `date_time_scene_source.mkv` by default (`2026-10-20_14-32_Podcast_Discord.mkv`). The “Files” button opens this folder.
+
+**Keyboard shortcuts**, active even when Polyptyque is in the background, and customizable in Settings:
+
+| Shortcut | Action |
 |---|---|
-| <kbd>Ctrl</kbd> + <kbd>Maj</kbd> + <kbd>F9</kbd> | Démarrer ou arrêter l'enregistrement |
-| <kbd>Ctrl</kbd> + <kbd>Maj</kbd> + <kbd>F10</kbd> | Afficher ou réduire Polyptyque |
-| <kbd>Ctrl</kbd> + <kbd>Maj</kbd> + <kbd>F11</kbd> | Activer ou couper les aperçus |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>F9</kbd> | Start or stop recording |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>F10</kbd> | Show or minimize Polyptyque |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>F11</kbd> | Turn previews on or off |
 
-Dans la fenêtre de Polyptyque, <kbd>Ctrl</kbd> + <kbd>C</kbd> copie la source sélectionnée et <kbd>Ctrl</kbd> + <kbd>V</kbd> la colle dans la scène en cours.
+In the Polyptyque window, <kbd>Ctrl</kbd> + <kbd>C</kbd> copies the selected source and <kbd>Ctrl</kbd> + <kbd>V</kbd> pastes it into the current scene.
 
-## Pour le montage
+## For editing
 
-- **MKV ou MP4** : pendant l'enregistrement, Polyptyque écrit en MKV, un format qui reste lisible même après une coupure. « Convertir en MP4… » crée une copie MP4 à côté, sans perte de qualité, et la conversion peut être automatique en fin d'enregistrement. Le MKV est conservé ; prévoir le double d'espace disque.
-- **Micro** : son fichier `…_Micro.mka` devient `…_Micro.m4a` après conversion.
-- **Parties** : si l'encodeur a été relancé, la suite d'une source se trouve dans `…_partie2.mkv`, à placer juste après la première partie.
-- **Fichier coupé net** (coupure de courant) : il se lit, mais sans durée ni index. La réparation proposée au lancement suivant les reconstruit sans réencodage ; la conversion en MP4 le fait aussi.
-- **Source ajoutée en cours de route** : son fichier commence à l'heure indiquée dans son nom.
+- **MKV or MP4**: while recording, Polyptyque writes MKV, a format that stays readable even after a power cut. “Convert to MP4…” creates an MP4 copy alongside, losslessly, and conversion can run automatically when a recording ends. The MKV is kept: plan for twice the disk space.
+- **Mic**: its `…_Mic.mka` file becomes `…_Mic.m4a` after conversion.
+- **Parts**: if the encoder was restarted, the rest of a source is in `…_part2.mkv`, to place right after the first part.
+- **File cut off abruptly** (power outage): it plays, but without a duration or index. The repair offered at the next launch rebuilds them without re-encoding; converting to MP4 does too.
+- **Source added mid-recording**: its file starts at the time shown in its name.
 
-## Limites connues
+## Known limitations
 
-- Le son est isolé **par programme**, pas par onglet : tous les onglets d'un même profil de navigateur partagent la même piste. Une source navigateur par contenu à isoler suffit à le contourner.
-- Une fenêtre réduite dans la barre des tâches n'est plus dessinée par Windows : son image se fige, et sa carte affiche « Réduite ». Le bouton « Rétablir la fenêtre » de la carte la ramène, même pendant l'enregistrement. Une fenêtre cachée derrière d'autres s'enregistre normalement.
-- Les contenus protégés (Netflix, Disney+…) apparaissent souvent en noir.
-- Certains jeux en plein écran exclusif donnent une image noire : préférer le mode « fenêtré sans bordure ».
-- Les enregistrements programmés ne démarrent que si Polyptyque est ouvert et l'ordinateur allumé : Windows ne lance pas encore Polyptyque à l'heure prévue, ni ne sort l'ordinateur de veille. La version console n'a pas de programmation.
-- Si le navigateur d'une source a plusieurs fenêtres, seule celle de la source revient au lancement suivant quand Polyptyque les ferme : Firefox et Chrome ne rouvrent que la dernière fenêtre fermée. Les autres restent dans « Fenêtres récemment fermées » de l'historique du navigateur.
+- Sound is isolated **per program**, not per tab: all tabs in the same browser profile share one track. One browser source per piece of content to isolate gets around this.
+- Windows stops drawing a window minimized to the taskbar: its picture freezes, and its card shows “Minimized”. The card’s “Restore window” button brings it back, even during a recording. A window hidden behind others records normally.
+- Protected content (Netflix, Disney+…) often shows up black.
+- Some games in exclusive fullscreen give a black picture: use “borderless windowed” mode instead.
+- Scheduled recordings only start if Polyptyque is open and the computer is on: Windows doesn’t launch Polyptyque at the set time yet, or wake the computer from sleep. The console version has no scheduling.
+- If a source’s browser has several windows, only the source’s window comes back at the next launch when Polyptyque closes them: Firefox and Chrome only reopen the last window closed. The others stay under “Recently closed windows” in the browser’s history.
+- The console version (`polyptyque-console.exe`, shipped for diagnostics) is in French only for now.
 
-La liste complète, les choix techniques et la feuille de route sont dans le [cahier des charges](docs/cahier-des-charges.md).
+The full list, technical choices and roadmap are in the [specification](docs/cahier-des-charges.md) (in French).
 
-## Pour les développeurs
+## Reporting a problem
 
-**Organisation**
+Settings > “Report a problem…” (also offered after an interrupted recording) prepares a report file: version, Windows, graphics card, a summary of the settings without any paths, and the recent logs. Your user folder and Windows account name are masked. Polyptyque then shows the file in File Explorer and opens a pre-filled GitHub issue page: describe the problem there and attach the file, after reading it if you like. Polyptyque never sends anything by itself. Issues are public, and a GitHub account is required.
 
-| Dossier | Rôle |
+The report and logs are written in French, so that diagnostics stay searchable in a single language.
+
+## For developers
+
+**Layout**
+
+| Folder | Role |
 |---|---|
-| `crates/polyptyque-core` | Scènes, sources, réglages et leurs sauvegardes, nommage, calculs de synchronisation, commandes FFmpeg, version portable, journal de la session en cours, programmations (créneaux et décisions) ; le contrat `Platform` que chaque système doit remplir |
-| `crates/polyptyque-windows` | Implémentation Windows : capture d'image (Windows.Graphics.Capture) et de son (WASAPI), fenêtres, navigateurs, tubes, copie unique, veille et fermeture de session, lancement au démarrage de Windows |
-| `crates/polyptyque-engine` | Sessions d'enregistrement : horloge commune, capture, encodeurs FFmpeg surveillés et relancés, dossier de secours, conversion MP4 et réparation des fichiers coupés net |
-| `crates/polyptyque-app` | Interface graphique : apparence dans `ui/` (thème dans `ui/theme.slint`), logique dans `src/` (dont le bilan après un incident), mises à jour |
-| `crates/polyptyque-cli` | Version en console, livrée pour le diagnostic |
-| `assets/logo` | Logo et icônes, générés par `generer.py` |
-| `docs` | Cahier des charges, analyse des risques, fiches de test et captures d'écran |
+| `crates/polyptyque-core` | Scenes, sources, settings and their backups, naming, sync calculations, FFmpeg commands, portable version, current session log, scheduled recordings (time slots and decisions), reading the translation catalog; the `Platform` contract each system has to fulfill |
+| `crates/polyptyque-windows` | Windows implementation: picture capture (Windows.Graphics.Capture) and sound capture (WASAPI), windows, browsers, pipes, single instance, sleep and session end, start with Windows, regional clock format |
+| `crates/polyptyque-engine` | Recording sessions: shared clock, capture, monitored and restarted FFmpeg encoders, fallback folder, MP4 conversion and repair of files cut off abruptly |
+| `crates/polyptyque-app` | Graphical interface: look in `ui/` (theme in `ui/theme.slint`), logic in `src/` (including the post-incident summary), updates, translations in `lang/` |
+| `crates/polyptyque-cli` | Console version, shipped for diagnostics |
+| `assets/logo` | Logo and icons, generated by `generer.py` |
+| `docs` | Specification, risk analysis, test sheets and screenshots |
 
-Seule `polyptyque-windows` dépend du système : un portage vers macOS ou Linux consistera à écrire son équivalent.
+Only `polyptyque-windows` depends on the operating system: a port to macOS or Linux would mean writing its equivalent. Code comments and working documents are in French.
 
-**Compiler et tester**
+**Build and test**
 
 ```sh
-cargo test --workspace                                    # tests, dont des sessions simulées (FFmpeg requis)
+cargo test --workspace                                    # tests, including simulated sessions (requires FFmpeg)
 cargo build --release -p polyptyque-app -p polyptyque-cli
-cargo run -p polyptyque-app                               # hors Windows : mode démonstration
+cargo run -p polyptyque-app                               # outside Windows: demo mode
 ```
 
-Les sessions simulées rejouent des enregistrements complets avec de fausses fenêtres et un vrai FFmpeg, et vérifient :
-- les durées et la synchronisation des fichiers ;
-- la conversion MP4 ;
-- l'enregistrement source par source ;
-- la reprise après un plantage ou un blocage réel de FFmpeg, et la réparation du fichier coupé net ;
-- la suite de l'enregistrement dans le dossier de secours quand le dossier choisi disparaît ;
-- le passage sur le processeur quand la carte graphique refuse un encodage.
+The simulated sessions replay full recordings with fake windows and a real FFmpeg, and check:
+- file durations and sync;
+- MP4 conversion;
+- recording source by source;
+- recovery after a real FFmpeg crash or freeze, and repair of the file cut off abruptly;
+- continuing the recording in the fallback folder when the chosen folder disappears;
+- switching to the CPU when the graphics card refuses an encode.
 
-Le mode démonstration permet de développer l'interface sans Windows. Des variables d'environnement y simulent des situations à tester :
+Demo mode makes it possible to work on the interface without Windows. Environment variables simulate situations to test:
 
-| Variable | Situation simulée |
+| Variable | Simulated situation |
 |---|---|
-| `POLYPTYQUE_DEMO_REDUITE` | La fenêtre de Discord est réduite |
-| `POLYPTYQUE_DEMO_PERDUE` | La fenêtre de Chrome est fermée |
-| `POLYPTYQUE_DEMO_MISE_A_JOUR` | Une nouvelle version est disponible |
+| `POLYPTYQUE_DEMO_REDUITE` | The Discord window is minimized |
+| `POLYPTYQUE_DEMO_PERDUE` | The Chrome window is closed |
+| `POLYPTYQUE_DEMO_MISE_A_JOUR` | A new version is available |
+| `POLYPTYQUE_LANG` | `fr` or `en`: stands in for the Windows language (interface set to Automatic, demo data) |
 
-## Licence
+**Translations**
 
-Polyptyque est un logiciel libre et gratuit, sous licence [GPL v3 ou ultérieure](LICENSE). Il s'appuie sur :
-- [FFmpeg](https://ffmpeg.org), livré à côté sous sa propre licence GPL ;
-- [Slint](https://slint.dev) ;
-- [Velopack](https://velopack.io) ;
-- la crate [`windows`](https://github.com/microsoft/windows-rs) de Microsoft.
+French is the source language, written in the code (`@tr()` in Slint, `tr!` in Rust). The English text lives in a gettext catalog, `crates/polyptyque-app/lang/en/LC_MESSAGES/polyptyque-app.po`, built into the executable. `cargo test -p polyptyque-app --test catalogue` fails if any text has no English version or if its placeholders don’t match; `POLYPTYQUE_CATALOGUE=maj` before the same command updates the catalogs. Terms and writing rules for English: [English glossary](docs/lexique-anglais.md) (in French).
+
+## License
+
+Polyptyque is free software, under the [GPL v3 or later](LICENSE). It relies on:
+- [FFmpeg](https://ffmpeg.org), shipped alongside under its own GPL license;
+- [Slint](https://slint.dev);
+- [Velopack](https://velopack.io);
+- Microsoft’s [`windows`](https://github.com/microsoft/windows-rs) crate.

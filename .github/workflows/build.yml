@@ -58,6 +58,7 @@ jobs:
           Copy-Item "ffmpeg/$env:FFMPEG_ZIP/LICENSE.txt" "$dist/FFMPEG-LICENSE.txt"
           Copy-Item LICENSE "$dist/LICENSE.txt"
           Copy-Item packaging/LISEZMOI.txt $dist/
+          Copy-Item packaging/README.txt $dist/
           & "$dist/ffmpeg.exe" -hide_banner -version | Select-Object -First 1
           & "$dist/ffmpeg.exe" -hide_banner -encoders | Select-String -Pattern "nvenc|amf|qsv|libx264"
       - uses: actions/setup-dotnet@v4
@@ -80,7 +81,9 @@ jobs:
           $numbers = $core.Split('.')
           $title = "Polyptyque $($numbers[0]).$($numbers[1])"
           if ($numbers[2] -ne '0') { $title += ".$($numbers[2])" }
-          if ($suffix -match '^beta\.(\d+)$') { $title += " bêta $($Matches[1])" } elseif ($beta) { $title += " $suffix" }
+          # Titre de la page en anglais, langue de tête du dépôt (« Polyptyque
+          # 1.0 beta 5 ») ; les notes sont en anglais puis en français.
+          if ($suffix -match '^beta\.(\d+)$') { $title += " beta $($Matches[1])" } elseif ($beta) { $title += " $suffix" }
           $notes = "packaging/notes/v$version.md"
           Write-Host "Version $version, page « $title », bêta : $beta, notes : $(Test-Path $notes)"
           "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append

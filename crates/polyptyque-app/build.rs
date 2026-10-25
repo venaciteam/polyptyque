@@ -10,5 +10,7 @@ fn main() {
         .with_bundled_translations("lang")
         .with_default_translation_context(slint_build::DefaultTranslationContext::None);
     slint_build::compile_with_config("ui/app.slint", config).expect("compilation de l'interface");
-    ressources_windows("Polyptyque - enregistrement multi-fenêtres", "polyptyque");
+    // Description affichée par le Gestionnaire des tâches : le nom seul, le
+    // même dans toutes les langues de l'interface.
+    ressources_windows("Polyptyque", "polyptyque");
 }

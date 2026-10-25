@@ -1,5 +1,6 @@
 // Ressources Windows communes aux exécutables (inclus par leur build.rs) :
 // icône et description visibles dans l'Explorateur (Propriétés > Détails).
+// Langue neutre : un même exécutable pour le français et l'anglais.
 
 /// Intègre l'icône et la description dans l'exécutable. Sans effet hors
 /// d'une compilation Windows faite sous Windows (l'outil `rc.exe` est requis).
@@ -29,13 +30,13 @@ FILESUBTYPE 0x0L
 BEGIN
     BLOCK "StringFileInfo"
     BEGIN
-        BLOCK "040C04B0"
+        BLOCK "000004B0"
         BEGIN
             VALUE "CompanyName", "Polyptyque"
             VALUE "FileDescription", "{description}"
             VALUE "FileVersion", "{version}"
             VALUE "InternalName", "{fichier}"
-            VALUE "LegalCopyright", "Licence GPL v3 ou ultérieure"
+            VALUE "LegalCopyright", "GPL-3.0-or-later"
             VALUE "OriginalFilename", "{fichier}.exe"
             VALUE "ProductName", "Polyptyque"
             VALUE "ProductVersion", "{version}"
@@ -43,7 +44,7 @@ BEGIN
     END
     BLOCK "VarFileInfo"
     BEGIN
-        VALUE "Translation", 0x40C, 1200
+        VALUE "Translation", 0x0, 1200
     END
 END
 "#
