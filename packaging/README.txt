@@ -1,4 +1,4 @@
-POLYPTYQUE 1.0 BETA 7
+POLYPTYQUE 1.0 BETA 8
 =====================
 
 Polyptyque records several windows at once, each in its own file, with

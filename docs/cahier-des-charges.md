@@ -948,6 +948,7 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 | 2026-10-27 | Bêta 6 jamais publiée seule : son contenu (arrière-plan) sort avec le pilotage dans la bêta 7, pour tout tester en une fois sur la machine de référence |
 | 2026-10-27 | Publication de la 1.0.0-beta.7 (préversion) : arrière-plan dans la zone de notification (icône près de l'horloge), choix à la fermeture avec une programmation prévue et réglage, lancement au démarrage de Windows en arrière-plan ; pilotage par d'autres programmes (réglage, `polyptyque-cli.exe` à la place de la console, serveur MCP, point rouge et notification d'enregistrement en arrière-plan) |
 | 2026-10-27 | Rapport de problème : **fins inattendues** (témoin de lancement retiré à chaque fin normale) et **erreurs récentes de la carte graphique** lues dans les journaux de Windows. Cas d'origine : bêta 7 fermée d'office par le pilote OpenGL de NVIDIA lors d'une réinitialisation du pilote (erreur matérielle du GPU), invisible dans le journal et le rapport de Polyptyque, retrouvée seulement dans l'Observateur d'événements |
+| 2026-10-27 | Bêta 7 finalement jamais publiée seule (fabrication de `dev` testée sur la machine de référence, sans étiquette ni page de version) : son contenu sort dans la **1.0.0-beta.8**, avec les fins inattendues et les erreurs de la carte graphique dans le rapport de problème. Notes `packaging/notes/v1.0.0-beta.8.md` (celles des bêtas 6 et 7 reprises) |
 
 ---
 

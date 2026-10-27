@@ -28,10 +28,10 @@
 
 ## Download
 
-**Windows 10 and 11** (64-bit), version 1.0 beta 7:
+**Windows 10 and 11** (64-bit), version 1.0 beta 8:
 
-- **[Download the installer](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.7/Polyptyque-Setup.exe)**: the standard version, installed like any other program. If in doubt, choose this one.
-- **[Download the portable version](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.7/Polyptyque-portable.zip)**: no installation, unzip it to any folder, even on a USB stick.
+- **[Download the installer](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.8/Polyptyque-Setup.exe)**: the standard version, installed like any other program. If in doubt, choose this one.
+- **[Download the portable version](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.8/Polyptyque-portable.zip)**: no installation, unzip it to any folder, even on a USB stick.
 
 macOS and Linux: not available yet.
 
