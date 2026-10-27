@@ -1,8 +1,8 @@
 //! Moteur d'enregistrement de Polyptyque.
 //!
-//! Indépendant de l'interface : la console du prototype, une future
-//! interface graphique ou un test le pilotent de la même façon
-//! ([`Session::start`], [`Session::status`], [`Session::stop`]).
+//! Indépendant de l'interface : l'interface graphique ou un test le
+//! pilotent de la même façon ([`Session::start`], [`Session::status`],
+//! [`Session::stop`]).
 //!
 //! Pour chaque source :
 //! - un fil vidéo capture la fenêtre et émet les images à cadence constante ;

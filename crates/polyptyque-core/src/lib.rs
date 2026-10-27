@@ -9,9 +9,11 @@
 pub mod browsers;
 pub mod clock;
 pub mod config;
+pub mod control;
 pub mod encoder;
 pub mod hotkeys;
 pub mod i18n;
+pub mod launch;
 pub mod level;
 pub mod naming;
 pub mod paths;

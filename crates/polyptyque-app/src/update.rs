@@ -121,5 +121,13 @@ pub fn download(update: &Available, progress: &dyn Fn(f32)) -> Result<()> {
 
 /// Installe la version téléchargée et redémarre Polyptyque.
 pub fn apply(update: &Available) -> Result<()> {
-    imp::apply(update)
+    // Polyptyque quitte sans revenir dans `main` : fermeture normale quand
+    // même, le témoin de lancement est retiré. Remis si l'installation échoue.
+    let marker = polyptyque_core::paths::launch_marker_file();
+    polyptyque_core::launch::end(&marker);
+    let result = imp::apply(update);
+    if result.is_err() {
+        polyptyque_core::launch::begin(&marker, crate::LOG_NAME.get().map_or("", String::as_str));
+    }
+    result
 }

@@ -26,6 +26,7 @@ type: doc
 	4. [[#Réglages et encodage]]
 	5. [[#Fichiers, conversion, réparation]]
 	6. [[#Mises à jour et signalement]]
+	7. [[#Pilotage par d'autres programmes]]
 4. [[#Jamais traduits]]
 5. [[#Règles pour le catalogue]]
 
@@ -137,6 +138,11 @@ type: doc
 | Une seule fois / Tous les jours / Certains jours de la semaine | Once / Every day / Specific days of the week |
 | Du lundi au vendredi / Le week-end / Chaque lundi | Weekdays / Weekends / Every Monday |
 | aujourd'hui à… / demain à… | today at… / tomorrow at… |
+| arrière-plan (Continuer en arrière-plan) | background (Keep running in the background) |
+| icône près de l'horloge (zone de notification) | icon next to the clock (*notification area* : terme évité, Windows 11 dit aussi *system tray*) |
+| Afficher Polyptyque / Quitter Polyptyque (menu de l'icône) | Show Polyptyque / Quit Polyptyque |
+| Se souvenir de mon choix | Remember my choice |
+| Demander à chaque fois | Ask every time |
 | Se termine le lendemain. | Ends the next day. |
 | Lancer Polyptyque au démarrage de Windows | Start Polyptyque when Windows starts |
 
@@ -184,6 +190,25 @@ type: doc
 | Préparer le signalement | Prepare the report |
 | rapport (fichier) | report ; fichier `report_….txt` |
 | (détail dans le journal) | (details in the log) |
+
+### Pilotage par d'autres programmes
+
+Ajouté le 2026-10-25 (chantier du pilotage par un assistant IA).
+
+| Français | Anglais |
+|---|---|
+| pilotage (titre du réglage, pastille) | remote control (*Remote control*, *Remote control · Claude*) |
+| Autoriser le pilotage par d'autres programmes | Allow control by other programs |
+| Connecter un assistant IA… | Connect an AI assistant… |
+| assistant IA | AI assistant |
+| canal de commande | command channel |
+| mode commande (`polyptyque-cli`) | command line |
+| Demandé par « Claude ». (message de démarrage) | Requested by “Claude”. |
+| Activer le micro (demande d'un programme) | Turn on the mic |
+| confirmation requise | confirmation required |
+| identifiant (d'une scène, d'une source) | id |
+
+Les noms de commandes, de paramètres et les clés JSON ne se traduisent jamais (`recording.start`, `confirm`, `scene`) : ce sont des identifiants stables. Les descriptions des commandes sont des textes du catalogue comme les autres ; le serveur MCP et `polyptyque-cli commands` les donnent toujours en anglais, la langue la plus sûre pour un modèle.
 
 ---
 

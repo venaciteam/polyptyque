@@ -1,5 +1,7 @@
 // Ressources Windows communes aux exécutables (inclus par leur build.rs) :
-// icône et description visibles dans l'Explorateur (Propriétés > Détails).
+// icône et description visibles dans l'Explorateur (Propriétés > Détails),
+// et icône de l'enregistrement en cours (ressource 2 : point rouge, pour la
+// zone de notification).
 // Langue neutre : un même exécutable pour le français et l'anglais.
 
 /// Intègre l'icône et la description dans l'exécutable. Sans effet hors
@@ -7,7 +9,9 @@
 fn ressources_windows(description: &str, fichier: &str) {
     let racine = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let icone = racine.join("assets/logo/polyptyque.ico");
+    let icone_enregistrement = racine.join("assets/logo/polyptyque-enregistrement.ico");
     println!("cargo:rerun-if-changed={}", icone.display());
+    println!("cargo:rerun-if-changed={}", icone_enregistrement.display());
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") || !cfg!(windows) {
         return;
     }
@@ -16,9 +20,11 @@ fn ressources_windows(description: &str, fichier: &str) {
     nombres.resize(3, 0);
     let virgules = format!("{},{},{},0", nombres[0], nombres[1], nombres[2]);
     let chemin_icone = icone.display().to_string().replace('\\', "\\\\");
+    let chemin_enregistrement = icone_enregistrement.display().to_string().replace('\\', "\\\\");
     let rc = format!(
         r#"#pragma code_page(65001)
 1 ICON "{chemin_icone}"
+2 ICON "{chemin_enregistrement}"
 1 VERSIONINFO
 FILEVERSION {virgules}
 PRODUCTVERSION {virgules}

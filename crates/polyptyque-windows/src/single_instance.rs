@@ -5,11 +5,14 @@
 use std::path::Path;
 
 use windows::core::w;
-use windows::Win32::Foundation::{CloseHandle, GetLastError, ERROR_ALREADY_EXISTS, HANDLE};
+use windows::Win32::Foundation::{CloseHandle, GetLastError, ERROR_ALREADY_EXISTS, HANDLE, LPARAM, WPARAM};
 use windows::Win32::System::Threading::CreateMutexW;
-use windows::Win32::UI::WindowsAndMessaging::{IsIconic, SetForegroundWindow, ShowWindowAsync, SW_RESTORE, SW_SHOW};
+use windows::Win32::UI::WindowsAndMessaging::{
+    AllowSetForegroundWindow, IsIconic, IsWindowVisible, PostMessageW, SetForegroundWindow, ShowWindowAsync,
+    SW_RESTORE, SW_SHOW,
+};
 
-use crate::windows_list;
+use crate::{tray, windows_list};
 
 /// Verrou tenu tant que Polyptyque est ouvert (absent si le système n'a pas
 /// pu le créer : mieux vaut alors deux copies qu'aucune).
@@ -57,17 +60,26 @@ pub fn acquire(bring_to_front: bool) -> Instance {
     Instance::AlreadyOpen
 }
 
-/// Ramène au premier plan la fenêtre de la copie déjà ouverte.
+/// Ramène au premier plan la fenêtre de la copie déjà ouverte. Cachée (dans
+/// la zone de notification), elle est priée de s'afficher elle-même.
 fn show_existing() {
     let own_pid = std::process::id();
-    let existing =
-        windows_list::list(own_pid).into_iter().find(|w| is_polyptyque(&w.exe) && w.title.ends_with("Polyptyque"));
+    let existing = windows_list::list_including_hidden(own_pid)
+        .into_iter()
+        .find(|w| is_polyptyque(&w.exe) && w.title.ends_with("Polyptyque"));
     let Some(window) = existing else {
         log::warn!("Polyptyque est déjà ouvert, mais sa fenêtre est introuvable");
         return;
     };
     let hwnd = windows_list::hwnd(window.handle);
     unsafe {
+        if !IsWindowVisible(hwnd).as_bool() {
+            // Elle pourra passer au premier plan : c'est cette copie-ci,
+            // lancée à l'instant, qui en a le droit.
+            let _ = AllowSetForegroundWindow(window.pid);
+            let _ = PostMessageW(Some(hwnd), tray::show_request_message(), WPARAM(0), LPARAM(0));
+            return;
+        }
         // Sans attendre : une copie figée ne doit pas bloquer celle-ci.
         let _ = ShowWindowAsync(hwnd, if IsIconic(hwnd).as_bool() { SW_RESTORE } else { SW_SHOW });
         let _ = SetForegroundWindow(hwnd);

@@ -8,6 +8,7 @@
 
 mod audio;
 mod browsers;
+pub mod control_pipe;
 pub mod hotkeys;
 mod pipe;
 mod process;
@@ -16,6 +17,7 @@ pub mod single_instance;
 pub mod startup;
 mod system;
 mod system_info;
+pub mod tray;
 mod video;
 mod windows_list;
 
@@ -150,6 +152,10 @@ impl Platform for WindowsPlatform {
 
     fn graphics_adapters(&self) -> Vec<String> {
         system_info::graphics_adapters()
+    }
+
+    fn graphics_driver_events(&self) -> Option<Vec<String>> {
+        system_info::graphics_driver_events()
     }
 
     fn uses_twelve_hour_clock(&self) -> bool {

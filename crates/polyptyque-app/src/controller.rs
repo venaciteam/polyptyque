@@ -19,8 +19,8 @@ use std::time::{Duration, Instant};
 use anyhow::{anyhow, Context, Result};
 use polyptyque_core::browsers::{classify_executable, is_tor_browser, program_name};
 use polyptyque_core::config::{
-    BrowserFamily, BrowserRef, ClockChoice, Codec, Config, HardwarePreference, LanguageChoice, PasteError, Scene,
-    Settings, Source, SourceKind, UpdateChannel,
+    BrowserFamily, BrowserRef, ClockChoice, CloseChoice, Codec, Config, HardwarePreference, LanguageChoice, PasteError,
+    Scene, Settings, Source, SourceKind, UpdateChannel,
 };
 use polyptyque_core::encoder::{bytes_per_hour, EncoderChoice};
 use polyptyque_core::hotkeys;
@@ -32,6 +32,7 @@ use polyptyque_core::storage;
 use polyptyque_engine::remux;
 use polyptyque_engine::resolve::{self, PrepareEvent};
 use polyptyque_engine::{probe, MicrophonePlan, Session, SessionPlan, SourceState, SourceStatus, SourceSummary};
+use serde_json::Value;
 use slint::{CloseRequestResponse, ComponentHandle, Image, Model, ModelRc, SharedString, Timer, TimerMode, VecModel};
 use tr::tr;
 
@@ -44,6 +45,10 @@ use crate::preview::{self, PreviewManager, PreviewState};
 use crate::update;
 use crate::{AppWindow, Bridge, IncidentFile, SceneItem, ScheduleItem, SourceCard, SourceItem, WindowItem};
 
+mod background;
+mod assistants;
+mod commands;
+mod control;
 mod report;
 mod scheduling;
 use scheduling::Prompt;
@@ -101,6 +106,9 @@ enum Confirm {
     /// Quitter alors qu'une programmation doit encore lancer un
     /// enregistrement.
     QuitWithSchedules,
+    /// Activer le micro, à la demande d'un programme (pilotage) : seule la
+    /// personne devant l'écran peut l'accepter.
+    EnableMicrophone,
 }
 
 /// Fenêtre à montrer dès que l'interface est libre (aucun enregistrement,
@@ -249,9 +257,19 @@ pub struct App {
     schedule_days: Rc<VecModel<bool>>,
     /// Années de la liste « Année » du formulaire.
     schedule_years: RefCell<Vec<i32>>,
-    /// Lancé par Windows à l'ouverture de session : la fenêtre est réduite
-    /// dès qu'elle existe.
-    minimize_pending: Cell<bool>,
+    /// Lancé par Windows à l'ouverture de session : la fenêtre passe en
+    /// arrière-plan dès qu'elle existe.
+    hide_pending: Cell<bool>,
+    /// Fenêtre cachée, icône dans la zone de notification.
+    in_background: Cell<bool>,
+    /// Info-bulle de cette icône.
+    tray_tip: RefCell<String>,
+    /// Les actions sur cette icône sont reçues.
+    #[cfg(windows)]
+    tray_watch: Cell<bool>,
+    /// Pilotage par d'autres programmes : canal, programmes connectés.
+    control: RefCell<control::ControlState>,
+    assistant_setup: RefCell<assistants::SetupState>,
 }
 
 /// Enregistrement interrompu trouvé au lancement.
@@ -307,8 +325,8 @@ pub struct Paths {
     pub schedule_state: PathBuf,
 }
 
-/// `at_startup` : lancé par Windows à l'ouverture de session (réduit, sans
-/// ouvrir les fenêtres de la scène).
+/// `at_startup` : lancé par Windows à l'ouverture de session (en
+/// arrière-plan, sans ouvrir les fenêtres de la scène).
 pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, at_startup: bool) -> Result<()> {
     let ui = AppWindow::new().context(tr!("création de la fenêtre"))?;
     crate::i18n::apply_to_ui(crate::i18n::Language::current());
@@ -388,7 +406,13 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
         schedule_scene_ids: RefCell::new(Vec::new()),
         schedule_days: Rc::new(VecModel::from(vec![false; 7])),
         schedule_years: RefCell::new(Vec::new()),
-        minimize_pending: Cell::new(at_startup),
+        hide_pending: Cell::new(at_startup),
+        in_background: Cell::new(false),
+        tray_tip: RefCell::new(String::new()),
+        #[cfg(windows)]
+        tray_watch: Cell::new(false),
+        control: RefCell::new(control::ControlState::default()),
+        assistant_setup: RefCell::new(assistants::SetupState::default()),
     });
     APP.with(|a| *a.borrow_mut() = Some(app.clone()));
     *app.converter.borrow_mut() =
@@ -411,6 +435,7 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
     app.refresh_all();
     app.restart_previews();
     app.register_hotkeys();
+    app.apply_remote_control();
     app.check_interrupted_session();
     // Emplacement inscrit au démarrage de Windows remis à jour (version
     // portable déplacée).
@@ -426,12 +451,19 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
         app.toast(&tr!("Polyptyque a été mis à jour : version {}.", version), 1);
     }
 
-    ui.window()
-        .on_close_requested(|| with_app(|app| app.close_requested()).unwrap_or(CloseRequestResponse::HideWindow));
+    ui.window().on_close_requested(|| {
+        with_app(|app| app.close_requested()).unwrap_or_else(|| {
+            let _ = slint::quit_event_loop();
+            CloseRequestResponse::HideWindow
+        })
+    });
 
     let status_timer = Timer::default();
     status_timer.start(TimerMode::Repeated, Duration::from_millis(500), || {
-        with_app(|app| app.tick_status());
+        with_app(|app| {
+            app.tick_status();
+            app.tick_assistants();
+        });
     });
     let preview_timer = Timer::default();
     preview_timer.start(TimerMode::Repeated, Duration::from_millis(100), || {
@@ -446,7 +478,12 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
         with_app(|app| app.check_for_updates());
     });
 
-    ui.run().context(tr!("boucle de l'interface"))?;
+    // La boucle continue fenêtre cachée (Polyptyque en arrière-plan) :
+    // seule une fermeture voulue l'arrête (`slint::quit_event_loop`).
+    ui.show().context(tr!("boucle de l'interface"))?;
+    slint::run_event_loop_until_quit().context(tr!("boucle de l'interface"))?;
+    app.leave_background();
+    app.stop_control();
 
     app.previews.borrow_mut().stop();
     app.meters.borrow_mut().stop();
@@ -581,6 +618,14 @@ fn install_callbacks(ui: &AppWindow) {
     b.on_install_update(|| {
         with_app(|a| a.install_update());
     });
+    b.on_open_control_help(|| {
+        with_app(|a| a.open_assistants());
+    });
+    b.on_refresh_assistants(|| { with_app(|a| a.refresh_assistants()); });
+    b.on_configure_assistant(|id, disconnect| { with_app(|a| a.configure_assistant(&id, disconnect)); });
+    b.on_browse_assistant_config(|id| { with_app(|a| a.browse_assistant_config(&id)); });
+    b.on_copy_assistant_prompt(|| { with_app(|a| a.copy_assistant_prompt()); });
+    b.on_close_assistants(|| { with_app(|a| a.close_assistants()); });
     b.on_open_mic_privacy(|| {
         with_app(|a| a.open_mic_privacy());
     });
@@ -592,6 +637,12 @@ fn install_callbacks(ui: &AppWindow) {
     });
     b.on_confirm_accepted(|| {
         with_app(|a| a.confirm_accepted());
+    });
+    b.on_close_to_background(|| {
+        with_app(|a| a.close_to_background());
+    });
+    b.on_close_anyway(|| {
+        with_app(|a| a.close_anyway());
     });
     b.on_dismiss_toast(|| {
         with_app(|a| a.dismiss_toast());
@@ -854,6 +905,7 @@ impl App {
 
     fn toast(&self, message: &str, tone: i32) {
         log::info!("message affiché : {message}");
+        self.control_message(message, tone);
         self.with_bridge(|b| {
             b.set_toast_text(message.into());
             b.set_toast_tone(tone);
@@ -886,7 +938,9 @@ impl App {
             let config = self.config.borrow();
             let mut previews = self.previews.borrow_mut();
             previews.stop();
-            if config.settings.previews {
+            // En arrière-plan, personne ne les regarde : ils reprennent
+            // quand la fenêtre revient.
+            if config.settings.previews && !self.in_background.get() {
                 *previews = PreviewManager::start(&self.platform, &config.active_sources(), self.preview_size.get());
             }
         }
@@ -900,6 +954,9 @@ impl App {
         let config = self.config.borrow();
         let mut meters = self.meters.borrow_mut();
         meters.stop();
+        if self.in_background.get() {
+            return;
+        }
         *meters = SourceMeters::start(&self.platform, &config.active_sources(), |id| self.engine_listens(id));
     }
 
@@ -1007,11 +1064,18 @@ impl App {
     }
 
     fn tick_previews(&self) {
+        // Ici plutôt qu'au rythme de la barre d'état : la fenêtre ouverte
+        // par Slint au lancement doit disparaître au plus vite.
+        self.hide_at_startup();
         let previews = self.previews.borrow();
         for worker in previews.workers() {
             let (frame, state) = worker.take_update();
             if frame.is_none() && state.is_none() {
                 continue;
+            }
+            if let Some(state) = &state {
+                // État de la fenêtre, pour le pilotage.
+                self.control.borrow_mut().previews.insert(worker.source_id.clone(), state.clone());
             }
             let Some(index) = (0..self.cards.row_count())
                 .find(|&i| self.cards.row_data(i).is_some_and(|c| c.id.as_str() == worker.source_id))
@@ -1088,6 +1152,7 @@ impl App {
             sources.retain(|s| s.id == id);
         }
         if sources.is_empty() {
+            self.control.borrow_mut().start_request = None;
             self.toast(&tr!("Ajouter d'abord au moins une source à cette scène."), 2);
             self.flush_pending_repairs();
             return;
@@ -1108,6 +1173,9 @@ impl App {
             let _ = slint::quit_event_loop();
             return;
         }
+        // Démarrage demandé par un programme (pilotage) : son nom est cité,
+        // et l'arrêt automatique pendant un créneau est déjà choisi.
+        let request = self.control.borrow_mut().start_request.take();
         let prepared = match result {
             Ok(prepared) => prepared,
             Err(e) => {
@@ -1202,9 +1270,17 @@ impl App {
                         2,
                     )
                 };
+                self.control.borrow_mut().last_missing = prepared.missing.clone();
+                let message = match &request {
+                    Some(request) => format!("{message} {}", tr!("Demandé par « {} ».", request.client)),
+                    None => message,
+                };
                 // Enregistrement programmé (le message le précise), ou lancé à
-                // la main pendant un créneau (l'arrêt automatique est proposé).
-                self.recording_started(&message, tone);
+                // la main pendant un créneau (l'arrêt automatique est proposé,
+                // ou déjà choisi par le programme qui l'a demandé).
+                self.recording_started(&message, tone, request.map(|r| r.auto_stop));
+                // En arrière-plan, l'enregistrement doit se voir.
+                self.notify_recording_started(&message);
             }
             Err(e) => {
                 self.toast(&tr!("Impossible de démarrer : {}", format!("{e:#}")), 3);
@@ -1357,6 +1433,25 @@ impl App {
         }
         self.set_shutdown_block(false);
         self.set_busy("");
+        {
+            // Bilan pour le pilotage (`recording.stop`).
+            let files: Vec<String> =
+                summaries.iter().flat_map(|s| s.outputs.iter().map(|p| p.display().to_string())).collect();
+            let errors: Vec<Value> = summaries
+                .iter()
+                .filter_map(|s| s.error.as_ref().map(|e| serde_json::json!({ "source": s.name, "error": e })))
+                .collect();
+            let total: u64 = summaries.iter().map(|s| s.file_size).sum();
+            let mut control = self.control.borrow_mut();
+            control.statuses.clear();
+            control.last_stop = Some(serde_json::json!({
+                "recording": false,
+                "files": files,
+                "total_bytes": total,
+                "errors": errors,
+                "reason": reason,
+            }));
+        }
         self.with_bridge(|b| {
             b.set_recording(false);
             b.set_mic_recording(false);
@@ -1418,28 +1513,13 @@ impl App {
         self.show_next_deferred();
     }
 
-    /// Lancé par Windows à l'ouverture de session : la fenêtre est réduite
-    /// dès qu'elle existe (Slint ne peut pas la créer réduite).
-    fn minimize_at_startup(&self) {
-        if !self.minimize_pending.get() {
-            return;
-        }
-        #[cfg(windows)]
-        if self.main_window().is_none() {
-            return;
-        }
-        self.minimize_pending.set(false);
-        if let Some(ui) = self.ui.upgrade() {
-            ui.window().set_minimized(true);
-        }
-    }
-
     fn tick_status(&self) {
         self.update_preview_size();
         self.watch_session_end();
-        self.minimize_at_startup();
         self.tick_schedule();
+        self.tick_background();
         self.tick_mic_test();
+        self.control_tick();
         let statuses: (Vec<SourceStatus>, Vec<PathBuf>) = {
             let mut session = self.session.borrow_mut();
             let Some(session) = session.as_mut() else {
@@ -1457,6 +1537,7 @@ impl App {
             (session.status(), session.outputs())
         };
         let (statuses, outputs) = statuses;
+        self.control.borrow_mut().statuses = statuses.clone();
         self.update_session_record(outputs);
         let joining = self.joining.borrow().clone();
         for status in &statuses {
@@ -2166,20 +2247,25 @@ impl App {
     }
 
     fn request_cancel_conversion(&self) {
+        self.ask(
+            Confirm::CancelConversion,
+            &tr!("Annuler la conversion"),
+            &self.cancel_conversion_text(),
+            &tr!("Arrêter la conversion"),
+        );
+    }
+
+    /// Question avant d'annuler les conversions (interface, pilotage).
+    fn cancel_conversion_text(&self) -> String {
         let remaining = {
             let progress = self.conversion.borrow();
             progress.total.saturating_sub(progress.finished)
         };
-        self.ask(
-            Confirm::CancelConversion,
-            &tr!("Annuler la conversion"),
-            &tr!(
-                "Arrêter la conversion MP4 ({n} fichier restant) ? Le fichier en cours de conversion est effacé ; les MKV d'origine ne sont pas touchés."
-                    | "Arrêter la conversion MP4 ({n} fichiers restants) ? Le fichier en cours de conversion est effacé ; les MKV d'origine ne sont pas touchés."
-                    % remaining
-            ),
-            &tr!("Arrêter la conversion"),
-        );
+        tr!(
+            "Arrêter la conversion MP4 ({n} fichier restant) ? Le fichier en cours de conversion est effacé ; les MKV d'origine ne sont pas touchés."
+                | "Arrêter la conversion MP4 ({n} fichiers restants) ? Le fichier en cours de conversion est effacé ; les MKV d'origine ne sont pas touchés."
+                % remaining
+        )
     }
 
     // ----- Scènes ----------------------------------------------------------
@@ -2225,42 +2311,92 @@ impl App {
             return;
         }
         let mode = bridge.get_sheet();
+        bridge.set_sheet("".into());
+        let active = self.config.borrow().active_scene.clone();
+        match mode.as_str() {
+            "scene-new" => {
+                self.create_scene(&name, true);
+            }
+            "scene-duplicate" => {
+                self.duplicate_scene(&active, &name);
+            }
+            _ => self.rename_scene(&active, &name),
+        }
+    }
+
+    /// Nouvelle scène, vide (interface, pilotage). Renvoie son identifiant.
+    fn create_scene(&self, name: &str, activate: bool) -> String {
+        let scene = Scene::new(name);
+        let id = scene.id.clone();
         {
             let mut config = self.config.borrow_mut();
-            match mode.as_str() {
-                "scene-new" => {
-                    let scene = Scene::new(&name);
-                    config.active_scene = scene.id.clone();
-                    config.scenes.push(scene);
-                }
-                "scene-duplicate" => {
-                    let id = config.active_scene.clone();
-                    config.duplicate_scene(&id, &name);
-                }
-                _ => config.active_scene_mut().name = name,
+            if activate {
+                config.active_scene = id.clone();
             }
+            config.scenes.push(scene);
         }
-        bridge.set_sheet("".into());
+        self.after_scene_change(activate);
+        id
+    }
+
+    fn rename_scene(&self, id: &str, name: &str) {
+        if let Some(scene) = self.config.borrow_mut().scenes.iter_mut().find(|s| s.id == id) {
+            scene.name = name.to_string();
+        }
+        self.after_scene_change(false);
+    }
+
+    /// Duplique une scène, par référence ; la copie devient la scène en
+    /// cours. Renvoie son identifiant.
+    fn duplicate_scene(&self, id: &str, name: &str) -> Option<String> {
+        let copy = self.config.borrow_mut().duplicate_scene(id, name);
+        if copy.is_some() {
+            self.after_scene_change(true);
+        }
+        copy
+    }
+
+    /// Supprime une scène (jamais la dernière), ses programmations et les
+    /// sources qui ne sont dans aucune autre.
+    fn delete_scene(&self, id: &str) {
+        if !self.config.borrow_mut().delete_scene(id) {
+            return;
+        }
         self.save();
-        let changed_scene = mode != "scene-rename";
-        if changed_scene {
-            bridge.set_selected_source(-1);
+        self.refresh_all();
+        self.restart_previews();
+    }
+
+    /// Après une modification des scènes : enregistrée et affichée ; si la
+    /// scène en cours a changé, la sélection et les aperçus suivent.
+    fn after_scene_change(&self, active_changed: bool) {
+        self.save();
+        if active_changed {
+            self.with_bridge(|b| b.set_selected_source(-1));
         }
         self.refresh_all();
-        if changed_scene {
+        if active_changed {
             self.restart_previews();
         }
     }
 
     fn request_delete_scene(&self) {
-        let (id, name) = {
-            let config = self.config.borrow();
-            (config.active_scene.clone(), config.active_scene().name.clone())
-        };
+        let id = self.config.borrow().active_scene.clone();
+        self.ask(
+            Confirm::DeleteScene,
+            &tr!("Supprimer la scène"),
+            &self.delete_scene_text(&id),
+            &tr!("Bouton : supprimer une scène" => "Supprimer"),
+        );
+    }
+
+    /// Question avant de supprimer une scène (interface, pilotage).
+    fn delete_scene_text(&self, id: &str) -> String {
+        let name = self.config.borrow().scene(id).map(|s| s.name.clone()).unwrap_or_default();
         // Les sources partagées avec d'autres scènes y restent.
         let (total, only_here) = {
             let config = self.config.borrow();
-            (config.scene(&id).map_or(0, |s| s.source_ids.len()), config.sources_only_in(&id).len())
+            (config.scene(id).map_or(0, |s| s.source_ids.len()), config.sources_only_in(id).len())
         };
         let mut text = vec![if total == 0 {
             tr!("La scène « {} » sera supprimée.", name)
@@ -2276,17 +2412,12 @@ impl App {
                 name
             )
         }];
-        let schedules = self.scene_schedule_count(&id);
+        let schedules = self.scene_schedule_count(id);
         if schedules > 0 {
             text.push(tr!("Sa programmation aussi." | "Ses {n} programmations aussi." % schedules));
         }
         text.push(tr!("Les profils de navigateur restent sur le disque."));
-        self.ask(
-            Confirm::DeleteScene,
-            &tr!("Supprimer la scène"),
-            &text.join(" "),
-            &tr!("Bouton : supprimer une scène" => "Supprimer"),
-        );
+        text.join(" ")
     }
 
     // ----- Sources ---------------------------------------------------------
@@ -2321,26 +2452,17 @@ impl App {
         };
         let bridge = ui.global::<Bridge>();
         let index = bridge.get_browser_index().max(0) as usize;
-        let browser = {
-            let browsers = self.browsers.borrow();
-            match browsers.get(index) {
-                Some(b) => BrowserRef { name: b.name.clone(), exe_path: b.exe_path.clone(), family: b.family },
-                None => {
-                    let path = PathBuf::from(bridge.get_browser_path().trim().trim_matches('"'));
-                    if !path.exists() {
-                        self.toast(&tr!("Ce fichier de navigateur n'existe pas."), 3);
+        let installed = self.browsers.borrow().get(index).cloned();
+        let browser = match installed {
+            Some(b) => BrowserRef { name: b.name, exe_path: b.exe_path, family: b.family },
+            None => {
+                let path = PathBuf::from(bridge.get_browser_path().trim().trim_matches('"'));
+                match self.browser_from_path(&path) {
+                    Ok(browser) => browser,
+                    Err((message, tone)) => {
+                        self.toast(&message, tone);
                         return;
                     }
-                    if is_tor_browser(&path) {
-                        self.toast(
-                            &tr!("Tor Browser s'ajoute comme source application (il efface tout à la fermeture)."),
-                            2,
-                        );
-                        return;
-                    }
-                    let family = classify_executable(&path).unwrap_or(BrowserFamily::Chromium);
-                    let name = program_name(&path).map(|n| format::capitalize(&n)).unwrap_or_else(|| tr!("Navigateur"));
-                    BrowserRef { name, exe_path: path, family }
                 }
             }
         };
@@ -2349,19 +2471,41 @@ impl App {
             return;
         }
         let url = bridge.get_new_url().to_string();
-        let source = Source::browser(
-            &bridge.get_new_name(),
-            browser,
-            Some(url.as_str()).filter(|u| !u.trim().is_empty()),
-            &self.profiles_root,
-        );
         let open_now = bridge.get_open_now();
-        let name = source.name.clone();
-        self.config.borrow_mut().add_source(source.clone());
         bridge.set_sheet("".into());
-        self.save();
-        self.refresh_all();
-        self.restart_previews();
+        let scene = self.config.borrow().active_scene.clone();
+        self.add_browser_source(&bridge.get_new_name(), browser, Some(url.as_str()), open_now, &scene);
+    }
+
+    /// Navigateur indiqué par son exécutable (« Autre navigateur… »,
+    /// pilotage). L'erreur : message et couleur.
+    fn browser_from_path(&self, path: &Path) -> Result<BrowserRef, (String, i32)> {
+        if !path.exists() {
+            return Err((tr!("Ce fichier de navigateur n'existe pas."), 3));
+        }
+        if is_tor_browser(path) {
+            return Err((tr!("Tor Browser s'ajoute comme source application (il efface tout à la fermeture)."), 2));
+        }
+        let family = classify_executable(path).unwrap_or(BrowserFamily::Chromium);
+        let name = program_name(path).map(|n| format::capitalize(&n)).unwrap_or_else(|| tr!("Navigateur"));
+        Ok(BrowserRef { name, exe_path: path.to_path_buf(), family })
+    }
+
+    /// Ajoute une source navigateur à une scène, et ouvre le navigateur si
+    /// demandé (pour s'y connecter). Renvoie son identifiant.
+    fn add_browser_source(
+        &self,
+        name: &str,
+        browser: BrowserRef,
+        url: Option<&str>,
+        open_now: bool,
+        scene_id: &str,
+    ) -> String {
+        let source = Source::browser(name, browser, url.filter(|u| !u.trim().is_empty()), &self.profiles_root);
+        let id = source.id.clone();
+        let name = source.name.clone();
+        self.config.borrow_mut().add_source_to(scene_id, source.clone());
+        self.after_source_change(scene_id);
         if open_now {
             match resolve::launch(&source) {
                 Ok(()) => self.toast(
@@ -2376,6 +2520,17 @@ impl App {
             }
         } else {
             self.toast(&tr!("« {} » ajoutée.", name), 1);
+        }
+        id
+    }
+
+    /// Après une modification des sources d'une scène : enregistrée et
+    /// affichée (aperçus relancés si c'est la scène en cours).
+    fn after_source_change(&self, scene_id: &str) {
+        self.save();
+        self.refresh_all();
+        if self.config.borrow().active_scene == scene_id {
+            self.restart_previews();
         }
     }
 
@@ -2434,15 +2589,33 @@ impl App {
             self.toast(&tr!("Nom de source manquant."), 2);
             return;
         }
-        let source =
-            Source::application(&bridge.get_new_name(), &window, bridge.get_relaunch(), bridge.get_capture_cursor());
-        let name = source.name.clone();
-        self.config.borrow_mut().add_source(source);
         bridge.set_sheet("".into());
-        self.save();
-        self.refresh_all();
-        self.restart_previews();
+        let scene = self.config.borrow().active_scene.clone();
+        self.add_application_source(
+            &bridge.get_new_name(),
+            &window,
+            bridge.get_relaunch(),
+            bridge.get_capture_cursor(),
+            &scene,
+        );
+    }
+
+    /// Ajoute une source application à une scène. Renvoie son identifiant.
+    fn add_application_source(
+        &self,
+        name: &str,
+        window: &WindowInfo,
+        relaunch: bool,
+        capture_cursor: bool,
+        scene_id: &str,
+    ) -> String {
+        let source = Source::application(name, window, relaunch, capture_cursor);
+        let id = source.id.clone();
+        let name = source.name.clone();
+        self.config.borrow_mut().add_source_to(scene_id, source);
+        self.after_source_change(scene_id);
         self.toast(&tr!("« {} » ajoutée.", name), 1);
+        id
     }
 
     /// Source de la scène active.
@@ -2462,16 +2635,28 @@ impl App {
         let Some(source) = self.selected_source() else {
             return;
         };
+        let scene = self.config.borrow().active_scene.clone();
+        self.ask(
+            Confirm::RemoveSource(source.id.clone()),
+            &tr!("Supprimer la source"),
+            &self.remove_source_text(&source, &scene),
+            &tr!("Bouton : retirer une source" => "Supprimer"),
+        );
+    }
+
+    /// Question avant de retirer une source d'une scène (interface,
+    /// pilotage).
+    fn remove_source_text(&self, source: &Source, scene_id: &str) -> String {
         let others: Vec<String> = {
             let config = self.config.borrow();
             config
                 .scenes_with(&source.id)
                 .into_iter()
-                .filter(|s| s.id != config.active_scene)
+                .filter(|s| s.id != scene_id)
                 .map(|s| tr!("« {} »", s.name))
                 .collect()
         };
-        let text = if others.is_empty() {
+        if others.is_empty() {
             let removed = tr!("La source « {} » sera supprimée.", source.name);
             if source.is_browser() {
                 format!("{removed} {}", tr!("Son profil de navigateur reste sur le disque."))
@@ -2484,13 +2669,7 @@ impl App {
                 source.name,
                 format::join_list(&others)
             )
-        };
-        self.ask(
-            Confirm::RemoveSource(source.id.clone()),
-            &tr!("Supprimer la source"),
-            &text,
-            &tr!("Bouton : retirer une source" => "Supprimer"),
-        );
+        }
     }
 
     /// Mémorise la source sélectionnée, pour la coller dans une autre scène.
@@ -2655,6 +2834,8 @@ impl App {
 
     fn finish_open_scene_windows(&self, auto: bool, opening: Vec<String>, failed: Vec<String>, missing: Vec<String>) {
         self.opening_windows.set(false);
+        self.control.borrow_mut().last_open =
+            Some(serde_json::json!({ "opened": opening, "failed": failed, "missing": missing }));
         if !failed.is_empty() {
             self.toast(
                 &tr!("Impossible d'ouvrir : {} (programme introuvable ? voir le journal).", failed.join(", ")),
@@ -2802,6 +2983,12 @@ impl App {
         let s_open_windows = s.open_windows_at_launch;
         let s_close_browsers = s.close_browsers_at_exit;
         let s_startup = s.launch_at_startup;
+        let s_remote = s.remote_control;
+        let s_close = match s.close_with_schedules {
+            CloseChoice::Ask => 0,
+            CloseChoice::Background => 1,
+            CloseChoice::Quit => 2,
+        };
         let mic_labels: Vec<SharedString> = mics.iter().map(|(_, name)| name.as_str().into()).collect();
         *self.mic_choices.borrow_mut() = mics;
         drop(config);
@@ -2832,6 +3019,8 @@ impl App {
             b.set_settings_open_windows(s_open_windows);
             b.set_settings_close_browsers(s_close_browsers);
             b.set_settings_startup(s_startup);
+            b.set_settings_remote_control(s_remote);
+            b.set_settings_close_index(s_close);
             b.set_settings_mic(mic_enabled);
             b.set_mic_choices(ModelRc::new(VecModel::from(mic_labels)));
             b.set_mic_index(mic_index as i32);
@@ -2906,84 +3095,96 @@ impl App {
             b.set_settings_error(tr!("Un même raccourci ne peut servir qu'à une seule action.").into());
             return;
         }
-        let previews_before;
-        let previews_after;
-        let updates_before;
-        let updates_after;
-        let startup_changed;
-        let display_changed;
-        {
-            let mut config = self.config.borrow_mut();
-            let s = &mut config.settings;
-            if let Some(&(w, h)) = RESOLUTIONS.get(b.get_resolution_index().max(0) as usize) {
-                s.video.width = w;
-                s.video.height = h;
-            }
-            if let Some(&fps) = FRAME_RATES.get(b.get_fps_index().max(0) as usize) {
-                s.video.fps = fps;
-            }
-            s.video.bitrate_kbps = bitrate;
-            s.video.codec = if b.get_codec_index() == 1 { Codec::Hevc } else { Codec::H264 };
-            s.video.hardware =
-                HARDWARE.get(b.get_hardware_index().max(0) as usize).copied().unwrap_or(HardwarePreference::Auto);
-            if let Some(&audio) = AUDIO_BITRATES.get(b.get_audio_index().max(0) as usize) {
-                s.audio.bitrate_kbps = audio;
-            }
-            s.output_dir = PathBuf::from(output_dir);
-            s.filename_template = b.get_template().trim().to_string();
-            previews_before = s.previews;
-            s.previews = b.get_settings_previews();
-            previews_after = s.previews;
-            s.convert_to_mp4 = b.get_settings_convert();
-            updates_before = update_choice(s);
-            let update_index = b.get_settings_update_index();
-            s.check_updates = update_index != UPDATES_OFF;
-            if s.check_updates {
-                let chosen = if update_index == 1 { UpdateChannel::Beta } else { UpdateChannel::Stable };
-                // Tant que le choix reste celui de la version en cours, rien
-                // n'est figé : une bêta passera seule aux versions stables une
-                // fois la version stable installée.
-                if s.update_channel.is_some() || chosen != UpdateChannel::of_version(VERSION) {
-                    s.update_channel = Some(chosen);
-                }
-            }
-            updates_after = update_choice(s);
-            s.open_windows_at_launch = b.get_settings_open_windows();
-            s.close_browsers_at_exit = b.get_settings_close_browsers();
-            startup_changed = s.launch_at_startup != b.get_settings_startup();
-            s.launch_at_startup = b.get_settings_startup();
-            let language = match b.get_settings_language_index() {
-                1 => LanguageChoice::French,
-                2 => LanguageChoice::English,
-                _ => LanguageChoice::Auto,
-            };
-            let clock = match b.get_settings_clock_index() {
-                1 => ClockChoice::H24,
-                2 => ClockChoice::H12,
-                _ => ClockChoice::Auto,
-            };
-            display_changed = (s.language, s.clock) != (language, clock);
-            s.language = language;
-            s.clock = clock;
-            s.microphone.enabled = b.get_settings_mic();
-            if let Some((id, name)) = self.mic_choices.borrow().get(b.get_mic_index().max(0) as usize) {
-                if *id != s.microphone.device_id {
-                    s.microphone.device_id = id.clone();
-                    s.microphone.device_name = if id.is_empty() { String::new() } else { name.clone() };
-                }
-            }
-            let [record, show, previews] = chosen;
-            s.hotkeys.toggle_recording = record;
-            s.hotkeys.show_window = show;
-            s.hotkeys.toggle_previews = previews;
+        let mut s = self.config.borrow().settings.clone();
+        if let Some(&(w, h)) = RESOLUTIONS.get(b.get_resolution_index().max(0) as usize) {
+            s.video.width = w;
+            s.video.height = h;
         }
+        if let Some(&fps) = FRAME_RATES.get(b.get_fps_index().max(0) as usize) {
+            s.video.fps = fps;
+        }
+        s.video.bitrate_kbps = bitrate;
+        s.video.codec = if b.get_codec_index() == 1 { Codec::Hevc } else { Codec::H264 };
+        s.video.hardware =
+            HARDWARE.get(b.get_hardware_index().max(0) as usize).copied().unwrap_or(HardwarePreference::Auto);
+        if let Some(&audio) = AUDIO_BITRATES.get(b.get_audio_index().max(0) as usize) {
+            s.audio.bitrate_kbps = audio;
+        }
+        s.output_dir = PathBuf::from(output_dir);
+        s.filename_template = b.get_template().trim().to_string();
+        s.previews = b.get_settings_previews();
+        s.convert_to_mp4 = b.get_settings_convert();
+        let update_index = b.get_settings_update_index();
+        s.check_updates = update_index != UPDATES_OFF;
+        if s.check_updates {
+            let chosen = if update_index == 1 { UpdateChannel::Beta } else { UpdateChannel::Stable };
+            // Tant que le choix reste celui de la version en cours, rien
+            // n'est figé : une bêta passera seule aux versions stables une
+            // fois la version stable installée.
+            if s.update_channel.is_some() || chosen != UpdateChannel::of_version(VERSION) {
+                s.update_channel = Some(chosen);
+            }
+        }
+        s.open_windows_at_launch = b.get_settings_open_windows();
+        s.close_browsers_at_exit = b.get_settings_close_browsers();
+        s.launch_at_startup = b.get_settings_startup();
+        s.remote_control = b.get_settings_remote_control();
+        s.close_with_schedules = match b.get_settings_close_index() {
+            1 => CloseChoice::Background,
+            2 => CloseChoice::Quit,
+            _ => CloseChoice::Ask,
+        };
+        let language = match b.get_settings_language_index() {
+            1 => LanguageChoice::French,
+            2 => LanguageChoice::English,
+            _ => LanguageChoice::Auto,
+        };
+        let clock = match b.get_settings_clock_index() {
+            1 => ClockChoice::H24,
+            2 => ClockChoice::H12,
+            _ => ClockChoice::Auto,
+        };
+        s.language = language;
+        s.clock = clock;
+        s.microphone.enabled = b.get_settings_mic();
+        if let Some((id, name)) = self.mic_choices.borrow().get(b.get_mic_index().max(0) as usize) {
+            if *id != s.microphone.device_id {
+                s.microphone.device_id = id.clone();
+                s.microphone.device_name = if id.is_empty() { String::new() } else { name.clone() };
+            }
+        }
+        let [record, show, previews] = chosen;
+        s.hotkeys.toggle_recording = record;
+        s.hotkeys.show_window = show;
+        s.hotkeys.toggle_previews = previews;
         b.set_sheet("".into());
+        self.apply_settings(s);
+    }
+
+    /// Applique de nouveaux réglages (fenêtre des réglages, pilotage) :
+    /// enregistrés, puis suivis partout (langue, aperçus, raccourcis,
+    /// démarrage de Windows, canal de pilotage, mises à jour).
+    fn apply_settings(&self, new: Settings) {
+        let (previews_changed, display_changed, startup_changed, remote_changed, updates_before, updates_after) = {
+            let mut config = self.config.borrow_mut();
+            let old = &config.settings;
+            let changes = (
+                old.previews != new.previews,
+                (old.language, old.clock) != (new.language, new.clock),
+                old.launch_at_startup != new.launch_at_startup,
+                old.remote_control != new.remote_control,
+                update_choice(old),
+                update_choice(&new),
+            );
+            config.settings = new;
+            changes
+        };
         self.save();
         if display_changed {
             self.apply_language_and_clock();
         }
         self.refresh_all();
-        if previews_before != previews_after || display_changed {
+        if previews_changed || display_changed {
             self.restart_previews();
         }
         if display_changed {
@@ -2992,6 +3193,9 @@ impl App {
         self.register_hotkeys();
         if startup_changed {
             self.apply_launch_at_startup(true);
+        }
+        if remote_changed {
+            self.apply_remote_control();
         }
         self.toast(&tr!("Réglages enregistrés."), 1);
         if updates_after != updates_before && updates_after != UPDATES_OFF {
@@ -3058,6 +3262,10 @@ impl App {
         if self.report_closing() {
             return;
         }
+        if matches!(*self.confirm.borrow(), Some(Confirm::EnableMicrophone)) {
+            log::info!("pilotage : activation du micro refusée");
+            self.control.borrow_mut().mic_answer = Some(false);
+        }
         self.confirm.borrow_mut().take();
         self.quit_with_schedules.set(false);
         if self.incident.borrow_mut().take().is_some() {
@@ -3075,7 +3283,10 @@ impl App {
     }
 
     fn ask(&self, action: Confirm, title: &str, text: &str, button: &str) {
-        let danger = !matches!(action, Confirm::InstallUpdate | Confirm::ResumeAfterSleep(_) | Confirm::RepairFiles(_));
+        let danger = !matches!(
+            action,
+            Confirm::InstallUpdate | Confirm::ResumeAfterSleep(_) | Confirm::RepairFiles(_) | Confirm::EnableMicrophone
+        );
         *self.confirm.borrow_mut() = Some(action);
         self.with_bridge(|b| {
             b.set_confirm_danger(danger);
@@ -3092,18 +3303,12 @@ impl App {
         match action {
             Some(Confirm::DeleteScene) | Some(Confirm::RemoveSource(_)) if self.locked() => {}
             Some(Confirm::DeleteScene) => {
-                {
-                    let mut config = self.config.borrow_mut();
-                    if config.scenes.len() <= 1 {
-                        return;
-                    }
-                    let id = config.active_scene.clone();
-                    config.scenes.retain(|s| s.id != id);
-                    config.normalize();
-                }
-                self.save();
-                self.refresh_all();
-                self.restart_previews();
+                let id = self.config.borrow().active_scene.clone();
+                self.delete_scene(&id);
+            }
+            Some(Confirm::EnableMicrophone) => {
+                log::info!("pilotage : activation du micro acceptée");
+                self.control.borrow_mut().mic_answer = Some(true);
             }
             Some(Confirm::RemoveSource(id)) => {
                 self.config.borrow_mut().remove_source(&id);
@@ -3131,9 +3336,7 @@ impl App {
             Some(Confirm::QuitWithSchedules) => {
                 self.quit_with_schedules.set(true);
                 // La suite comme une fermeture normale (conversion en cours…).
-                if matches!(self.close_requested(), CloseRequestResponse::HideWindow) {
-                    let _ = slint::quit_event_loop();
-                }
+                self.close_requested();
             }
             Some(Confirm::CancelConversion) => {
                 if let Some(converter) = self.converter.borrow().as_ref() {
@@ -3164,8 +3367,26 @@ impl App {
         }
     }
 
+    /// Croix de la fenêtre (ou Alt+F4, ou « Fermer la fenêtre » de la barre
+    /// des tâches).
     fn close_requested(&self) -> CloseRequestResponse {
+        self.quit_requested(false)
+    }
+
+    /// Fermeture demandée par la croix de la fenêtre, ou par « Quitter
+    /// Polyptyque » sur l'icône de la zone de notification (`from_tray`).
+    /// Une programmation prévue fait passer en arrière-plan ou demande quoi
+    /// faire, selon le réglage ; un enregistrement ou une conversion en
+    /// cours demande toujours confirmation (la fenêtre revient pour cela).
+    fn quit_requested(&self, from_tray: bool) -> CloseRequestResponse {
+        let choice = self.config.borrow().settings.close_with_schedules;
+        let schedules = !self.quit_with_schedules.get() && self.schedules_need_polyptyque();
+        if !from_tray && schedules && choice == CloseChoice::Background {
+            self.hide_to_background();
+            return CloseRequestResponse::KeepWindowShown;
+        }
         if self.busy.get() {
+            self.show_from_background();
             self.toast(&tr!("Opération en cours : Polyptyque pourra être fermé dans un instant."), 2);
             return CloseRequestResponse::KeepWindowShown;
         }
@@ -3183,16 +3404,30 @@ impl App {
                 text.push(' ');
                 text.push_str(&tr!("Les programmations ne se lancent pas tant que Polyptyque est fermé."));
             }
+            self.show_from_background();
             self.ask(Confirm::QuitWhileRecording, &tr!("Enregistrement en cours"), &text, &tr!("Arrêter et quitter"));
             return CloseRequestResponse::KeepWindowShown;
         }
-        if !self.quit_with_schedules.get() {
-            if let Some(text) = self.quit_schedule_warning() {
-                self.ask(Confirm::QuitWithSchedules, &tr!("Programmation active"), &text, &tr!("Quitter quand même"));
+        // « Quitter » retenu : plus d'avertissement pour les programmations.
+        if schedules && choice != CloseChoice::Quit {
+            if let Some(next) = self.quit_schedule_next() {
+                self.show_from_background();
+                if from_tray {
+                    let text = self.quit_schedule_warning(&next);
+                    self.ask(
+                        Confirm::QuitWithSchedules,
+                        &tr!("Programmation active"),
+                        &text,
+                        &tr!("Quitter quand même"),
+                    );
+                } else {
+                    self.ask_close_with_schedules(&next);
+                }
                 return CloseRequestResponse::KeepWindowShown;
             }
         }
         if self.with_bridge_value(|b| b.get_converting()) {
+            self.show_from_background();
             self.ask(
                 Confirm::QuitWhileConverting,
                 &tr!("Conversion en cours"),
@@ -3204,6 +3439,7 @@ impl App {
         self.previews.borrow_mut().stop();
         self.meters.borrow_mut().stop();
         self.mic_meter.borrow_mut().take();
+        let _ = slint::quit_event_loop();
         CloseRequestResponse::HideWindow
     }
 
@@ -3276,6 +3512,9 @@ impl App {
             SessionEnd::Ending => {
                 self.session_ending.set(true);
                 self.finalize_now();
+                // Windows arrête Polyptyque sans revenir dans `main` : fin
+                // normale tout de même.
+                polyptyque_core::launch::end(&paths::launch_marker_file());
                 false
             }
             // Traités juste après, hors du traitement du message de Windows.
@@ -3391,12 +3630,14 @@ impl App {
         log::info!("raccourci : {action:?}");
         match action {
             HotkeyAction::ToggleRecording => self.start_stop(),
-            HotkeyAction::ShowWindow => {
-                if let Some(ui) = self.ui.upgrade() {
+            HotkeyAction::ShowWindow => match self.ui.upgrade() {
+                Some(_) if self.in_background.get() => self.show_from_background(),
+                Some(ui) => {
                     let window = ui.window();
                     window.set_minimized(!window.is_minimized());
                 }
-            }
+                None => {}
+            },
             HotkeyAction::TogglePreviews => self.toggle_previews(),
         }
     }

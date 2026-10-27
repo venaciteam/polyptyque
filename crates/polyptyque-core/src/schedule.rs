@@ -768,7 +768,7 @@ mod tests {
         let now = paris(2026, 10, 25, 10, 0);
         assert_eq!(s.next_slot(now, &Paris).unwrap().start, paris(2027, 10, 31, 21, 0));
         assert!(s.is_active(now, &Paris));
-        assert!(any_active(&[s.clone()], now, &Paris));
+        assert!(any_active(std::slice::from_ref(&s), now, &Paris));
         assert_eq!(next_slot(&[s], now, &Paris).unwrap().day, date(2027, 10, 31));
     }
 

@@ -88,6 +88,12 @@ impl Config {
         (Config::default(), Some(format!("{problem} {}", tr!("Aucune sauvegarde valide : réglages par défaut."))))
     }
 
+    /// Lit la configuration sans rien écrire ni restaurer (mode commande) :
+    /// `None` si le fichier est absent ou abîmé.
+    pub fn read(path: &Path) -> Option<Config> {
+        fs::read_to_string(path).ok().and_then(|text| parse(&text).ok())
+    }
+
     /// Enregistre la configuration sans jamais laisser un fichier à moitié
     /// écrit. La version précédente est gardée (`config.toml.precedent`),
     /// ainsi qu'une copie par jour dans `sauvegardes` (les cinq derniers
@@ -210,29 +216,63 @@ impl Config {
         self.scenes.iter().filter(|s| s.contains(source_id)).collect()
     }
 
+    fn scene_mut(&mut self, id: &str) -> Option<&mut Scene> {
+        self.scenes.iter_mut().find(|s| s.id == id)
+    }
+
     /// Ajoute une nouvelle source à la fin de la scène active.
     pub fn add_source(&mut self, source: Source) {
-        self.active_scene_mut().source_ids.push(source.id.clone());
+        let scene = self.active_scene().id.clone();
+        self.add_source_to(&scene, source);
+    }
+
+    /// Ajoute une nouvelle source à la fin d'une scène (faux si la scène
+    /// n'existe pas).
+    pub fn add_source_to(&mut self, scene_id: &str, source: Source) -> bool {
+        let Some(scene) = self.scene_mut(scene_id) else {
+            return false;
+        };
+        scene.source_ids.push(source.id.clone());
         self.sources.push(source);
+        true
     }
 
     /// Colle une source existante à la fin de la scène active : c'est la
     /// même source (même fenêtre, même profil), pas une copie.
     pub fn paste_source(&mut self, source_id: &str) -> Result<(), PasteError> {
+        let scene = self.active_scene().id.clone();
+        self.link_source(&scene, source_id)
+    }
+
+    /// Ajoute une source existante à la fin d'une scène (même source,
+    /// partagée).
+    pub fn link_source(&mut self, scene_id: &str, source_id: &str) -> Result<(), PasteError> {
         if self.source(source_id).is_none() {
             return Err(PasteError::Missing);
         }
-        if self.active_scene().contains(source_id) {
+        let Some(scene) = self.scene_mut(scene_id) else {
+            return Err(PasteError::Missing);
+        };
+        if scene.contains(source_id) {
             return Err(PasteError::AlreadyInScene);
         }
-        self.active_scene_mut().source_ids.push(source_id.to_string());
+        scene.source_ids.push(source_id.to_string());
         Ok(())
     }
 
     /// Déplace la source de la position `from` à la position `to` dans la
     /// scène active ; les autres se décalent. Faux si rien ne change.
     pub fn move_source(&mut self, from: usize, to: usize) -> bool {
-        let ids = &mut self.active_scene_mut().source_ids;
+        let scene = self.active_scene().id.clone();
+        self.move_source_in(&scene, from, to)
+    }
+
+    /// Comme [`Config::move_source`], dans une scène donnée.
+    pub fn move_source_in(&mut self, scene_id: &str, from: usize, to: usize) -> bool {
+        let Some(scene) = self.scene_mut(scene_id) else {
+            return false;
+        };
+        let ids = &mut scene.source_ids;
         if from == to || from >= ids.len() || to >= ids.len() {
             return false;
         }
@@ -244,8 +284,28 @@ impl Config {
     /// Retire une source de la scène active seulement. Si elle n'est plus
     /// dans aucune scène, elle disparaît (son profil reste sur le disque).
     pub fn remove_source(&mut self, source_id: &str) {
-        self.active_scene_mut().source_ids.retain(|id| id != source_id);
+        let scene = self.active_scene().id.clone();
+        self.remove_source_from(&scene, source_id);
+    }
+
+    /// Comme [`Config::remove_source`], dans une scène donnée.
+    pub fn remove_source_from(&mut self, scene_id: &str, source_id: &str) {
+        if let Some(scene) = self.scene_mut(scene_id) {
+            scene.source_ids.retain(|id| id != source_id);
+        }
         self.normalize();
+    }
+
+    /// Supprime une scène, avec ses programmations et les sources qui ne
+    /// sont dans aucune autre scène. Faux si c'est la dernière (il en reste
+    /// toujours une) ou si elle n'existe pas.
+    pub fn delete_scene(&mut self, scene_id: &str) -> bool {
+        if self.scenes.len() <= 1 || self.scene(scene_id).is_none() {
+            return false;
+        }
+        self.scenes.retain(|s| s.id != scene_id);
+        self.normalize();
+        true
     }
 
     /// Nouvelle scène avec les mêmes sources (par référence, dans le même
@@ -516,10 +576,17 @@ pub struct Settings {
     /// Lancer Polyptyque à l'ouverture de la session Windows (réduit), pour
     /// que les programmations survivent à un redémarrage.
     pub launch_at_startup: bool,
+    /// Fermeture de la fenêtre alors qu'une programmation doit encore
+    /// lancer un enregistrement.
+    pub close_with_schedules: CloseChoice,
     /// Langue de l'interface (voir « Langues et formats »).
     pub language: LanguageChoice,
     /// Heures affichées et saisies sur 24 h ou 12 h.
     pub clock: ClockChoice,
+    /// Pilotage par d'autres programmes de cet ordinateur (assistant IA,
+    /// Stream Deck) par le canal de commande. Désactivé par défaut ; seule
+    /// l'interface peut l'activer.
+    pub remote_control: bool,
     pub video: VideoSettings,
     pub audio: AudioSettings,
     pub microphone: MicrophoneSettings,
@@ -538,8 +605,10 @@ impl Default for Settings {
             open_windows_at_launch: true,
             close_browsers_at_exit: true,
             launch_at_startup: false,
+            close_with_schedules: CloseChoice::Ask,
             language: LanguageChoice::Auto,
             clock: ClockChoice::Auto,
+            remote_control: false,
             video: VideoSettings::default(),
             audio: AudioSettings::default(),
             microphone: MicrophoneSettings::default(),
@@ -577,6 +646,21 @@ pub enum ClockChoice {
     H24,
     #[serde(rename = "12h")]
     H12,
+}
+
+/// Fermeture de la fenêtre alors qu'une programmation doit encore lancer
+/// un enregistrement : Polyptyque doit rester ouvert pour cela.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CloseChoice {
+    /// Poser la question à chaque fois.
+    #[default]
+    Ask,
+    /// Continuer en arrière-plan, dans la zone de notification.
+    Background,
+    /// Quitter, sans autre avertissement que ceux d'un enregistrement ou
+    /// d'une conversion en cours.
+    Quit,
 }
 
 /// Versions proposées par la recherche de mises à jour.
@@ -960,7 +1044,17 @@ mod tests {
         assert_eq!(config.settings.hotkeys.toggle_recording, "Ctrl+Maj+F9");
         assert_eq!(config.settings.update_channel, None);
         assert!(!config.settings.launch_at_startup);
+        assert_eq!(config.settings.close_with_schedules, CloseChoice::Ask);
         assert!(config.schedules.is_empty());
+    }
+
+    #[test]
+    fn close_choice_is_written_in_words() {
+        let mut settings = Settings { close_with_schedules: CloseChoice::Background, ..Settings::default() };
+        let text = toml::to_string(&settings).unwrap();
+        assert!(text.contains("close_with_schedules = \"background\""));
+        settings = toml::from_str(&text.replace("\"background\"", "\"quit\"")).unwrap();
+        assert_eq!(settings.close_with_schedules, CloseChoice::Quit);
     }
 
     #[test]
@@ -1149,6 +1243,36 @@ name = "Archive"
         assert_eq!(config.sources.len(), 2);
         assert_eq!(config.active_scene().source_ids.len(), 2);
         assert_eq!(config.active_scene().source_ids[0], firefox);
+    }
+
+    #[test]
+    fn edits_a_scene_other_than_the_active_one() {
+        let mut config = sample();
+        let firefox = config.sources[0].id.clone();
+        let first = config.active_scene.clone();
+        let other = Scene::new("Archive");
+        let other_id = other.id.clone();
+        config.scenes.push(other);
+        // La scène active ne change pas.
+        assert_eq!(config.link_source(&other_id, &firefox), Ok(()));
+        assert_eq!(config.link_source(&other_id, &firefox), Err(PasteError::AlreadyInScene));
+        assert_eq!(config.link_source("inconnue", &firefox), Err(PasteError::Missing));
+        let discord = Source { id: new_id(), name: "Discord".into(), ..config.sources[1].clone() };
+        let discord_id = discord.id.clone();
+        assert!(config.add_source_to(&other_id, discord));
+        assert!(!config.add_source_to("inconnue", config.sources[0].clone()));
+        assert_eq!(config.scene(&other_id).unwrap().source_ids, [firefox.clone(), discord_id.clone()]);
+        assert!(config.move_source_in(&other_id, 1, 0));
+        assert_eq!(config.scene(&other_id).unwrap().source_ids, [discord_id.clone(), firefox.clone()]);
+        assert_eq!(config.active_scene, first);
+        // Retirée d'une scène, elle reste dans l'autre.
+        config.remove_source_from(&other_id, &firefox);
+        assert!(config.source(&firefox).is_some());
+        // Supprimer la scène emporte la source qui n'était que là.
+        assert!(config.delete_scene(&other_id));
+        assert!(config.source(&discord_id).is_none());
+        // La dernière scène reste.
+        assert!(!config.delete_scene(&first));
     }
 
     #[test]

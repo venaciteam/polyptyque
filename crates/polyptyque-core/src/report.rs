@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 
-use crate::naming;
+use crate::{launch, naming};
 
 /// Journaux des derniers lancements repris : un plantage se lit dans celui
 /// du lancement précédent.
@@ -32,6 +32,107 @@ pub struct ReportInfo {
     pub graphics: Vec<String>,
     /// Résumé des réglages, sans aucun chemin.
     pub settings: Vec<String>,
+    /// Erreurs récentes du pilote graphique et plantages de Polyptyque ou de
+    /// FFmpeg, lus dans les journaux du système (voir [`parse_events`]) ;
+    /// `None` quand le système ne permet pas de les lire.
+    pub driver_events: Option<Vec<String>>,
+}
+
+/// Période des erreurs du pilote graphique reprises dans le rapport.
+pub const DRIVER_EVENTS_DAYS: u32 = 7;
+/// Au plus autant d'événements du système dans le rapport (les plus récents).
+pub const DRIVER_EVENTS_MAX: usize = 40;
+
+/// Un événement d'un journal de Windows, tel que l'exporte
+/// `wevtutil qe … /f:xml`.
+#[derive(Debug, PartialEq)]
+pub struct SystemEvent {
+    /// Heure locale : « 2026-10-27 14:48:13 ».
+    pub time: String,
+    pub provider: String,
+    pub id: String,
+    /// Valeurs de l'événement (`<Data>`), espaces regroupés.
+    pub data: Vec<String>,
+}
+
+impl SystemEvent {
+    /// L'un des `names` figure dans les valeurs (casse ignorée).
+    pub fn mentions_any(&self, names: &[&str]) -> bool {
+        self.data.iter().any(|d| {
+            let d = d.to_lowercase();
+            names.iter().any(|n| d.contains(&n.to_lowercase()))
+        })
+    }
+
+    /// Ligne du rapport : heure, journal, source et identifiant, valeurs.
+    pub fn line(&self, log: &str) -> String {
+        const MAX: usize = 400;
+        let mut data = self.data.iter().filter(|d| !d.is_empty()).cloned().collect::<Vec<_>>().join(" | ");
+        if data.chars().count() > MAX {
+            data = data.chars().take(MAX).collect::<String>() + "…";
+        }
+        format!("{} [{log}] {} {} : {data}", self.time, self.provider, self.id)
+    }
+}
+
+/// Événements d'un export XML de `wevtutil` (éléments `<Event>` mis bout à
+/// bout). Le nom de l'ordinateur et les données binaires sont ignorés.
+pub fn parse_events(xml: &str) -> Vec<SystemEvent> {
+    xml.split("<Event ")
+        .skip(1)
+        .filter_map(|event| {
+            let provider = attribute(element(event, "Provider")?, "Name")?;
+            let id = text_of(event, "EventID")?;
+            let utc = attribute(element(event, "TimeCreated")?, "SystemTime")?;
+            let time = chrono::DateTime::parse_from_rfc3339(&utc)
+                .map(|t| t.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M:%S").to_string())
+                .unwrap_or(utc);
+            let mut data = Vec::new();
+            let mut rest = event;
+            while let Some(start) = rest.find("<Data") {
+                rest = &rest[start + 5..];
+                let Some(close) = rest.find('>') else { break };
+                // `<Data/>` ou `<Data Name='…'/>` : valeur vide.
+                if rest[..close].ends_with('/') {
+                    rest = &rest[close + 1..];
+                    continue;
+                }
+                let body = &rest[close + 1..];
+                let Some(end) = body.find("</Data>") else { break };
+                data.push(unescape(&body[..end]).split_whitespace().collect::<Vec<_>>().join(" "));
+                rest = &body[end..];
+            }
+            Some(SystemEvent { time, provider, id, data })
+        })
+        .collect()
+}
+
+/// Début de l'élément `<name …>` (jusqu'à son `>`).
+fn element<'a>(xml: &'a str, name: &str) -> Option<&'a str> {
+    let start = xml.find(&format!("<{name}"))?;
+    let rest = &xml[start..];
+    Some(&rest[..rest.find('>')?])
+}
+
+fn attribute(element: &str, name: &str) -> Option<String> {
+    for quote in ['\'', '"'] {
+        let key = format!("{name}={quote}");
+        if let Some(start) = element.find(&key) {
+            let rest = &element[start + key.len()..];
+            return Some(unescape(&rest[..rest.find(quote)?]));
+        }
+    }
+    None
+}
+
+fn text_of(xml: &str, name: &str) -> Option<String> {
+    let rest = &xml[xml.find(&format!("<{name}"))?..];
+    let rest = &rest[rest.find('>')? + 1..];
+    Some(unescape(rest[..rest.find('<')?].trim()))
+}
+
+fn unescape(text: &str) -> String {
+    text.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&apos;", "'").replace("&amp;", "&")
 }
 
 /// Masque les données personnelles d'un texte : dossier personnel remplacé
@@ -132,6 +233,50 @@ pub fn build(info: &ReportInfo, logs_dir: &Path, masker: &Masker) -> String {
 
     let launches =
         newest(logs_dir, |name, is_dir| !is_dir && name.starts_with("polyptyque_") && name.ends_with(".log"));
+
+    // Fins inattendues signalées par les lancements suivants (voir
+    // `launch`) : en tête, un plantage passe sinon inaperçu dans les journaux.
+    let unexpected: Vec<String> = launches
+        .iter()
+        .take(LAUNCH_LOGS)
+        .rev()
+        .filter_map(|path| fs::read_to_string(path).ok())
+        .flat_map(|text| {
+            text.lines()
+                .filter_map(|line| line.split_once(launch::UNEXPECTED_END).map(|(_, rest)| rest.to_string()))
+                .collect::<Vec<_>>()
+        })
+        .filter_map(|rest| {
+            // Le nom peut lui-même contenir des parenthèses : « … (2).log ».
+            let name = rest.split_once("(journal ")?.1;
+            let end = name.find(".log)").map(|i| i + 4).or_else(|| name.find(')'))?;
+            Some(name[..end].to_string())
+        })
+        .collect();
+    out.push_str("\nFins inattendues\n----------------\n");
+    if unexpected.is_empty() {
+        out.push_str("aucune parmi les derniers lancements\n");
+    } else {
+        for name in &unexpected {
+            out.push_str(&format!("{name} : terminé sans fermeture normale (plantage, fermeture forcée ou coupure de courant)\n"));
+        }
+    }
+
+    out.push_str(&format!(
+        "\nErreurs récentes de la carte graphique ({DRIVER_EVENTS_DAYS} derniers jours)\n"
+    ));
+    out.push_str("-----------------------------------------------------\n");
+    match &info.driver_events {
+        None => out.push_str("non consultées sur ce système\n"),
+        Some(events) if events.is_empty() => out.push_str("aucune\n"),
+        Some(events) => {
+            for line in events {
+                out.push_str(line);
+                out.push('\n');
+            }
+        }
+    }
+
     out.push_str(&format!("\nJournaux des derniers lancements ({})\n", launches.len().min(LAUNCH_LOGS)));
     out.push_str("------------------------------------\n");
     // Du plus ancien au plus récent : l'ordre des événements.
@@ -295,6 +440,7 @@ mod tests {
             language: "fr".into(),
             graphics: vec![],
             settings: vec!["Vidéo : 1920x1080".into()],
+            driver_events: Some(vec![]),
         };
         let text = build(&info, &dir, &Masker::new(None, None));
         let first = text.find("lancement 0").unwrap();
@@ -302,8 +448,66 @@ mod tests {
         assert!(first < second, "du plus ancien au plus récent");
         assert!(text.contains("=== 01-Discord.ffmpeg.log (fin) ===\nframe=1\nfin\n"));
         assert!(text.contains("Vidéo : 1920x1080"));
+        assert!(text.contains("Fins inattendues\n----------------\naucune parmi les derniers lancements\n"));
+        assert!(text.contains("derniers jours)\n-----------------------------------------------------\naucune\n"));
         let path = write(&dir, FILE_PREFIXES[0], &text).unwrap();
         assert!(file_name(&path).starts_with("rapport_"));
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn report_lists_unexpected_ends_and_driver_errors() {
+        let dir = std::env::temp_dir().join(format!("polyptyque-rapport-{}", crate::config::new_id()));
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("polyptyque_2026-10-27_14h47.log"), "14:47:26 [INFO] Polyptyque\n").unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        fs::write(
+            dir.join("polyptyque_2026-10-27_14h48.log"),
+            format!(
+                "14:48:28 [WARN] {u} (journal polyptyque_2026-10-27_14h47.log) : plantage, fermeture forcée ou coupure de courant\n\
+                 14:48:59 [WARN] {u} (journal polyptyque_2026-10-27_14h48 (2).log) : plantage, fermeture forcée ou coupure de courant\n",
+                u = launch::UNEXPECTED_END
+            ),
+        )
+        .unwrap();
+        let info = ReportInfo {
+            version: "1.0.0".into(),
+            system: "Windows".into(),
+            language: "fr".into(),
+            graphics: vec![],
+            settings: vec![],
+            driver_events: Some(vec!["2026-10-27 14:48:13 [Application] NVIDIA OpenGL Driver 1 : …".into()]),
+        };
+        let text = build(&info, &dir, &Masker::new(None, None));
+        assert!(text.contains("----------------\npolyptyque_2026-10-27_14h47.log : terminé sans fermeture normale"));
+        assert!(text.contains("\npolyptyque_2026-10-27_14h48 (2).log : terminé sans fermeture normale"));
+        assert!(text.contains("-\n2026-10-27 14:48:13 [Application] NVIDIA OpenGL Driver 1 : …\n"));
+        let unknown = ReportInfo { driver_events: None, ..info };
+        assert!(build(&unknown, &dir, &Masker::new(None, None)).contains("non consultées sur ce système"));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn reads_wevtutil_events() {
+        let xml = "<Event xmlns='http://schemas.microsoft.com/win/2004/08/events/event'><System>\
+            <Provider Name='nvlddmkm'/><EventID Qualifiers='0'>153</EventID><Level>2</Level>\
+            <TimeCreated SystemTime='2026-10-27T13:48:11.7872431Z'/><Computer>Poste</Computer></System>\
+            <EventData><Data>\\Device\\000000de</Data><Data>Reset TDR occurred on GPUID:2d00</Data>\
+            <Binary>0000</Binary></EventData></Event>\
+            <Event xmlns='x'><System><Provider Name='Application Error' Guid='{a}'/><EventID>1000</EventID>\
+            <TimeCreated SystemTime='2026-10-27T13:48:13Z'/></System><EventData>\
+            <Data Name='AppName'>polyptyque.exe</Data><Data Name='Empty'/><Data Name='Text'>a &amp; b\n  c</Data>\
+            </EventData></Event>";
+        let events = parse_events(xml);
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].provider, "nvlddmkm");
+        assert_eq!(events[0].id, "153");
+        assert_eq!(events[0].data, vec!["\\Device\\000000de", "Reset TDR occurred on GPUID:2d00"]);
+        assert_eq!(events[1].data, vec!["polyptyque.exe", "a & b c"]);
+        assert!(events[1].mentions_any(&["POLYPTYQUE.EXE"]));
+        assert!(!events[0].mentions_any(&["polyptyque.exe"]));
+        let line = events[0].line("Système");
+        assert!(line.ends_with(" [Système] nvlddmkm 153 : \\Device\\000000de | Reset TDR occurred on GPUID:2d00"));
+        assert!(!line.contains("Poste"));
     }
 }

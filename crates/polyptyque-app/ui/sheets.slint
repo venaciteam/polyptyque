@@ -214,6 +214,54 @@ export component ConfirmSheet inherits Sheet {
     }
 }
 
+// Fermeture de la fenêtre alors qu'une programmation est prévue.
+export component CloseSchedulesSheet inherits Sheet {
+    title: @tr("Programmation active");
+    sheet-width: 560px;
+    close => {
+        Bridge.close-sheet();
+    }
+
+    Text {
+        text: Bridge.close-text;
+        color: Theme.text-muted;
+        wrap: word-wrap;
+    }
+    CheckBox {
+        text: @tr("Se souvenir de mon choix");
+        checked <=> Bridge.close-remember;
+    }
+    Text {
+        text: @tr("Modifiable ensuite dans les réglages.");
+        color: Theme.text-muted;
+        font-size: Theme.font-small;
+        wrap: word-wrap;
+    }
+    Footer {
+        ActionButton {
+            text: @tr("Annuler");
+            kind: "ghost";
+            clicked => {
+                Bridge.close-sheet();
+            }
+        }
+        ActionButton {
+            text: @tr("Quitter quand même");
+            kind: "danger";
+            clicked => {
+                Bridge.close-anyway();
+            }
+        }
+        ActionButton {
+            text: @tr("Continuer en arrière-plan");
+            kind: "primary";
+            clicked => {
+                Bridge.close-to-background();
+            }
+        }
+    }
+}
+
 // Bilan d'un enregistrement interrompu, au lancement suivant.
 export component IncidentSheet inherits Sheet {
     title: @tr("Enregistrement interrompu");
@@ -292,7 +340,7 @@ export component ReportSheet inherits Sheet {
         wrap: word-wrap;
     }
     if !root.ready: Text {
-        text: @tr("• les versions de Polyptyque et de Windows, et la carte graphique ;\n• les réglages d'enregistrement, sans aucun chemin de dossier ;\n• les journaux des trois derniers lancements et du dernier enregistrement.");
+        text: @tr("• les versions de Polyptyque et de Windows, et la carte graphique ;\n• les réglages d'enregistrement, sans aucun chemin de dossier ;\n• les erreurs récentes de la carte graphique relevées par Windows ;\n• les journaux des trois derniers lancements et du dernier enregistrement.");
         color: Theme.text-muted;
         wrap: word-wrap;
     }
@@ -554,6 +602,14 @@ export component SettingsSheet inherits Sheet {
                     }
                 }
                 Field {
+                    label: @tr("Fermer la fenêtre avec une programmation prévue");
+                    hint: @tr("Polyptyque doit rester ouvert pour lancer les programmations. En arrière-plan, son icône reste près de l'horloge : un clic l'affiche, un clic droit permet de le quitter.");
+                    ComboBox {
+                        model: [@tr("Demander à chaque fois"), @tr("Continuer en arrière-plan"), @tr("Quitter Polyptyque")];
+                        current-index <=> Bridge.settings-close-index;
+                    }
+                }
+                Field {
                     label: @tr("Conversion pour le montage");
                     hint: @tr("Copie MP4 sans perte de qualité, créée à côté du MKV, qui est conservé. Prévoir le double d'espace disque.");
                     Toggle {
@@ -570,6 +626,27 @@ export component SettingsSheet inherits Sheet {
                     ComboBox {
                         model: [@tr("Versions stables"), @tr("Versions stables et bêta"), @tr("Ne pas rechercher")];
                         current-index <=> Bridge.settings-update-index;
+                    }
+                }
+                Field {
+                    label: @tr("Pilotage");
+                    hint: @tr("Un assistant IA, un script ou un Stream Deck peut alors tout régler et lancer un enregistrement. Seuls les programmes de ce compte Windows, sur cet ordinateur, y ont accès, jamais une page web ; un enregistrement reste toujours signalé.");
+                    Toggle {
+                        text: @tr("Autoriser le pilotage par d'autres programmes");
+                        checked: Bridge.settings-remote-control;
+                        toggled(value) => {
+                            Bridge.settings-remote-control = value;
+                        }
+                    }
+                }
+                if Bridge.settings-remote-control: HorizontalLayout {
+                    alignment: start;
+                    ActionButton {
+                        text: @tr("Connecter un assistant IA…");
+                        kind: "ghost";
+                        clicked => {
+                            Bridge.open-control-help();
+                        }
                     }
                 }
                 Field {
@@ -634,6 +711,120 @@ export component SettingsSheet inherits Sheet {
                     Bridge.save-settings();
                 }
             }
+        }
+    }
+}
+
+// Le branchement se fait ici ; l'échange reste dans l'assistant habituel.
+export component AssistantsSheet inherits Sheet {
+    property <bool> show-options: false;
+    title: @tr("Connecter un assistant IA");
+    sheet-width: 720px;
+    close => { Bridge.close-assistants(); }
+
+    Note {
+        text: @tr("Choisir un assistant installé sur ce PC. Polyptyque prépare sa connexion ; les échanges et le compte IA restent dans cet assistant.");
+    }
+    for assistant in Bridge.assistants: Rectangle {
+        background: Theme.surface-raised;
+        border-radius: Theme.radius-small;
+        border-width: 1px;
+        border-color: Theme.border;
+        VerticalLayout {
+            padding: 12px;
+            spacing: 8px;
+            HorizontalLayout {
+                spacing: 12px;
+                Text {
+                    text: assistant.name;
+                    color: Theme.text;
+                    font-size: Theme.font-normal;
+                    font-weight: 600;
+                    horizontal-stretch: 1;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: assistant.state;
+                    color: assistant.tone == 0 ? Theme.text-muted : Theme.tone-color(assistant.tone);
+                    font-size: Theme.font-small;
+                    vertical-alignment: center;
+                }
+                if !assistant.configured || assistant.needs-repair || root.show-options: ActionButton {
+                    text: assistant.needs-repair ? @tr("Réparer") : assistant.configured ? @tr("Réinstaller la connexion") : @tr("Connecter");
+                    kind: assistant.configured ? "secondary" : "primary";
+                    enabled: assistant.can-connect && !Bridge.assistants-busy;
+                    clicked => { Bridge.configure-assistant(assistant.id, false); }
+                }
+            }
+            Text {
+                text: assistant.detail;
+                color: Theme.text-muted;
+                font-size: Theme.font-small;
+                wrap: word-wrap;
+            }
+            if root.show-options || !assistant.can-connect || assistant.can-disconnect: HorizontalLayout {
+                alignment: end;
+                spacing: 8px;
+                if root.show-options || !assistant.can-connect: ActionButton {
+                    text: @tr("Choisir la configuration…");
+                    kind: "ghost";
+                    enabled: !Bridge.assistants-busy;
+                    clicked => { Bridge.browse-assistant-config(assistant.id); }
+                }
+                if assistant.can-disconnect: ActionButton {
+                    text: @tr("Déconnecter");
+                    kind: "ghost";
+                    enabled: !Bridge.assistants-busy;
+                    clicked => { Bridge.configure-assistant(assistant.id, true); }
+                }
+            }
+        }
+    }
+    if Bridge.assistants-busy: Text {
+        text: @tr("Vérification des connexions…");
+        color: Theme.text-muted;
+        font-size: Theme.font-small;
+    }
+    if Bridge.assistants-message != "": Note {
+        text: Bridge.assistants-message;
+        tone: Bridge.assistants-message-tone;
+    }
+    Field {
+        label: @tr("Vérifier depuis l'assistant");
+        hint: @tr("Suivre les étapes de l'assistant choisi, puis envoyer cette demande. « Configuration enregistrée » indique que Polyptyque a terminé sa préparation ; « Connecté » apparaît après l'utilisation d'un outil. Aucun clic sur Réparer n'est nécessaire pour terminer la connexion.");
+        HorizontalLayout {
+            spacing: 10px;
+            Text {
+                text: @tr("Liste mes scènes dans Polyptyque.");
+                color: Theme.text;
+                font-size: Theme.font-normal;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+                wrap: word-wrap;
+            }
+            ActionButton {
+                text: @tr("Copier la demande");
+                clicked => { Bridge.copy-assistant-prompt(); }
+            }
+        }
+    }
+    if root.show-options: Note {
+        text: @tr("Installations Windows natives uniquement. WSL, Docker et les serveurs distants demandent une configuration particulière. Les autres réglages sont conservés ; une sauvegarde garde le fichier original. Les commentaires JSON5 et YAML ne sont pas conservés dans le fichier modifié.");
+    }
+    Footer {
+        ActionButton {
+            text: root.show-options ? @tr("Masquer les options") : @tr("Options de connexion");
+            kind: "ghost";
+            clicked => { root.show-options = !root.show-options; }
+        }
+        ActionButton {
+            text: @tr("Actualiser");
+            enabled: !Bridge.assistants-busy;
+            clicked => { Bridge.refresh-assistants(); }
+        }
+        ActionButton {
+            text: @tr("Retour aux réglages");
+            clicked => { Bridge.close-assistants(); }
         }
     }
 }
@@ -815,7 +1006,7 @@ export component SchedulesSheet inherits Sheet {
     }
     Field {
         label: @tr("Démarrage de Windows");
-        hint: @tr("Sans cela, après un redémarrage de Windows (une mise à jour, par exemple), les programmations attendent la réouverture de Polyptyque. Lancé par Windows, il démarre réduit, sans ouvrir les fenêtres de la scène.");
+        hint: @tr("Sans cela, après un redémarrage de Windows (une mise à jour, par exemple), les programmations attendent la réouverture de Polyptyque. Lancé par Windows, il démarre en arrière-plan (icône près de l'horloge), sans ouvrir les fenêtres de la scène.");
         Toggle {
             text: @tr("Lancer Polyptyque au démarrage de Windows");
             checked: Bridge.startup-enabled;

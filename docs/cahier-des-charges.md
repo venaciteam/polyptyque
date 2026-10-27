@@ -39,8 +39,9 @@ type: projet
 	12. [[#Langues et formats]]
 	13. [[#Signalement d'un problème]]
 	14. [[#Raccourcis clavier]]
-	15. [[#Préparation de la diffusion en direct]]
-	16. [[#Installation]]
+	15. [[#Pilotage par d'autres programmes]]
+	16. [[#Préparation de la diffusion en direct]]
+	17. [[#Installation]]
 5. [[#Exigences non fonctionnelles]]
 	1. [[#Fiabilité]]
 	2. [[#Performance]]
@@ -244,9 +245,18 @@ Au lancement de Polyptyque (réglage « Ouvrir les fenêtres de la scène au lan
 - **Accès** : pastille de la barre du haut, qui affiche « Programmer », le prochain créneau (« Podcast · aujourd'hui à 21:00 ») ou la fin prévue de l'enregistrement programmé (« Arrêt programmé à 22:00 »). Un clic ouvre la liste des programmations (avec le prochain créneau de chacune), d'où l'on crée et modifie.
 - **Polyptyque doit être ouvert** : il n'y a pas encore de lancement par Windows à l'heure prévue.
 	- Tant qu'une programmation est **active** (un créneau en cours ou à venir), la mise en veille automatique et l'extinction de l'écran sont empêchées, par le même mécanisme que pendant l'enregistrement mais indépendamment de lui (la fin d'un enregistrement ne lève pas cette protection). Une mise en veille demandée (capot, bouton) reste possible.
-	- Quitter Polyptyque alors qu'une programmation doit encore lancer un enregistrement demande confirmation.
+	- Fermer la fenêtre alors qu'une programmation doit encore lancer un enregistrement (ou arrêter celui en cours) : voir **Arrière-plan** ci-dessous.
+- **Arrière-plan** : fenêtre cachée (absente de la barre des tâches), icône de Polyptyque dans la zone de notification, près de l'horloge (sous la flèche « ^ » si Windows l'y range). Les programmations, les raccourcis globaux, l'anti-veille et l'enregistrement en cours continuent ; les aperçus et les niveaux sonores des cartes s'arrêtent jusqu'au retour de la fenêtre.
+	- Icône : un clic fait revenir la fenêtre ; clic droit : « Afficher Polyptyque », « Quitter Polyptyque ». Info-bulle : « Polyptyque », « Enregistrement en cours » le cas échéant, et le texte de la pastille de la programmation (« Podcast · demain à 07:00 »). L'icône n'existe que pendant l'arrière-plan ; elle est reposée si l'Explorateur redémarre.
+	- La fenêtre revient aussi avec le raccourci « Afficher / réduire Polyptyque », un second lancement de Polyptyque (raccourci du bureau, menu Démarrer) et toute question qui doit se voir (démarrage manqué).
+	- **Fermer la fenêtre** (croix, <kbd>Alt</kbd> + <kbd>F4</kbd>, « Fermer la fenêtre » de la barre des tâches) alors qu'une programmation a encore besoin de Polyptyque, selon le réglage « Fermer la fenêtre avec une programmation prévue » (Fichiers et interface) :
+		- **Demander à chaque fois** (par défaut) : fenêtre « Programmation active » (« « Podcast » est programmé demain à 07:00 : Polyptyque doit rester ouvert pour le lancer. Il peut continuer en arrière-plan, avec son icône près de l'horloge. »), boutons Annuler / Quitter quand même / **Continuer en arrière-plan**, case « Se souvenir de mon choix » (« Modifiable ensuite dans les réglages. ») qui enregistre le choix dans le réglage ;
+		- **Continuer en arrière-plan** : directement, sans question, y compris pendant un enregistrement (rien n'est interrompu) ;
+		- **Quitter Polyptyque** : sans avertissement pour les programmations.
+	- Sans programmation qui attend, la croix ferme Polyptyque comme avant, quel que soit le réglage. Un enregistrement ou une conversion en cours demande toujours confirmation avant de quitter, quel que soit le réglage (sauf « Continuer en arrière-plan », qui ne quitte pas).
+	- **« Quitter Polyptyque »** (icône) : quitte pour de bon. Une programmation qui attend demande confirmation (« … Quitter quand même ? »), sauf réglage « Quitter Polyptyque » ; la fenêtre revient pour toute confirmation.
 - **Lancer Polyptyque au démarrage de Windows** (option, dans les programmations et dans les réglages, désactivée par défaut) : sans elle, les programmations ne survivent pas à un redémarrage (mise à jour de Windows).
-	- Inscription dans la liste « Applications au démarrage » de l'utilisateur (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`), sans droits administrateur. Lancé ainsi, Polyptyque démarre **réduit**, sans ouvrir les fenêtres de la scène : elles s'ouvrent au début du créneau, comme pour tout enregistrement.
+	- Inscription dans la liste « Applications au démarrage » de l'utilisateur (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`), sans droits administrateur. Lancé ainsi, Polyptyque démarre **en arrière-plan** (icône près de l'horloge), sans ouvrir les fenêtres de la scène : elles s'ouvrent au début du créneau, comme pour tout enregistrement.
 	- L'emplacement inscrit est remis à jour à chaque lancement (version portable déplacée) ; l'inscription est retirée à la désinstallation.
 	- Désactivé par l'utilisateur dans les Paramètres de Windows (Applications > Démarrage) : signalé dans la fenêtre des programmations. Réactiver l'option dans Polyptyque lève cette désactivation.
 	- Version portable : seule exception à « rien n'est écrit ailleurs sur le PC », signalée sous l'option.
@@ -257,7 +267,7 @@ Au lancement de Polyptyque (réglage « Ouvrir les fenêtres de la scène au lan
 | Situation | Comportement |
 |---|---|
 | Début d'un créneau, rien n'enregistre | La scène du créneau devient la scène en cours et s'enregistre. Message : « Enregistrement programmé : arrêt prévu à 22:00 » |
-| **Démarrage manqué** : Polyptyque fermé ou ordinateur en veille à l'heure prévue, ouvert pendant le créneau | Fenêtre « Enregistrement programmé » : lancer maintenant, jusqu'à la fin du créneau ? Compte à rebours de **deux minutes** ; sans réponse, l'enregistrement démarre (Polyptyque relancé seul après une mise à jour de Windows, sans personne devant). La fenêtre réduite revient à l'écran. Sans objet si le créneau se termine avant |
+| **Démarrage manqué** : Polyptyque fermé ou ordinateur en veille à l'heure prévue, ouvert pendant le créneau | Fenêtre « Enregistrement programmé » : lancer maintenant, jusqu'à la fin du créneau ? Compte à rebours de **deux minutes** ; sans réponse, l'enregistrement démarre (Polyptyque relancé seul après une mise à jour de Windows, sans personne devant). La fenêtre réduite ou en arrière-plan revient à l'écran. Sans objet si le créneau se termine avant |
 | Créneau commencé il y a moins de 30 s (Polyptyque ouvert juste après l'heure) | Démarrage direct, sans question |
 | Programmation créée, modifiée ou activée pendant son propre créneau | Question du démarrage manqué, plutôt qu'un démarrage d'office |
 | **Enregistrement lancé à la main** pendant un créneau (bouton, raccourci, carte d'une source) | Fenêtre : « Arrêter automatiquement cet enregistrement à 22:00 ? » Compte à rebours de deux minutes ; sans réponse, **pas d'arrêt automatique** (le lancement peut n'avoir rien à voir avec la programmation). Dans les deux cas, la programmation ne lance plus rien dans ce créneau |
@@ -278,7 +288,6 @@ Au lancement de Polyptyque (réglage « Ouvrir les fenêtres de la scène au lan
 > [!info] Plus tard
 > - Lancement par Windows à l'heure prévue, même logiciel fermé (Planificateur de tâches).
 > - Sortie de veille automatique à l'heure prévue (minuteries de réveil).
-> - Programmations exposées au pilotage par un modèle de langage : la logique est déjà séparée de l'interface (`polyptyque-core`, module `schedule`).
 
 ### Microphone
 
@@ -391,7 +400,7 @@ Inspirée d'[[OBS Studio]], volontairement allégée, thème sombre.
 	- par **glisser-déposer**, dans la liste comme dans la grille. Le glisser démarre après 8 px de déplacement bouton enfoncé : un simple clic reste un clic, et un appui sur un bouton d'une carte (enregistrement, ouvrir ou rétablir la fenêtre) ne déplace jamais la carte. Pendant le glisser, la source reste atténuée à sa place ; un trait (liste) ou un cadre (grille) montre où elle arrivera, et dans la grille une version réduite de la carte suit le pointeur. Relâcher hors de la liste ou de la grille annule. La source déplacée devient la source sélectionnée.
 	- Bloqué pendant un enregistrement, comme les flèches. La liste ne défile pas seule pendant un glisser : pour un grand déplacement, la grille montre toutes les sources.
 - Niveau sonore affiché **en permanence**, pas seulement pendant l'enregistrement : chaque source écoute le son de son programme (même capture que l'enregistrement, seule la crête est gardée). Dès que le moteur écoute la source (enregistrement, préparation, finalisation), cette écoute s'arrête et la carte affiche le niveau du moteur. Indépendant du réglage des aperçus.
-- Barre du haut : pastille de la programmation (voir [[#Programmation des enregistrements]]), pastille du micro (avec son niveau pendant l'enregistrement) et pastille de la conversion MP4 en cours.
+- Barre du haut : pastille de la programmation (voir [[#Programmation des enregistrements]]), pastille du micro (avec son niveau pendant l'enregistrement), pastille de la conversion MP4 en cours et pastille « Pilotage » tant qu'un programme est connecté (voir [[#Pilotage par d'autres programmes]]).
 - **Barre d'état** : espace disque libre, autonomie estimée, charge processeur et carte graphique, images perdues.
 - **Fenêtre de paramètres** : Sortie, Encodage, Audio, Raccourcis, Général. Dans une fenêtre trop petite, seul son contenu défile : le bas (version, « Signaler un problème… », boutons) reste toujours visible.
 - Langues : français et anglais, voir [[#Langues et formats]].
@@ -445,7 +454,7 @@ Inspirée d'[[OBS Studio]], volontairement allégée, thème sombre.
 - **Journaux** : en français, non traduits (diagnostic : une seule langue reste cherchable).
 - **Détails techniques venus d'autres logiciels** (messages de FFmpeg, de Velopack, du lecteur de réglages…) : jamais affichés, puisqu'ils sont en anglais quelle que soit la langue ; le message affiché, dans la langue de l'interface, se termine par « (détail dans le journal) », et le détail est écrit au journal. Les messages d'erreur de Windows lui-même, dans la langue du système, restent affichés.
 - **Dossiers sur disque** (`données` de la version portable, `profils`, `journaux`) et clés du fichier de réglages : jamais renommés, sinon les installations existantes perdraient leurs données.
-- **Version console** (`polyptyque-console.exe`) : française pour l'instant ; elle sera traduite (ou remplacée) lors du chantier du pilotage par un modèle de langage, qui définit un mode commande non interactif.
+- **Mode commande** (`polyptyque-cli.exe`) : messages traduits comme l'interface, par le même catalogue, dans la langue de Polyptyque. Noms de commandes, de paramètres et clés JSON : en anglais, jamais traduits. Le serveur MCP et le catalogue JSON donnent les descriptions en anglais (lues par un modèle).
 - Documents de travail (`docs/`) : en français. Le README existe dans les deux langues, l'anglais en tête.
 
 **Technique**
@@ -468,7 +477,9 @@ Rendre facile la transmission d'un problème sur GitHub, sans exposer de donnée
 	3. ouvre la page « nouvelle issue » du dépôt, avec le formulaire de la langue de l'interface, pré-rempli (version, Windows, carte graphique).
 
 	Il reste à décrire le problème et à glisser le fichier dans la page. Le rapport peut être ouvert pour le relire avant.
-- **Contenu du rapport** (en français, comme les journaux) : version (installée ou portable), Windows, langue, cartes graphiques, résumé des réglages sans aucun chemin, journaux des trois derniers lancements (un plantage se lit dans le précédent), fin des journaux FFmpeg du dernier enregistrement. Taille plafonnée.
+- **Contenu du rapport** (en français, comme les journaux) : version (installée ou portable), Windows, langue, cartes graphiques, résumé des réglages sans aucun chemin, fins inattendues, erreurs récentes de la carte graphique, journaux des trois derniers lancements (un plantage se lit dans le précédent), fin des journaux FFmpeg du dernier enregistrement. Taille plafonnée.
+- **Fins inattendues** : un témoin (`lancement-en-cours.txt`, à côté de `session-en-cours.toml`) est posé au lancement de l'interface avec le nom de son journal, et retiré à chaque fin normale : fermeture, erreur affichée, installation d'une mise à jour, fermeture de la session Windows. Témoin trouvé au lancement suivant : le journal le note (« lancement précédent terminé sans fermeture normale (journal …) »), et le rapport liste en tête les lancements concernés. Cas visé : Polyptyque fermé d'office par le pilote graphique, plantage, coupure de courant, sans rien dans son propre journal. Une fin normale écrit « fermeture normale de Polyptyque » au journal. Relance dans la même minute : nouveau journal `… (2).log`, celui du lancement interrompu est gardé (il était écrasé jusqu'ici). « Fin de tâche » dans l'onglet Processus du Gestionnaire des tâches demande d'abord la fermeture : c'est une fin normale ; l'onglet Détails, lui, arrête net.
+- **Erreurs récentes de la carte graphique** (7 derniers jours, 40 au plus) lues dans les journaux de Windows par `wevtutil`, sans droits d'administrateur : erreurs et avertissements des pilotes NVIDIA, AMD, Intel et de Windows (pilote réinitialisé), programmes fermés par le pilote OpenGL de NVIDIA (l'interface dessine en OpenGL : une réinitialisation du pilote la ferme, quand les programmes en DirectX survivent), plantages et blocages de Polyptyque et de FFmpeg. Nom de l'ordinateur jamais repris ; masquage appliqué comme au reste du rapport.
 - **Masquage** : le dossier personnel est remplacé par `%USERPROFILE%`, et le nom du compte Windows retiré des chemins. Les titres des fenêtres ne sont jamais écrits dans les journaux.
 - Polyptyque n'envoie rien lui-même : la personne joint le fichier. Pas de nouveau flux réseau.
 - **Côté GitHub** : deux formulaires d'issue (`.github/ISSUE_TEMPLATE/`), anglais et français, étiquette `bug` posée par le formulaire (le paramètre `labels` de l'adresse exige des droits que les visiteurs n'ont pas). Les champs se pré-remplissent par leur identifiant dans l'adresse ; les modèles ne sont lus que sur la branche par défaut (`main`).
@@ -489,6 +500,76 @@ Rendre facile la transmission d'un problème sur GitHub, sans exposer de donnée
 
 > [!tip] Pourquoi pas Ctrl + Alt
 > Sur un clavier AZERTY, <kbd>Ctrl</kbd> + <kbd>Alt</kbd> équivaut à <kbd>AltGr</kbd> : ces combinaisons entreraient en conflit avec la saisie de caractères (€, @, #…).
+
+### Pilotage par d'autres programmes
+
+> [!abstract] But
+> Un assistant IA (modèle de langage), un script ou le futur plugin Stream Deck peuvent faire tout ce que fait l'interface : régler Polyptyque à la place de la personne, préparer les scènes, lancer et suivre un enregistrement. Pour qui ne veut pas s'embêter avec les réglages, l'assistant s'en charge.
+
+**Canal de commande**
+
+- Tenu par Polyptyque ouvert (fenêtre affichée ou en arrière-plan). Polyptyque fermé : `polyptyque-cli app launch` le démarre en arrière-plan.
+- Windows : tube nommé `\\.\pipe\polyptyque-<SID du compte>`.
+	- Réservé au compte Windows qui a lancé Polyptyque : les autorisations du tube ne donnent accès qu'à ce compte (celles que Windows donne par défaut ouvrent la lecture à tous les comptes, anonyme compris).
+	- Connexions depuis une autre machine refusées par le système (`PIPE_REJECT_REMOTE_CLIENTS`).
+	- Polyptyque exige d'être le premier à créer le tube, et chaque client vérifie que le tube appartient à son propre compte : un autre programme ne peut pas se faire passer pour Polyptyque.
+- **Pas de serveur web local** : une page web ne peut pas ouvrir un tube nommé (un port local, lui, serait joignable par n'importe quelle page).
+- Hors Windows (mode démonstration, futur portage) : socket Unix dans le dossier temporaire du compte, accessible à ce seul compte.
+- Protocole : JSON-RPC 2.0, un message JSON par ligne (UTF-8), version du protocole annoncée (`protocol: 1`). Référence complète, en anglais : [[control|docs/control.md]].
+- **État en direct** : après `subscribe`, Polyptyque envoie l'état à chaque changement (au plus deux fois par seconde) et chaque message qu'il affiche.
+- Plusieurs programmes peuvent être connectés en même temps.
+
+**Commandes** : tout ce que fait l'interface.
+
+- État ; informations système (cartes graphiques, FFmpeg, disque) et essai des encodeurs ; scènes ; sources (navigateurs installés, fenêtres ouvertes, ajout, retrait, ordre, partage entre scènes, ouverture et rétablissement des fenêtres) ; enregistrement, de toutes les sources ou d'une seule ; réglages (lecture et modification, raccourcis compris) ; micros ; programmations et réponse à leurs questions ; conversion MP4 ; liste des enregistrements ; aperçus ; mise à jour ; afficher la fenêtre ; quitter.
+- Restent dans la fenêtre : le bilan d'un enregistrement interrompu et le signalement d'un problème. Un dossier se donne par son chemin, sans Explorateur.
+- Une scène, une source ou une programmation se désigne par son identifiant ou par son nom.
+- Les commandes longues (démarrer, arrêter, ouvrir les fenêtres de la scène) répondent une fois l'opération terminée, avec son résultat et les messages affichés entre-temps.
+- **Confirmations** : ce que l'interface fait confirmer (supprimer une scène ou une source, arrêter un enregistrement programmé, annuler une conversion, installer une mise à jour, quitter pendant un enregistrement ou avec une programmation prévue) est refusé sans `confirm: true`, avec le texte que l'interface aurait affiché (`confirmation_required`). L'assistant pose la question à la personne, puis recommence.
+- **Mêmes verrous que l'interface** : pendant un enregistrement, rien ne change dans les scènes, les sources et les réglages (`locked`). Les réglages sont aussi refusés tant que leur fenêtre est ouverte dans Polyptyque (elle les écraserait en se fermant), de même que les programmations pendant que leur formulaire est ouvert.
+- Démarrage pendant un créneau programmé : l'arrêt automatique se choisit dans la commande (`auto_stop`, non par défaut comme dans l'interface) ; aucune question n'est affichée.
+
+**Garde-fous**
+
+- **Désactivé par défaut.** Réglage « Autoriser le pilotage par d'autres programmes » (Fichiers et interface), seul moyen de l'activer ou de le désactiver : aucune commande ne le peut. Désactivé, le tube n'existe pas ; désactivé en cours de route, les programmes connectés sont déconnectés.
+- Sous ce réglage, le bouton « Connecter un assistant IA… » ouvre une feuille intégrée avec Claude Code, Claude Desktop, Codex, OpenClaw et Hermes Agent. Si l'autorisation vient d'être cochée, ce bouton enregistre uniquement cette autorisation immédiatement ; les autres champs des réglages restent en attente. Aucun renvoi vers GitHub pour se connecter et aucune conversation IA dans Polyptyque.
+- **Connexion Windows native** : détection des configurations et exécutables du compte, bouton « Connecter », « Réparer » pour une entrée reconnue, « Déconnecter » et choix d'un fichier de configuration personnalisé mémorisé entre les lancements. Configuration directe : Claude Code (`.claude.json`, portée utilisateur), Claude Desktop (`claude_desktop_config.json`), Codex (`config.toml`), OpenClaw (`openclaw.json`, JSON5), Hermes Agent (`config.yaml`). Chemin réel de `polyptyque-cli.exe`, argument `mcp`, identité `POLYPTYQUE_ASSISTANT`. Variables de répertoire des clients respectées lorsqu'elles sont héritées par Polyptyque.
+- **Préservation** : seule l'entrée `polyptyque` est modifiée, jamais un serveur homonyme qui n'utilise pas le mode commande de Polyptyque. Autres réglages, serveurs, variables d'environnement et filtres d'outils conservés ; copie exacte `.polyptyque-<identifiant>.bak` à côté de l'original avant modification, fichier temporaire unique puis remplacement, contrôle des modifications concurrentes. TOML conserve les commentaires ; JSON5 et YAML sont normalisés sans leurs commentaires (annoncé dans la feuille). Fichier invalide, lien symbolique, chemins réseau/WSL ou configuration OpenClaw à inclusions : refus explicite, sans remplacement.
+- **État vérifiable** : « Détecté », « Configuration enregistrée », « À réparer », « Connecté » après utilisation réelle d'un outil, et « Session encore connectée » si une session reste ouverte après retrait de la configuration. « Configuration enregistrée » indique que Polyptyque a terminé sa préparation ; aucun clic sur Réparer n'est requis pour la terminer. Étapes numérotées propres au client : fermeture/rechargement, menu des outils et demande « Liste mes scènes dans Polyptyque. » à copier. Claude Desktop précise le mode Claude puis + > Connecteurs ; Claude Code, /mcp ; Codex, ses paramètres MCP et une conversation locale ; OpenClaw, la passerelle et ses menus MCP/Tool access ; Hermes, /reload-mcp. « Réparer » n'apparaît que pour une entrée qui le nécessite ; la réinstallation d'une entrée correcte reste dans les options. L'état des fichiers est relu toutes les deux secondes tant que la feuille est ouverte, sans écriture automatique. Le retrait de configuration n'arrête pas les processus des assistants. Aucun test ne lance un enregistrement.
+- WSL, Docker et assistants sur un serveur distant ne sont pas connectés automatiquement. Pas de clé API, fournisseur de modèle, abonnement ni facturation gérés par Polyptyque.
+- **Micro** : l'activer par une commande ouvre une fenêtre de confirmation dans Polyptyque (fenêtre ramenée au premier plan) ; seule la personne devant l'écran peut accepter. Sans réponse en deux minutes, c'est un refus.
+- **Enregistrement toujours visible** :
+	- en arrière-plan, l'icône de la zone de notification porte un point rouge pendant tout enregistrement, et un enregistrement qui démarre affiche une notification de Windows (l'icône peut être rangée sous « ^ ») ;
+	- le message de démarrage nomme le programme qui l'a demandé (« Demandé par « Claude ». ») ;
+	- aucune commande ne cache la fenêtre.
+- **Pastille « Pilotage »** dans la barre du haut tant qu'un programme est connecté, avec son nom ; un clic ouvre les réglages.
+- **Titres des fenêtres** : la liste des fenêtres ouvertes ne donne que le programme de chaque fenêtre, et son titre seulement quand plusieurs fenêtres du même programme sont ouvertes (un titre peut être privé : objet d'un courriel, nom d'une conversation ; un assistant en ligne l'envoie à son fournisseur).
+- **Journal** : chaque commande reçue, avec le programme qui l'envoie (nom annoncé et exécutable) ; jamais les titres des fenêtres.
+
+**Mode commande** (`polyptyque-cli.exe`, qui remplace la console interactive du prototype)
+
+- `polyptyque-cli <commande> [--paramètre valeur…]`, par exemple `polyptyque-cli recording start --scene Podcast` ; `polyptyque-cli call <méthode> '<json>'` pour n'importe quel appel.
+- `polyptyque-cli help` : aide lisible ; `polyptyque-cli commands` : catalogue JSON (paramètres, types, descriptions) ; `polyptyque-cli events` : état en direct, une ligne JSON par changement ; `polyptyque-cli app launch` : lance Polyptyque en arrière-plan s'il est fermé et attend que le canal réponde.
+- Sortie : JSON sur la sortie standard, y compris les erreurs (`{"error": {"reason": …, "message": …}}`) ; `--pretty` pour l'indenter.
+- Codes de retour stables :
+
+| Code | Raison | Sens |
+|---|---|---|
+| 0 | | Réussi |
+| 1 | `internal` | Erreur interne ou inattendue |
+| 2 | `invalid_request` | Commande ou paramètres invalides |
+| 3 | `not_running` | Polyptyque n'est pas ouvert |
+| 4 | `control_disabled` | Pilotage désactivé dans les réglages |
+| 5 | `locked`, `busy` | Impossible pour l'instant : enregistrement ou opération en cours, fenêtre ouverte dans Polyptyque |
+| 6 | `not_found`, `ambiguous` | Scène, source, programmation, fenêtre ou fichier introuvable, ou nom qui en désigne plusieurs |
+| 7 | `confirmation_required` | À confirmer par la personne, puis à relancer avec `--confirm` |
+| 8 | `refused`, `declined`, `timeout` | Valeur invalide ou conflit, refus de la personne, délai dépassé |
+| 9 | `unavailable` | Impossible sur ce système ou dans cet état (FFmpeg absent, aucune mise à jour…) |
+
+- Messages dans la langue de Polyptyque (réglage « Langue », sinon celle de Windows), tirés du même catalogue que l'interface. Noms de commandes, de paramètres et clés JSON : en anglais, stables.
+- **Serveur MCP** : `polyptyque-cli mcp` (entrée et sortie standard), pour les assistants sans terminal (Claude Desktop…). Ses outils sont les commandes du catalogue (`recording_start`…), plus `app_launch` ; leurs descriptions sont en anglais, lues par le modèle.
+
+**Documentation pour les modèles de langage** : [[control|docs/control.md]] (référence), `llms.txt` (point d'entrée), `AGENTS.md` (agents qui travaillent sur le code), skill `skills/polyptyque/SKILL.md`. Un test échoue si une commande du catalogue manque dans la référence.
 
 ### Préparation de la diffusion en direct
 
@@ -570,6 +651,7 @@ Solution retenue : **[[Velopack]]** (outil d'installation et de mise à jour éc
 
 - Les profils de navigateur contiennent des **sessions connectées** : stockés uniquement en local, jamais transmis.
 - Microphone désactivé par défaut, activation explicite.
+- Pilotage par d'autres programmes : désactivé par défaut, local au compte Windows, jamais joignable depuis une page web ou un autre ordinateur ; micro seulement avec l'accord de la personne dans la fenêtre (voir [[#Pilotage par d'autres programmes]]). Un assistant en ligne envoie ce qu'il lit (noms des scènes et des sources) à son fournisseur : c'est pourquoi les titres des fenêtres ne lui sont donnés qu'en cas de besoin.
 - Aucune donnée envoyée sur Internet par Polyptyque (proposition, voir [[#Questions ouvertes]]). Seule exception : la recherche de mises à jour interroge GitHub (adresse IP visible de GitHub, rien d'autre), désactivable dans les réglages.
 
 ### Distribution et licence
@@ -605,9 +687,9 @@ Solution retenue : **[[Velopack]]** (outil d'installation et de mise à jour éc
 | AV1 indisponible sur RTX 30 | Matériel | Codecs proposés selon la carte détectée |
 | Plantage de l'encodeur : environ une seconde perdue | Données encore en mémoire dans FFmpeg | La suite est dans `…_partie2.mkv`, à placer au montage à la suite de la première partie |
 | Arrêt forcé de Windows sans délai | Windows peut fermer Polyptyque sans attendre | Fichiers MKV lisibles quand même ; au plus une seconde perdue |
-| Pas de protection contre l'arrêt de Windows dans la console | Seule l'interface graphique a une fenêtre pour la recevoir | Utiliser l'interface graphique |
 | Programmation : Polyptyque doit être ouvert, l'ordinateur éveillé | Pas encore de lancement par Windows à l'heure prévue, ni de sortie de veille | Option « Lancer Polyptyque au démarrage de Windows », anti-veille, question au retour (démarrage manqué) |
-| Pas de programmation dans la console | Fonction de l'interface graphique | Utiliser l'interface graphique |
+| Pilotage : Polyptyque doit être ouvert | Le canal de commande est tenu par Polyptyque | `polyptyque-cli app launch` (outil MCP `app_launch`) le lance en arrière-plan |
+| Pilotage : bilan d'un enregistrement interrompu et signalement d'un problème hors d'atteinte | Fenêtres réservées à la personne | À faire dans la fenêtre |
 
 > [!bug] Point à surveiller
 > Des utilisateurs d'OBS signalent que la capture audio d'un navigateur échoue selon qu'il a été ouvert avant ou après le logiciel de capture. Comme Polyptyque lance lui-même les navigateurs, le risque est réduit, mais il sera testé explicitement.
@@ -639,11 +721,11 @@ Le code est organisé en modules indépendants (« crates » Rust) :
 
 | Module | Rôle | Dépend du système |
 |---|---|---|
-| `polyptyque-core` | Scènes, sources, réglages, sauvegarde, nommage, calculs de synchronisation, commandes FFmpeg, programmations (créneaux et décisions), et le contrat `Platform` que chaque système doit remplir | Non |
-| `polyptyque-windows` | Implémentation Windows de `Platform` : capture d'image et de son, fenêtres, processus, navigateurs installés, tubes | **Oui** |
+| `polyptyque-core` | Scènes, sources, réglages, sauvegarde, nommage, calculs de synchronisation, commandes FFmpeg, programmations (créneaux et décisions), protocole du canal de commande et catalogue des commandes (`control`), et le contrat `Platform` que chaque système doit remplir | Non |
+| `polyptyque-windows` | Implémentation Windows de `Platform` : capture d'image et de son, fenêtres, processus, navigateurs installés, tubes (dont celui du canal de commande) | **Oui** |
 | `polyptyque-engine` | Sessions d'enregistrement : fils de capture, horloge commune, encodeurs, arrêt propre | Non |
 | `polyptyque-app` | Interface graphique [[Slint]] : apparence dans `ui/` (thème dans `ui/theme.slint`), logique dans `src/` ; mode démonstration hors Windows | Non (raccourcis et arrêt de Windows : oui) |
-| `polyptyque-cli` | Prototype en console (étape 0), livré à côté de l'interface pour le diagnostic | Non |
+| `polyptyque-cli` | Mode commande (`polyptyque-cli.exe`) et serveur MCP : clients du canal de commande (remplace le prototype en console de l'étape 0) | Non (tube nommé sous Windows) |
 
 La session simulée (`polyptyque-engine/tests`) rejoue des enregistrements complets avec de fausses fenêtres, un faux micro et un vrai FFmpeg, sur n'importe quel système. Elle vérifie à chaque modification les durées et la synchronisation des fichiers produits, la conversion MP4, l'enregistrement individuel et la reprise après un **plantage réel de FFmpeg** en cours d'enregistrement.
 
@@ -658,6 +740,9 @@ La session simulée (`polyptyque-engine/tests`) rejoue des enregistrements compl
 | Encodage et MKV | [[FFmpeg]] 8.1 (version GPL) : un processus par source, alimenté par deux tubes nommés (image NV12, son flottant), surveillé et relancé si besoin | NVENC, AMF, Quick Sync, x264 ; une panne d'encodeur n'affecte qu'une source |
 | Conversion MP4 | [[FFmpeg]] en recopie sans réencodage (`-c copy`) | Vérification des pistes et de la durée |
 | Fermeture de session | `ShutdownBlockReasonCreate`, messages `WM_QUERYENDSESSION` et `WM_ENDSESSION` sur la fenêtre principale | |
+| Pilotage | Tube nommé Windows en entrées-sorties asynchrones, autorisations SDDL réservées au compte (`O:<SID>D:P(A;;GA;;;<SID>)`), `PIPE_REJECT_REMOTE_CLIENTS`, `FILE_FLAG_FIRST_PIPE_INSTANCE` ; JSON-RPC 2.0, une ligne par message ; socket Unix hors Windows | Commandes exécutées sur le fil de l'interface (`invoke_from_event_loop`), comme un clic |
+| Serveur MCP | Entrée et sortie standard ; spécification 2026-07-28 (requêtes sans état, `_meta`, `server/discover`) et poignée de main `initialize` des versions précédentes | Écrit sans bibliothèque MCP : quelques centaines de lignes |
+| Arrière-plan | `Shell_NotifyIconW` (version 4), messages reçus par la fenêtre principale cachée ; menu `TrackPopupMenu` ; message `TaskbarCreated` ; second lancement : message enregistré `Polyptyque.Afficher` | Boucle de l'interface maintenue fenêtre cachée (`run_event_loop_until_quit` de Slint) |
 | Programmation | Heure locale du système par `chrono` (changements d'heure compris) ; anti-veille `SetThreadExecutionState` sur un fil dédié ; lancement au démarrage par la clé `Run` de l'utilisateur | Vérifiée par des tests avec le vrai fuseau Europe/Paris (`chrono-tz`) |
 | Conversion d'image | Processeur vidéo Direct3D 11 de la carte graphique | Mise à l'échelle et conversion NV12 BT.709 sans passer par le processeur |
 | Interface | [[Slint]] | Apparence décrite dans des fichiers `.slint` séparés de la logique ; compatible GPL v3 ; accessibilité via AccessKit ; aperçus par tampons d'image |
@@ -747,8 +832,33 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 > - [x] Détails d'erreur d'autres logiciels renvoyés au journal
 > - [x] Rapport masqué, fenêtre de signalement, boutons des réglages et du bilan d'incident (vérifié en mode démonstration)
 > - [x] Formulaires d'issue anglais et français (`bug-report.yml`, `signalement.yml`)
-> - [ ] Pré-remplissage de la page vérifié, une fois les formulaires sur `main`
+> - [x] Formulaires reconnus par GitHub sur `main` (2026-10-25) : valides, sans erreur, identifiants `version`, `windows`, `gpu` conformes à l'adresse construite par Polyptyque
+> - [ ] Page pré-remplie vue une fois, connecté à GitHub (la page « nouvelle issue » exige une connexion)
 > - [ ] Validation sur la machine de référence
+> - [x] Fins inattendues (témoin de lancement) et erreurs récentes de la carte graphique dans le rapport (2026-10-27)
+> - [x] Fin inattendue détectée sur la machine de référence (version portable arrêtée par `taskkill /F`, relancée dans la même minute : deux journaux, avertissement écrit ; fermeture normale : témoin retiré), 2026-10-27
+> - [ ] Section « Fins inattendues » vue dans un rapport préparé depuis l'interface
+
+> [!todo] Étape 3 septies - Arrière-plan ([[#Programmation des enregistrements]]), écrite le 2026-10-25
+> - [x] Icône dans la zone de notification pendant l'arrière-plan : clic, menu Afficher / Quitter, info-bulle, Explorateur redémarré
+> - [x] Lancement au démarrage de Windows directement en arrière-plan (au lieu de la fenêtre réduite)
+> - [x] Fermeture avec une programmation prévue : Continuer en arrière-plan / Quitter quand même, « Se souvenir de mon choix », réglage « Fermer la fenêtre avec une programmation prévue »
+> - [x] Fenêtre qui revient : raccourci, second lancement, question du démarrage manqué ; aperçus et niveaux arrêtés en arrière-plan
+> - [x] Vérifié en mode démonstration (question, choix retenu, réglage, français et anglais) ; icône et menu non vérifiables hors Windows
+> - [ ] Validation sur la machine de référence ([[protocole-test-programmation#G - Arrière-plan]])
+
+> [!todo] Étape 3 octies - Pilotage par d'autres programmes ([[#Pilotage par d'autres programmes]]), écrite le 2026-10-25
+> - [x] Canal de commande : tube nommé réservé au compte (socket Unix hors Windows), JSON-RPC 2.0, état en direct, plusieurs programmes à la fois
+> - [x] 42 commandes décrites une seule fois (catalogue), exécutées par les mêmes actions que l'interface ; confirmations et verrous identiques
+> - [x] Garde-fous : réglage désactivé par défaut, micro accepté seulement dans la fenêtre, point rouge et notification en arrière-plan, demandeur cité, pastille « Pilotage », titres des fenêtres retenus
+> - [x] Mode commande `polyptyque-cli.exe` (remplace la console de l'étape 0), JSON, codes de retour stables, traduit ; lancement en arrière-plan
+> - [x] Serveur MCP (spécification 2026-07-28 et précédentes)
+> - [x] Documentation : [[control|docs/control.md]] (liste des commandes générée et vérifiée par un test), `AGENTS.md`, `llms.txt`, skill `skills/polyptyque`, README
+> - [x] Connexion intégrée de Claude Code, Claude Desktop, Codex, OpenClaw et Hermes Agent : détection, ajout/réparation/retrait, sauvegarde et état réel
+> - [x] Consignes numérotées et menus propres aux cinq clients, état « Configuration enregistrée », réparation seulement si nécessaire ; connexion et accès aux scènes confirmés par l'utilisateur dans Claude Desktop
+> - [ ] Validation dans les cinq assistants Windows natifs (configuration locale et première utilisation d'un outil)
+> - [x] Vérifié en mode démonstration de bout en bout (toutes les commandes, erreurs, confirmations, enregistrement et conversion réels, question du micro acceptée, refusée et sans réponse, MCP des deux époques)
+> - [ ] Validation sur la machine de référence ([[protocole-test-pilotage]])
 
 > [!todo] Étape 4 - Publication
 > - [ ] Dépôt public, première version publiée
@@ -757,7 +867,8 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 > - [ ] Tests d'endurance de 12 h complets (un premier test de 14 h 15 réussi le 2026-10-21 en 1280×720, 30 i/s ; à refaire avec les réglages par défaut, 1920×1080 et 60 i/s)
 
 > [!info] Plus tard
-> - Programmation : lancement par Windows à l'heure prévue même logiciel fermé, sortie de veille automatique, pilotage par un modèle de langage
+> - Programmation : lancement par Windows à l'heure prévue même logiciel fermé, sortie de veille automatique
+> - Plugin Stream Deck, par le canal de commande
 > - Diffusion en direct (gratuite)
 > - Portage macOS, puis Linux
 > - Réglages d'encodage par source
@@ -836,6 +947,18 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 | 2026-10-25 | Date d'une programmation saisie dans **trois listes** jour, mois (en toutes lettres), année, dans l'ordre de la langue (« 25 octobre 2026 », « October 25, 2026 »), à la place du sélecteur de date de Slint : sa semaine commence le dimanche, sans réglage, et il écrit les mois en anglais même en français. Liste des jours ajustée au mois choisi ; années proposées : l'année en cours et la suivante ; jour de la semaine rappelé sous les listes |
 | 2026-10-25 | Publication bilingue : `README.md` en anglais (en tête) et `README.fr.md`, captures du mode démonstration dans les deux langues (données d'exemple dans la langue du système) ; `README.txt` anglais livré avec `LISEZMOI.txt` ; description des exécutables réduite au nom (« Polyptyque », affichée par le Gestionnaire des tâches) et ressources Windows en langue neutre ; titre des pages de version en anglais (« Polyptyque 1.0 beta 5 »), notes en anglais puis en français |
 | 2026-10-25 | Publication de la 1.0.0-beta.5 (préversion) : version anglaise complète (réglages « Langue » et « Horloge »), signalement d'un problème, date des programmations en trois listes |
+| 2026-10-25 | Démarrage à l'heure prévue confirmé sans question : la fenêtre au compte à rebours de deux minutes ne concerne que le démarrage manqué (rien à anticiper, Polyptyque n'était pas ouvert ou l'ordinateur dormait) |
+| 2026-10-25 | **Arrière-plan dans la zone de notification** (pas une fenêtre réduite) : sinon, le choix « arrière-plan » retenu ne laisserait plus aucun moyen de quitter par la croix ; l'icône donne « Quitter Polyptyque ». Lancement au démarrage de Windows directement en arrière-plan. Fermer avec une programmation prévue : question avec « Continuer en arrière-plan », « Se souvenir de mon choix » et réglage (Demander / Continuer en arrière-plan / Quitter). Le choix ne joue que si une programmation attend ; « Quitter » retenu ne saute que l'avertissement des programmations, jamais celui d'un enregistrement ou d'une conversion ; « arrière-plan » retenu s'applique aussi pendant un enregistrement |
+| 2026-10-25 | **Pilotage par d'autres programmes** (assistant IA, script, futur plugin Stream Deck) par un canal de commande local : tube nommé réservé au compte Windows, pas de serveur web local ; JSON-RPC 2.0 ; tout ce que fait l'interface, avec les mêmes verrous, et `confirm` pour ce qu'elle fait confirmer. Garde-fous : désactivé par défaut et activable dans la fenêtre seulement, enregistrement toujours visible (point rouge, notification, demandeur cité), pastille « Pilotage » |
+| 2026-10-25 | Console interactive du prototype **remplacée** par le mode commande `polyptyque-cli.exe` (JSON, codes de retour 0 à 9, traduit) plutôt que traduite : elle enregistrait en dehors de Polyptyque, sans prendre le verrou d'instance unique |
+| 2026-10-25 | Micro activé par un programme : confirmation affichée dans Polyptyque, seule la personne devant l'écran peut accepter (deux minutes, sinon refus) ; titres des fenêtres donnés seulement si plusieurs fenêtres du même programme sont ouvertes ; serveur MCP livré dans ce chantier (`polyptyque-cli mcp`) |
+| 2026-10-27 | Bêta 6 jamais publiée seule : son contenu (arrière-plan) sort avec le pilotage dans la bêta 7, pour tout tester en une fois sur la machine de référence |
+| 2026-10-27 | Publication de la 1.0.0-beta.7 (préversion) : arrière-plan dans la zone de notification (icône près de l'horloge), choix à la fermeture avec une programmation prévue et réglage, lancement au démarrage de Windows en arrière-plan ; pilotage par d'autres programmes (réglage, `polyptyque-cli.exe` à la place de la console, serveur MCP, point rouge et notification d'enregistrement en arrière-plan) |
+| 2026-10-27 | Rapport de problème : **fins inattendues** (témoin de lancement retiré à chaque fin normale) et **erreurs récentes de la carte graphique** lues dans les journaux de Windows. Cas d'origine : bêta 7 fermée d'office par le pilote OpenGL de NVIDIA lors d'une réinitialisation du pilote (erreur matérielle du GPU), invisible dans le journal et le rapport de Polyptyque, retrouvée seulement dans l'Observateur d'événements |
+| 2026-10-27 | Bêta 7 finalement jamais publiée seule (fabrication de `dev` testée sur la machine de référence, sans étiquette ni page de version) : son contenu sort dans la **1.0.0-beta.8**, avec les fins inattendues et les erreurs de la carte graphique dans le rapport de problème. Notes `packaging/notes/v1.0.0-beta.8.md` (celles des bêtas 6 et 7 reprises) |
+| 2026-10-27 | Connexion des assistants dans Polyptyque : le bouton remplace le renvoi GitHub par la détection et la configuration de Claude Code, Claude Desktop, Codex, OpenClaw et Hermes Agent. Fichiers natifs des clients, sauvegarde exacte et conflits refusés ; réparation et retrait sans toucher aux autres serveurs. Configuration préparée distincte d’une connexion réellement utilisée. Windows natif seulement pour le parcours automatique ; pas de chat intégré ni de gestion des abonnements |
+| 2026-10-27 | Retour utilisateur sur Claude Desktop : scènes et commandes accessibles, mais « autoriser les outils » et « Configuré · en attente » ambigus. Remplacés par des étapes numérotées propres aux cinq assistants et « Configuration enregistrée ». Réparer réservé à une configuration qui le nécessite ; état des fichiers relu pendant l'ouverture de la feuille sans écriture automatique |
+| 2026-10-27 | Préversion **1.0.0-beta.9** : connexion intégrée des cinq assistants, étapes propres aux clients et états explicites ; regroupe le pilotage, l'arrière-plan et les diagnostics des bêtas 6 à 8 non publiées. README français/anglais et notes bilingues synchronisés ; publication GitHub en préversion, pas de 1.0 stable |
 
 ---
 

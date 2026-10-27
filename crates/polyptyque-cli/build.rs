@@ -1,5 +1,6 @@
 include!("../../packaging/ressources_windows.rs");
 
 fn main() {
-    ressources_windows("Polyptyque (console)", "polyptyque-console");
+    // Même description que l'interface : le nom seul, dans toutes les langues.
+    ressources_windows("Polyptyque", "polyptyque-cli");
 }

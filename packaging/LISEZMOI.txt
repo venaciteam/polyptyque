@@ -1,4 +1,4 @@
-POLYPTYQUE 1.0 BÊTA 5
+POLYPTYQUE 1.0 BÊTA 8
 =====================
 
 Polyptyque enregistre plusieurs fenêtres en même temps, chacune dans son
@@ -29,8 +29,11 @@ affichent « portable » à côté du numéro de version.
 Contenu
 -------
 - polyptyque.exe         : Polyptyque, avec son interface
-- polyptyque-console.exe : la version en console de l'étape 0 (mêmes
-                           réglages, mêmes scènes)
+- polyptyque-cli.exe     : le mode commande, pour piloter Polyptyque
+                           depuis un assistant IA (serveur MCP), un script
+                           ou un Stream Deck. À autoriser dans les réglages :
+                           « Autoriser le pilotage par d'autres programmes ».
+                           Aide : polyptyque-cli help
 - ffmpeg.exe             : l'encodeur vidéo utilisé par Polyptyque (doit
                            rester à côté)
 - LISEZMOI.txt           : ce fichier (README.txt : en anglais)
@@ -104,8 +107,11 @@ La pastille « Programmer », en haut, ouvre les programmations : une scène,
 une heure de début et de fin (le lendemain si la fin est avant le début),
 une seule fois ou certains jours de la semaine. Polyptyque doit rester
 ouvert : tant qu'une programmation est active, l'ordinateur et l'écran ne
-se mettent pas en veille d'eux-mêmes. L'option « Lancer Polyptyque au
-démarrage de Windows » le relance (réduit) après un redémarrage.
+se mettent pas en veille d'eux-mêmes. Fermer la fenêtre propose alors de
+continuer en arrière-plan : l'icône de Polyptyque reste près de l'horloge
+(un clic l'affiche, un clic droit permet de le quitter). L'option
+« Lancer Polyptyque au démarrage de Windows » le relance en arrière-plan
+après un redémarrage.
 - Polyptyque fermé ou ordinateur en veille à l'heure prévue : à son retour
   pendant le créneau, il demande s'il faut lancer l'enregistrement, et le
   lance seul au bout de deux minutes sans réponse.
@@ -113,6 +119,20 @@ démarrage de Windows » le relance (réduit) après un redémarrage.
   à la main pendant un créneau n'est arrêté à l'heure de fin que si on
   l'accepte ; arrêter à la main un enregistrement programmé demande
   confirmation.
+
+Pilotage par un assistant IA
+----------------------------
+Un assistant IA (Claude ou tout assistant compatible MCP), un script ou un
+Stream Deck peut faire tout ce que fait la fenêtre : régler Polyptyque,
+préparer les scènes, lancer et programmer les enregistrements. Désactivé
+par défaut : Réglages > « Autoriser le pilotage par d'autres programmes ».
+Le bouton « Connecter un assistant IA… » qui apparaît alors explique
+comment le brancher (polyptyque-cli.exe, à côté de polyptyque.exe).
+Seuls les programmes de cet ordinateur, ouverts avec ce compte Windows, y
+ont accès ; le micro ne s'active qu'avec un accord donné dans la fenêtre,
+et un enregistrement se voit toujours (point rouge sur l'icône près de
+l'horloge et notification de Windows quand Polyptyque est en
+arrière-plan).
 
 À savoir
 --------

@@ -29,9 +29,10 @@ use std::path::{Path, PathBuf};
 /// sans traduction fait échouer le test.
 const ENGLISH_COMPLETE: bool = true;
 
-/// Crates dont les messages Rust passent par `tr!`. La console
-/// (`polyptyque-cli`) reste en français pour l'instant.
-const RUST_CRATES: [&str; 4] = ["polyptyque-app", "polyptyque-core", "polyptyque-engine", "polyptyque-windows"];
+/// Crates dont les messages Rust passent par `tr!`. Le mode commande
+/// (`polyptyque-cli`) partage le catalogue de l'interface.
+const RUST_CRATES: [&str; 5] =
+    ["polyptyque-app", "polyptyque-cli", "polyptyque-core", "polyptyque-engine", "polyptyque-windows"];
 
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct Key {
@@ -99,7 +100,8 @@ fn string_literal(text: &str, rust: bool) -> Result<(String, usize), String> {
                     out.push(char::from_u32(value).ok_or("caractère invalide")?);
                 }
                 // Rust : fin de ligne échappée, les espaces suivants sont ignorés.
-                Some('\n') if rust => {
+                // `\r\n` : fichiers extraits par Git sous Windows (autocrlf).
+                Some('\n' | '\r') if rust => {
                     let rest = &text[i + 2..];
                     let skip = rest.len() - rest.trim_start().len();
                     for _ in 0..rest[..skip].chars().count() {
@@ -175,7 +177,8 @@ fn scan_sources() -> Vec<Message> {
     for (path, rust) in files {
         let text = fs::read_to_string(&path).unwrap();
         let marker = if rust { "tr!(" } else { "@tr(" };
-        let relative = path.strip_prefix(&crates).unwrap().display().to_string();
+        // Séparateur `/` partout : catalogue identique quel que soit le système.
+        let relative = path.strip_prefix(&crates).unwrap().display().to_string().replace('\\', "/");
         for (start, _) in text.match_indices(marker) {
             // `xtr!(`, `str!(`… : pas notre macro.
             if rust && text[..start].chars().next_back().is_some_and(|c| c.is_alphanumeric() || c == '_') {

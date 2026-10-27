@@ -29,10 +29,10 @@
 
 ## Télécharger
 
-**Windows 10 et 11** (64 bits), version 1.0 bêta 5 :
+**Windows 10 et 11** (64 bits), version 1.0 bêta 9 :
 
-- **[Télécharger l'installateur](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.5/Polyptyque-Setup.exe)** : la version classique, qui s'installe comme un logiciel habituel. Dans le doute, choisir celle-ci.
-- **[Télécharger la version portable](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.5/Polyptyque-portable.zip)** : sans installation, à décompresser dans le dossier de son choix, même sur une clé USB.
+- **[Télécharger l'installateur](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.9/Polyptyque-Setup.exe)** : la version classique, qui s'installe comme un logiciel habituel. Dans le doute, choisir celle-ci.
+- **[Télécharger la version portable](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.9/Polyptyque-portable.zip)** : sans installation, à décompresser dans le dossier de son choix, même sur une clé USB.
 
 macOS et Linux : pas encore disponibles.
 
@@ -47,6 +47,7 @@ Configuration requise et message de Windows au premier lancement : voir [Install
 - [Léger par conception](#léger-par-conception)
 - [Installation](#installation)
 - [Prise en main](#prise-en-main)
+- [Piloter Polyptyque avec un assistant IA](#piloter-polyptyque-avec-un-assistant-ia)
 - [Pour le montage](#pour-le-montage)
 - [Limites connues](#limites-connues)
 - [Signaler un problème](#signaler-un-problème)
@@ -80,7 +81,7 @@ Polyptyque fait l'inverse : **chaque fenêtre est enregistrée à part**, dans s
 
 **Enregistrements programmés**
 - Début et fin à heure fixe, une seule fois ou certains jours de la semaine : chaque programmation lance une scène, y compris la nuit (créneaux qui passent minuit) et aux changements d'heure.
-- Tant qu'une programmation est active, l'ordinateur et l'écran ne se mettent pas en veille d'eux-mêmes. Polyptyque peut se lancer au démarrage de Windows (réduit), pour que les programmations survivent à un redémarrage.
+- Tant qu'une programmation est active, l'ordinateur et l'écran ne se mettent pas en veille d'eux-mêmes. Fermer la fenêtre propose de continuer en arrière-plan, avec l'icône de Polyptyque près de l'horloge, et Polyptyque peut se lancer au démarrage de Windows directement en arrière-plan, pour que les programmations survivent à un redémarrage.
 - Démarrage manqué (Polyptyque fermé ou ordinateur en veille à l'heure prévue) : à son retour pendant le créneau, Polyptyque demande s'il faut lancer l'enregistrement, et le lance seul au bout de deux minutes sans réponse.
 - La programmation n'arrête que ce qu'elle a lancé : un enregistrement lancé à la main pendant un créneau n'est arrêté à l'heure de fin que si on l'accepte. Arrêter à la main un enregistrement programmé demande confirmation.
 
@@ -104,6 +105,7 @@ Polyptyque fait l'inverse : **chaque fenêtre est enregistrée à part**, dans s
 - Niveau sonore de chaque source affiché en permanence, même sans enregistrer : une source muette se repère avant de lancer l'enregistrement.
 - Un bouton pour tout enregistrer, ou un bouton par source pour enregistrer une source seule.
 - Encodage par la carte graphique (NVIDIA, AMD, Intel) quand elle est disponible, ou par le processeur. Si la carte refuse un encodage de plus (limite des cartes GeForce, autres logiciels compris), la source passe seule sur le processeur.
+- Pilotable par un assistant IA, un script ou un Stream Deck, si vous l'autorisez : voir [Piloter Polyptyque avec un assistant IA](#piloter-polyptyque-avec-un-assistant-ia).
 - En français et en anglais : Polyptyque suit la langue d'affichage de Windows (le français si Windows est en français, l'anglais sinon), et son horloge suit le format régional de Windows (24 h ou 12 h). Les deux se changent dans les réglages.
 
 ## Léger par conception
@@ -179,6 +181,31 @@ Polyptyque existe en français et en anglais, dans une seule et même version. I
 
 Dans la fenêtre de Polyptyque, <kbd>Ctrl</kbd> + <kbd>C</kbd> copie la source sélectionnée et <kbd>Ctrl</kbd> + <kbd>V</kbd> la colle dans la scène en cours.
 
+## Piloter Polyptyque avec un assistant IA
+
+Un assistant IA (Claude, ou tout assistant compatible MCP), un script ou un Stream Deck peut faire tout ce que fait la fenêtre : ajouter des sources, choisir les bons réglages pour l'ordinateur, lancer, programmer et arrêter des enregistrements. Par exemple : « Prépare Polyptyque pour enregistrer mes fenêtres Firefox et Discord, puis enregistre ce soir de 21 h à 23 h. »
+
+**1. L'autoriser** : dans Polyptyque, Réglages › « Autoriser le pilotage par d'autres programmes » (désactivé par défaut), puis « Connecter un assistant IA… ».
+
+**2. Choisir l'assistant** : Claude Code, Claude Desktop, Codex, OpenClaw ou Hermes Agent. Cliquer sur **Connecter** : Polyptyque prépare la configuration locale, sans commande à saisir ni fichier à modifier à la main. Suivre ensuite les étapes numérotées propres à cet assistant : fermeture ou rechargement, menu des outils et première demande. « Configuration enregistrée » signifie que Polyptyque a terminé sa préparation ; aucun clic sur Réparer n'est nécessaire pour la terminer.
+
+**3. Vérifier** : le bouton **Copier la demande** prépare « Liste mes scènes dans Polyptyque. ». L'envoyer dans l'assistant : l'état passe de **Configuration enregistrée** à **Connecté** quand il utilise un outil Polyptyque.
+
+**Réparer** actualise une connexion existante, notamment après déplacement de la version portable. **Déconnecter** retire uniquement l'entrée Polyptyque ; relancer l'assistant pour fermer ses sessions encore actives. Une sauvegarde du fichier original est conservée à côté de sa configuration. Les autres serveurs et réglages restent en place ; les commentaires JSON5 et YAML ne sont pas conservés dans le fichier modifié. Si un autre serveur porte déjà le même nom, Polyptyque refuse de le remplacer.
+
+La connexion automatique vise les **installations Windows natives sur ce PC**. Si une configuration personnalisée n'est pas détectée, utiliser « Choisir la configuration… ». Les environnements WSL, Docker et les serveurs distants nécessitent une configuration particulière. Polyptyque ne gère ni compte IA, ni clé API, ni abonnement : les échanges restent dans l'assistant habituel.
+
+Pour les autres assistants et les scripts, `polyptyque-cli.exe`, à côté de `polyptyque.exe`, reste accessible en JSON (`polyptyque-cli help`). Configuration MCP manuelle : [docs/control.md](docs/control.md#mcp-server).
+
+**Ce qui reste entre vos mains**
+- Seuls les programmes de cet ordinateur, ouverts avec votre compte Windows, peuvent piloter Polyptyque : jamais une page web, jamais un autre ordinateur.
+- Activer le micro demande votre accord, dans la fenêtre de Polyptyque elle-même.
+- Un enregistrement se voit toujours : en arrière-plan, un point rouge sur l'icône près de l'horloge et une notification de Windows au démarrage ; le message de démarrage nomme le programme qui l'a demandé. Une pastille « Pilotage » en haut indique quel programme est connecté.
+- Tout ce que la fenêtre ferait confirmer (supprimer une scène, arrêter un enregistrement programmé, quitter…), l'assistant doit d'abord vous le demander.
+- Les titres des fenêtres peuvent être privés : l'assistant ne les voit que s'il faut distinguer deux fenêtres du même programme. Un assistant en ligne envoie ce qu'il lit (noms des scènes et des sources, par exemple) à son fournisseur.
+
+Référence complète, en anglais, pour les développeurs et les assistants : [docs/control.md](docs/control.md) ; skill pour les assistants : [skills/polyptyque](skills/polyptyque/SKILL.md).
+
 ## Pour le montage
 
 - **MKV ou MP4** : pendant l'enregistrement, Polyptyque écrit en MKV, un format qui reste lisible même après une coupure. « Convertir en MP4… » crée une copie MP4 à côté, sans perte de qualité, et la conversion peut être automatique en fin d'enregistrement. Le MKV est conservé ; prévoir le double d'espace disque.
@@ -193,7 +220,8 @@ Dans la fenêtre de Polyptyque, <kbd>Ctrl</kbd> + <kbd>C</kbd> copie la source s
 - Une fenêtre réduite dans la barre des tâches n'est plus dessinée par Windows : son image se fige, et sa carte affiche « Réduite ». Le bouton « Rétablir la fenêtre » de la carte la ramène, même pendant l'enregistrement. Une fenêtre cachée derrière d'autres s'enregistre normalement.
 - Les contenus protégés (Netflix, Disney+…) apparaissent souvent en noir.
 - Certains jeux en plein écran exclusif donnent une image noire : préférer le mode « fenêtré sans bordure ».
-- Les enregistrements programmés ne démarrent que si Polyptyque est ouvert et l'ordinateur allumé : Windows ne lance pas encore Polyptyque à l'heure prévue, ni ne sort l'ordinateur de veille. La version console n'a pas de programmation.
+- Les enregistrements programmés ne démarrent que si Polyptyque est ouvert et l'ordinateur allumé : Windows ne lance pas encore Polyptyque à l'heure prévue, ni ne sort l'ordinateur de veille.
+- Le pilotage par d'autres programmes demande que Polyptyque soit ouvert (`polyptyque-cli app launch` le lance en arrière-plan). Le bilan d'un enregistrement interrompu et le signalement d'un problème restent dans la fenêtre.
 - Si le navigateur d'une source a plusieurs fenêtres, seule celle de la source revient au lancement suivant quand Polyptyque les ferme : Firefox et Chrome ne rouvrent que la dernière fenêtre fermée. Les autres restent dans « Fenêtres récemment fermées » de l'historique du navigateur.
 
 La liste complète, les choix techniques et la feuille de route sont dans le [cahier des charges](docs/cahier-des-charges.md).
@@ -208,15 +236,16 @@ Réglages > « Signaler un problème… » (aussi proposé après un enregistrem
 
 | Dossier | Rôle |
 |---|---|
-| `crates/polyptyque-core` | Scènes, sources, réglages et leurs sauvegardes, nommage, calculs de synchronisation, commandes FFmpeg, version portable, journal de la session en cours, programmations (créneaux et décisions), lecture du catalogue de traduction ; le contrat `Platform` que chaque système doit remplir |
-| `crates/polyptyque-windows` | Implémentation Windows : capture d'image (Windows.Graphics.Capture) et de son (WASAPI), fenêtres, navigateurs, tubes, copie unique, veille et fermeture de session, lancement au démarrage de Windows, format d'horloge régional |
+| `crates/polyptyque-core` | Scènes, sources, réglages et leurs sauvegardes, nommage, calculs de synchronisation, commandes FFmpeg, version portable, journal de la session en cours, programmations (créneaux et décisions), lecture du catalogue de traduction, protocole du canal de commande et catalogue des commandes ; le contrat `Platform` que chaque système doit remplir |
+| `crates/polyptyque-windows` | Implémentation Windows : capture d'image (Windows.Graphics.Capture) et de son (WASAPI), fenêtres, navigateurs, tubes (dont celui du canal de commande), copie unique, veille et fermeture de session, lancement au démarrage de Windows, format d'horloge régional |
 | `crates/polyptyque-engine` | Sessions d'enregistrement : horloge commune, capture, encodeurs FFmpeg surveillés et relancés, dossier de secours, conversion MP4 et réparation des fichiers coupés net |
 | `crates/polyptyque-app` | Interface graphique : apparence dans `ui/` (thème dans `ui/theme.slint`), logique dans `src/` (dont le bilan après un incident), mises à jour, traductions dans `lang/` |
-| `crates/polyptyque-cli` | Version en console, livrée pour le diagnostic |
+| `crates/polyptyque-cli` | Mode commande (`polyptyque-cli.exe`) et serveur MCP : pilotage par d'autres programmes, par le canal de commande |
 | `assets/logo` | Logo et icônes, générés par `generer.py` |
-| `docs` | Cahier des charges, analyse des risques, fiches de test et captures d'écran |
+| `docs` | Cahier des charges, analyse des risques, fiches de test, captures d'écran, et la [référence du pilotage](docs/control.md) (en anglais) |
+| `skills/polyptyque` | Skill qui apprend à un assistant IA à se servir de Polyptyque |
 
-Seule `polyptyque-windows` dépend du système : un portage vers macOS ou Linux consistera à écrire son équivalent.
+Seule `polyptyque-windows` dépend du système : un portage vers macOS ou Linux consistera à écrire son équivalent. Agents de code : voir [AGENTS.md](AGENTS.md).
 
 **Compiler et tester**
 

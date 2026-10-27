@@ -4,6 +4,7 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 mod controller;
+mod assistants;
 mod convert;
 #[cfg(not(windows))]
 mod demo;
@@ -12,13 +13,15 @@ mod i18n;
 mod meter;
 mod preview;
 mod update;
+#[cfg(test)]
+mod ui_snapshot;
 
 use std::fs::{self, File};
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 
 use anyhow::Result;
-use polyptyque_core::{naming, paths, storage};
+use polyptyque_core::{launch, naming, paths, storage};
 use simplelog::{ConfigBuilder, LevelFilter, WriteLogger};
 
 slint::include_modules!();
@@ -26,6 +29,10 @@ slint::include_modules!();
 /// Version installée par une mise à jour, si Polyptyque vient d'être
 /// relancé par elle.
 pub static UPDATED_TO: OnceLock<String> = OnceLock::new();
+
+/// Nom du journal de ce lancement (témoin de lancement, voir
+/// `polyptyque_core::launch`).
+pub static LOG_NAME: OnceLock<String> = OnceLock::new();
 
 /// Argument donné par Windows quand il lance Polyptyque à l'ouverture de
 /// session (voir le réglage « Lancer Polyptyque au démarrage de Windows »).
@@ -50,12 +57,15 @@ fn main() {
         })
         .run();
     let at_startup = std::env::args().skip(1).any(|arg| arg == STARTUP_ARG);
+    // Lancé par le mode commande : en arrière-plan aussi.
+    let in_background =
+        at_startup || std::env::args().skip(1).any(|arg| arg == polyptyque_core::control::BACKGROUND_ARG);
     // Une seule copie : vérifié avant d'ouvrir le journal, qui écraserait
     // celui de la copie déjà ouverte s'il porte la même minute.
     #[cfg(windows)]
     let _instance = {
         use polyptyque_windows::single_instance::{self, Instance};
-        match single_instance::acquire(!at_startup) {
+        match single_instance::acquire(!in_background) {
             Instance::First(lock) => lock,
             Instance::AlreadyOpen => return,
         }
@@ -65,11 +75,22 @@ fn main() {
     i18n::set_language(i18n::Language::system());
     if at_startup {
         log::info!("lancé par Windows à l'ouverture de session");
+    } else if in_background {
+        log::info!("lancé en arrière-plan par le mode commande");
     }
     if let Some(root) = paths::portable_root() {
         log::info!("version portable : données dans {}", root.join(paths::PORTABLE_DATA_DIR).display());
     }
-    if let Err(e) = launch(at_startup) {
+    let log_name = log.as_ref().and_then(|p| p.file_name()).map(|n| n.to_string_lossy().into_owned());
+    let log_name = LOG_NAME.get_or_init(|| log_name.unwrap_or_default());
+    if let Some(previous) = launch::begin(&paths::launch_marker_file(), log_name) {
+        log::warn!("{} (journal {previous}) : plantage, fermeture forcée ou coupure de courant", launch::UNEXPECTED_END);
+    }
+    let result = launch(in_background);
+    // Erreur ou non, la fin est passée par ici et figure au journal.
+    log::info!("fermeture normale de Polyptyque");
+    launch::end(&paths::launch_marker_file());
+    if let Err(e) = result {
         log::error!("{e:#}");
         let log = log.map(|p| p.display().to_string()).unwrap_or_default();
         show_fatal(&tr::tr!("{}\n\nJournal : {}", format!("{e:#}"), log));
@@ -120,7 +141,9 @@ fn init_logging() -> Option<PathBuf> {
     let dir = paths::logs_dir();
     fs::create_dir_all(&dir).ok()?;
     let (date, time) = naming::now_parts();
-    let path = dir.join(format!("polyptyque_{date}_{time}.log"));
+    // Relance dans la même minute (après un plantage, justement) : nouveau
+    // fichier, `… (2).log`, le journal du lancement précédent est gardé.
+    let path = naming::unique_path(&dir, &format!("polyptyque_{date}_{time}"), "log", &Default::default());
     let file = File::create(&path).ok()?;
     let mut builder = ConfigBuilder::new();
     let _ = builder.set_time_offset_to_local();

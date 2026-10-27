@@ -19,10 +19,16 @@ polyptyque-core.workspace = true
 polyptyque-engine.workspace = true
 simplelog.workspace = true
 slint = { version = "1.18", features = ["raw-window-handle-06"] }
-sys-locale = "0.3"
+serde_json.workspace = true
+json5 = "0.4"
+serde_yaml_ng = "0.10"
+toml_edit = "0.25"
+toml.workspace = true
+sys-locale.workspace = true
 tr.workspace = true
 
 [target.'cfg(windows)'.dependencies]
+arboard = { version = "3.7", default-features = false }
 polyptyque-windows.workspace = true
 raw-window-handle = "0.6"
 rfd = { version = "0.17", default-features = false }

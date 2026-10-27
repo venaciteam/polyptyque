@@ -67,6 +67,18 @@ export struct WindowItem {
     browser: bool,
 }
 
+export struct AssistantItem {
+    id: string,
+    name: string,
+    state: string,
+    detail: string,
+    tone: int,
+    configured: bool,
+    needs-repair: bool,
+    can-connect: bool,
+    can-disconnect: bool,
+}
+
 export global Bridge {
     // État général.
     in property <bool> recording;
@@ -93,6 +105,10 @@ export global Bridge {
     in property <string> update-state;
     in property <string> update-text;
     in property <float> update-progress;
+
+    // Pilotage : programmes connectés (« Pilotage · Claude »), vide si
+    // aucun.
+    in property <string> control-text;
 
     // Conversion MP4 en cours.
     in property <bool> converting;
@@ -183,6 +199,11 @@ export global Bridge {
     // Action destructrice (bouton rouge) ou non.
     in property <bool> confirm-danger: true;
 
+    // Fermeture de la fenêtre alors qu'une programmation est prévue :
+    // arrière-plan ou quitter, choix retenu si la case est cochée.
+    in property <string> close-text;
+    in-out property <bool> close-remember;
+
     // Réglages.
     in property <[string]> resolution-choices;
     in-out property <int> resolution-index;
@@ -212,6 +233,11 @@ export global Bridge {
     in-out property <bool> settings-open-windows;
     in-out property <bool> settings-close-browsers;
     in-out property <bool> settings-startup;
+    // Pilotage par d'autres programmes (assistant IA, Stream Deck).
+    in-out property <bool> settings-remote-control;
+    // Fermeture avec une programmation prévue : 0 demander, 1 arrière-plan,
+    // 2 quitter.
+    in-out property <int> settings-close-index;
     in-out property <bool> settings-mic;
     in property <[string]> mic-choices;
     in-out property <int> mic-index;
@@ -279,9 +305,22 @@ export global Bridge {
     callback convert-files();
     callback install-update();
     callback open-mic-privacy();
+    // Connexion des assistants installés sur cet ordinateur.
+    in property <[AssistantItem]> assistants;
+    in property <bool> assistants-busy;
+    in property <string> assistants-message;
+    in property <int> assistants-message-tone;
+    callback open-control-help();
+    callback refresh-assistants();
+    callback configure-assistant(string, bool);
+    callback browse-assistant-config(string);
+    callback copy-assistant-prompt();
+    callback close-assistants();
     callback request-cancel-conversion();
     callback close-sheet();
     callback confirm-accepted();
+    callback close-to-background();
+    callback close-anyway();
     callback dismiss-toast();
 
     // Programmation.

@@ -36,7 +36,7 @@ impl App {
     }
 
     /// Écrit le rapport (hors du fil de l'interface : lecture des journaux,
-    /// cartes graphiques), puis montre le fichier et ouvre la page GitHub.
+    /// cartes graphiques, journaux de Windows), puis montre le fichier et ouvre la page GitHub.
     pub(super) fn prepare_report(&self) {
         let info_settings = self.report_settings();
         let platform = self.platform.clone();
@@ -204,5 +204,6 @@ fn report_info(platform: &dyn Platform, settings: Vec<String>) -> (ReportInfo, V
         sys_locale::get_locale().unwrap_or_else(|| "inconnue".into())
     );
     let fields = vec![("version", shown_version), ("windows", system.clone()), ("gpu", graphics.join(", "))];
-    (ReportInfo { version, system, language, graphics, settings }, fields)
+    let driver_events = platform.graphics_driver_events();
+    (ReportInfo { version, system, language, graphics, settings, driver_events }, fields)
 }
