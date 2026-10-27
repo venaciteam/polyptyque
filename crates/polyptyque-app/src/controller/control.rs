@@ -323,18 +323,8 @@ impl App {
         }
     }
 
-    /// Mode d'emploi du pilotage par un assistant IA : section du README,
-    /// dans la langue de l'interface.
-    pub(super) fn open_control_help(&self) {
-        let page = match crate::i18n::Language::current() {
-            crate::i18n::Language::French => "README.fr.md#piloter-polyptyque-avec-un-assistant-ia",
-            crate::i18n::Language::English => "README.md#control-polyptyque-with-an-ai-assistant",
-        };
-        let url = format!("{}/blob/main/{page}", crate::update::REPOSITORY);
-        if let Err(e) = self.platform.shell_open(&url) {
-            log::warn!("ouverture de {url} : {e:#}");
-            self.toast(&tr!("Impossible d'ouvrir la page : {}", url), 3);
-        }
+    pub(super) fn control_client_names(&self) -> Vec<String> {
+        self.control.borrow().clients.values().filter_map(|c| c.name.clone()).collect()
     }
 
     /// Pastille « Pilotage » : les programmes connectés.
@@ -351,6 +341,7 @@ impl App {
             names => tr!("Pilotage · {}", names.join(", ")),
         };
         self.with_bridge(|b| b.set_control_text(text.into()));
+        self.refresh_assistant_rows();
     }
 
     // ----- Requêtes -------------------------------------------------------------

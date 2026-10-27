@@ -46,6 +46,21 @@ Rules: only start or stop a recording, delete something or change settings when 
 
 /// Nom affiché dans Polyptyque pour un client MCP.
 fn display_name(info: Option<&Value>) -> String {
+    display_name_with_connector(info, std::env::var("POLYPTYQUE_ASSISTANT").ok().as_deref())
+}
+
+/// L'identité du branchement est transmise par sa configuration locale.
+/// Elle ne donne aucun droit supplémentaire : elle sert seulement à
+/// distinguer les connexions dans la fenêtre de Polyptyque.
+fn display_name_with_connector(info: Option<&Value>, connector: Option<&str>) -> String {
+    match connector {
+        Some("claude-code") => return "Claude Code".into(),
+        Some("claude-desktop") => return "Claude Desktop".into(),
+        Some("codex") => return "Codex".into(),
+        Some("openclaw") => return "OpenClaw".into(),
+        Some("hermes") => return "Hermes Agent".into(),
+        _ => {}
+    }
     let name = info.and_then(|i| i.get("name")).and_then(Value::as_str).unwrap_or_default();
     match name {
         "claude-ai" => "Claude".to_string(),
@@ -323,8 +338,12 @@ mod tests {
 
     #[test]
     fn names_known_clients() {
-        assert_eq!(display_name(Some(&json!({ "name": "claude-ai", "version": "1" }))), "Claude");
-        assert_eq!(display_name(Some(&json!({ "name": "x", "title": "Mon agent" }))), "Mon agent");
-        assert_eq!(display_name(None), "MCP");
+        assert_eq!(display_name_with_connector(Some(&json!({ "name": "claude-ai", "version": "1" })), None), "Claude");
+        assert_eq!(display_name_with_connector(Some(&json!({ "name": "x", "title": "Mon agent" })), None), "Mon agent");
+        assert_eq!(display_name_with_connector(None, None), "MCP");
+        for (id, name) in [("claude-code", "Claude Code"), ("claude-desktop", "Claude Desktop"), ("codex", "Codex"), ("openclaw", "OpenClaw"), ("hermes", "Hermes Agent")] {
+            assert_eq!(display_name_with_connector(None, Some(id)), name);
+        }
+        assert_eq!(display_name_with_connector(None, Some("unexpected")), "MCP");
     }
 }

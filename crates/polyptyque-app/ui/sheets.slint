@@ -643,8 +643,6 @@ export component SettingsSheet inherits Sheet {
                     alignment: start;
                     ActionButton {
                         text: @tr("Connecter un assistant IA…");
-                        icon: @image-url("icons/launch.svg");
-                        has-icon: true;
                         kind: "ghost";
                         clicked => {
                             Bridge.open-control-help();
@@ -713,6 +711,120 @@ export component SettingsSheet inherits Sheet {
                     Bridge.save-settings();
                 }
             }
+        }
+    }
+}
+
+// Le branchement se fait ici ; l'échange reste dans l'assistant habituel.
+export component AssistantsSheet inherits Sheet {
+    property <bool> show-options: false;
+    title: @tr("Connecter un assistant IA");
+    sheet-width: 720px;
+    close => { Bridge.close-assistants(); }
+
+    Note {
+        text: @tr("Choisir un assistant installé sur ce PC. Polyptyque prépare sa connexion ; les échanges et le compte IA restent dans cet assistant.");
+    }
+    for assistant in Bridge.assistants: Rectangle {
+        background: Theme.surface-raised;
+        border-radius: Theme.radius-small;
+        border-width: 1px;
+        border-color: Theme.border;
+        VerticalLayout {
+            padding: 12px;
+            spacing: 8px;
+            HorizontalLayout {
+                spacing: 12px;
+                Text {
+                    text: assistant.name;
+                    color: Theme.text;
+                    font-size: Theme.font-normal;
+                    font-weight: 600;
+                    horizontal-stretch: 1;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: assistant.state;
+                    color: assistant.tone == 0 ? Theme.text-muted : Theme.tone-color(assistant.tone);
+                    font-size: Theme.font-small;
+                    vertical-alignment: center;
+                }
+                ActionButton {
+                    text: assistant.configured ? @tr("Réparer") : @tr("Connecter");
+                    kind: assistant.configured ? "secondary" : "primary";
+                    enabled: assistant.can-connect && !Bridge.assistants-busy;
+                    clicked => { Bridge.configure-assistant(assistant.id, false); }
+                }
+            }
+            Text {
+                text: assistant.detail;
+                color: Theme.text-muted;
+                font-size: Theme.font-small;
+                wrap: word-wrap;
+            }
+            if root.show-options || !assistant.can-connect || assistant.can-disconnect: HorizontalLayout {
+                alignment: end;
+                spacing: 8px;
+                if root.show-options || !assistant.can-connect: ActionButton {
+                    text: @tr("Choisir la configuration…");
+                    kind: "ghost";
+                    enabled: !Bridge.assistants-busy;
+                    clicked => { Bridge.browse-assistant-config(assistant.id); }
+                }
+                if assistant.can-disconnect: ActionButton {
+                    text: @tr("Déconnecter");
+                    kind: "ghost";
+                    enabled: !Bridge.assistants-busy;
+                    clicked => { Bridge.configure-assistant(assistant.id, true); }
+                }
+            }
+        }
+    }
+    if Bridge.assistants-busy: Text {
+        text: @tr("Vérification des connexions…");
+        color: Theme.text-muted;
+        font-size: Theme.font-small;
+    }
+    if Bridge.assistants-message != "": Note {
+        text: Bridge.assistants-message;
+        tone: Bridge.assistants-message-tone;
+    }
+    Field {
+        label: @tr("Vérifier depuis l'assistant");
+        hint: @tr("Après avoir chargé la connexion, envoyer cette demande. L'état passe à « Connecté » quand l'assistant utilise un outil Polyptyque.");
+        HorizontalLayout {
+            spacing: 10px;
+            Text {
+                text: @tr("Liste mes scènes dans Polyptyque.");
+                color: Theme.text;
+                font-size: Theme.font-normal;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+                wrap: word-wrap;
+            }
+            ActionButton {
+                text: @tr("Copier la demande");
+                clicked => { Bridge.copy-assistant-prompt(); }
+            }
+        }
+    }
+    if root.show-options: Note {
+        text: @tr("Installations Windows natives uniquement. WSL, Docker et les serveurs distants demandent une configuration particulière. Les autres réglages sont conservés ; une sauvegarde garde le fichier original. Les commentaires JSON5 et YAML ne sont pas conservés dans le fichier modifié.");
+    }
+    Footer {
+        ActionButton {
+            text: root.show-options ? @tr("Masquer les options") : @tr("Options de connexion");
+            kind: "ghost";
+            clicked => { root.show-options = !root.show-options; }
+        }
+        ActionButton {
+            text: @tr("Actualiser");
+            enabled: !Bridge.assistants-busy;
+            clicked => { Bridge.refresh-assistants(); }
+        }
+        ActionButton {
+            text: @tr("Retour aux réglages");
+            clicked => { Bridge.close-assistants(); }
         }
     }
 }

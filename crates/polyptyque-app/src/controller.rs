@@ -46,6 +46,7 @@ use crate::update;
 use crate::{AppWindow, Bridge, IncidentFile, SceneItem, ScheduleItem, SourceCard, SourceItem, WindowItem};
 
 mod background;
+mod assistants;
 mod commands;
 mod control;
 mod report;
@@ -268,6 +269,7 @@ pub struct App {
     tray_watch: Cell<bool>,
     /// Pilotage par d'autres programmes : canal, programmes connectés.
     control: RefCell<control::ControlState>,
+    assistant_setup: RefCell<assistants::SetupState>,
 }
 
 /// Enregistrement interrompu trouvé au lancement.
@@ -410,6 +412,7 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
         #[cfg(windows)]
         tray_watch: Cell::new(false),
         control: RefCell::new(control::ControlState::default()),
+        assistant_setup: RefCell::new(assistants::SetupState::default()),
     });
     APP.with(|a| *a.borrow_mut() = Some(app.clone()));
     *app.converter.borrow_mut() =
@@ -613,8 +616,13 @@ fn install_callbacks(ui: &AppWindow) {
         with_app(|a| a.install_update());
     });
     b.on_open_control_help(|| {
-        with_app(|a| a.open_control_help());
+        with_app(|a| a.open_assistants());
     });
+    b.on_refresh_assistants(|| { with_app(|a| a.refresh_assistants()); });
+    b.on_configure_assistant(|id, disconnect| { with_app(|a| a.configure_assistant(&id, disconnect)); });
+    b.on_browse_assistant_config(|id| { with_app(|a| a.browse_assistant_config(&id)); });
+    b.on_copy_assistant_prompt(|| { with_app(|a| a.copy_assistant_prompt()); });
+    b.on_close_assistants(|| { with_app(|a| a.close_assistants()); });
     b.on_open_mic_privacy(|| {
         with_app(|a| a.open_mic_privacy());
     });

@@ -67,6 +67,17 @@ export struct WindowItem {
     browser: bool,
 }
 
+export struct AssistantItem {
+    id: string,
+    name: string,
+    state: string,
+    detail: string,
+    tone: int,
+    configured: bool,
+    can-connect: bool,
+    can-disconnect: bool,
+}
+
 export global Bridge {
     // État général.
     in property <bool> recording;
@@ -293,8 +304,17 @@ export global Bridge {
     callback convert-files();
     callback install-update();
     callback open-mic-privacy();
-    // Mode d'emploi du pilotage par un assistant IA (page du dépôt).
+    // Connexion des assistants installés sur cet ordinateur.
+    in property <[AssistantItem]> assistants;
+    in property <bool> assistants-busy;
+    in property <string> assistants-message;
+    in property <int> assistants-message-tone;
     callback open-control-help();
+    callback refresh-assistants();
+    callback configure-assistant(string, bool);
+    callback browse-assistant-config(string);
+    callback copy-assistant-prompt();
+    callback close-assistants();
     callback request-cancel-conversion();
     callback close-sheet();
     callback confirm-accepted();

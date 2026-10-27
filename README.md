@@ -184,25 +184,17 @@ In the Polyptyque window, <kbd>Ctrl</kbd> + <kbd>C</kbd> copies the selected sou
 
 An AI assistant (Claude, or any assistant that supports MCP), a script or a Stream Deck can do everything the window does: add sources, pick the right settings for your computer, start, schedule and stop recordings. For example: “Set up Polyptyque to record my Firefox and Discord windows, then record tonight from 9 to 11 PM.”
 
-**1. Allow it**: in Polyptyque, Settings › “Allow control by other programs” (off by default). The “Connect an AI assistant…” button there leads to this section.
+**1. Allow it**: in Polyptyque, Settings › “Allow control by other programs” (off by default), then “Connect an AI assistant…”.
 
-**2. Connect your assistant**
+**2. Choose your assistant**: Claude Code, Claude Desktop, Codex, OpenClaw or Hermes Agent. Select **Connect**: Polyptyque prepares the local configuration, without commands to type or files to edit by hand. Follow the displayed instructions to reload or restart your assistant.
 
-- **Claude Desktop**: Settings › Developer › Edit Config, add the lines below, then restart Claude Desktop. Replace `<you>` with your Windows user name; for the portable version, give the path to `current\polyptyque-cli.exe` in its folder.
+**3. Check the connection**: **Copy request** copies “List my scenes in Polyptyque.” Send it in your assistant: the status changes from **Configured · waiting** to **Connected** when it uses a Polyptyque tool.
 
-  ```json
-  {
-    "mcpServers": {
-      "polyptyque": {
-        "command": "C:\\Users\\<you>\\AppData\\Local\\PolyptyqueApp\\current\\polyptyque-cli.exe",
-        "args": ["mcp"]
-      }
-    }
-  }
-  ```
+**Repair** updates an existing connection, including after moving the portable version. **Disconnect** removes only Polyptyque’s entry; restart the assistant to close any remaining sessions. A backup of the original file is kept beside its configuration. Other servers and settings stay in place; JSON5 and YAML comments aren’t kept in the modified file. Polyptyque won’t overwrite a different server with the same name.
 
-- **Claude Code**: `claude mcp add polyptyque -- "$env:LOCALAPPDATA\PolyptyqueApp\current\polyptyque-cli.exe" mcp` in PowerShell.
-- **Other assistants and scripts**: `polyptyque-cli.exe`, next to `polyptyque.exe`, answers every command in JSON (`polyptyque-cli help`).
+Automatic setup supports **native Windows installations on this PC**. Use “Choose configuration…” if a custom configuration isn’t detected. WSL, Docker and remote servers require a separate setup. Polyptyque doesn’t manage AI accounts, API keys or subscriptions: conversations stay in your usual assistant.
+
+For other assistants and scripts, `polyptyque-cli.exe`, next to `polyptyque.exe`, remains available in JSON (`polyptyque-cli help`). Manual MCP configuration: [docs/control.md](docs/control.md#mcp-server).
 
 **What stays in your hands**
 - Only programs running on this computer, under your Windows account, can control Polyptyque: never a web page, never another computer.

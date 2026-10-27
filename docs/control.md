@@ -73,6 +73,14 @@ polyptyque-cli scenes delete --scene Archive --confirm
 
 `polyptyque-cli mcp` is an MCP server on standard input and output. Its tools are the commands of the catalog with `_` instead of `.` (`recording_start`), plus `app_launch`; `hello`, `subscribe` and `unsubscribe` are channel-only. It serves both protocol eras: modern stateless requests (`2026-07-28`, with `_meta` on every request, `server/discover`) and the earlier `initialize` handshake (`2025-11-25`, `2025-06-18`, `2025-03-26`, `2024-11-05`). Tool results are the command’s JSON as text; failures come back with `isError: true` and the error object.
 
+For native Windows clients, use **Settings › Allow control by other programs › Connect an AI assistant…** in Polyptyque. It configures Claude Code (user scope), Claude Desktop, Codex, OpenClaw and Hermes Agent directly. Each entry starts the current installation’s `polyptyque-cli.exe` with `mcp` and sets `POLYPTYQUE_ASSISTANT` to identify the connection in Polyptyque. No provider credentials are required by Polyptyque.
+
+The setup distinguishes a saved configuration from a live connection: the latter appears after a real tool call. Reload or restart the client as instructed, then send “List my scenes in Polyptyque.” Removing a configuration doesn’t kill running client processes; restart them to close existing sessions.
+
+Custom configuration paths can be selected and are remembered locally. The setup preserves unrelated settings and servers, refuses a conflicting `polyptyque` entry, backs up the original next to the client’s file, and checks for concurrent changes before atomic replacement. JSON5 and YAML are rewritten without comments; TOML comments are preserved. OpenClaw includes, symlinks and network/WSL paths aren’t modified automatically. WSL, Docker, profiles with different runtime environments and remote agents need a separate setup.
+
+The following examples are for manual integration and other MCP clients.
+
 Claude Desktop (`claude_desktop_config.json`, *Settings › Developer › Edit Config*):
 
 ```json
@@ -89,7 +97,7 @@ Claude Desktop (`claude_desktop_config.json`, *Settings › Developer › Edit C
 Claude Code:
 
 ```powershell
-claude mcp add polyptyque -- "$env:LOCALAPPDATA\PolyptyqueApp\current\polyptyque-cli.exe" mcp
+claude mcp add --scope user polyptyque -- "$env:LOCALAPPDATA\PolyptyqueApp\current\polyptyque-cli.exe" mcp
 ```
 
 A skill that teaches an assistant how to use Polyptyque well is in [`skills/polyptyque`](../skills/polyptyque/SKILL.md).

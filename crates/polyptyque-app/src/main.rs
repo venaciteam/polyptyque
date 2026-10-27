@@ -4,6 +4,7 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 mod controller;
+mod assistants;
 mod convert;
 #[cfg(not(windows))]
 mod demo;
@@ -12,6 +13,8 @@ mod i18n;
 mod meter;
 mod preview;
 mod update;
+#[cfg(test)]
+mod ui_snapshot;
 
 use std::fs::{self, File};
 use std::path::PathBuf;

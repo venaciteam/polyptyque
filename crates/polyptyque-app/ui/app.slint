@@ -2,14 +2,14 @@
 
 import { ListView } from "std-widgets.slint";
 import { Theme } from "theme.slint";
-import { Bridge, IncidentFile, SceneItem, ScheduleItem, SourceItem, SourceCard, WindowItem } from "bridge.slint";
+import { Bridge, AssistantItem, IncidentFile, SceneItem, ScheduleItem, SourceItem, SourceCard, WindowItem } from "bridge.slint";
 import { ActionButton, IconButton, LevelMeter, ListRow, Panel, SourceCardView, Toggle } from "components.slint";
 import {
-    AddApplicationSheet, AddBrowserSheet, BusyOverlay, CloseSchedulesSheet, ConfirmSheet, IncidentSheet, ReportSheet,
+    AddApplicationSheet, AddBrowserSheet, AssistantsSheet, BusyOverlay, CloseSchedulesSheet, ConfirmSheet, IncidentSheet, ReportSheet,
     SceneNameSheet, ScheduleEditorSheet, SchedulePrompt, SchedulesSheet, SettingsSheet, Toast,
 } from "sheets.slint";
 
-export { Bridge, IncidentFile, SceneItem, ScheduleItem, SourceItem, SourceCard, WindowItem }
+export { Bridge, AssistantItem, IncidentFile, SceneItem, ScheduleItem, SourceItem, SourceCard, WindowItem }
 
 // Logo : trois panneaux, comme un polyptyque.
 component Logo inherits HorizontalLayout {
@@ -884,6 +884,10 @@ export component AppWindow inherits Window {
         height: root.height;
     }
     if Bridge.sheet == "settings": SettingsSheet {
+        width: root.width;
+        height: root.height;
+    }
+    if Bridge.sheet == "assistants": AssistantsSheet {
         width: root.width;
         height: root.height;
     }

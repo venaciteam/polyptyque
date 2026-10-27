@@ -1121,7 +1121,7 @@ impl App {
 
     fn cmd_settings_set(&self, client: u64, params: &Value) -> Outcome {
         self.check_unlocked()?;
-        if self.sheet() == "settings" {
+        if matches!(self.sheet().as_str(), "settings" | "assistants") {
             return Err(CommandError::new(
                 Reason::Busy,
                 tr!("La fenêtre des réglages est ouverte dans Polyptyque : la fermer d'abord (elle remplacerait ces réglages)."),

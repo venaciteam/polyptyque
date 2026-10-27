@@ -185,25 +185,17 @@ Dans la fenêtre de Polyptyque, <kbd>Ctrl</kbd> + <kbd>C</kbd> copie la source s
 
 Un assistant IA (Claude, ou tout assistant compatible MCP), un script ou un Stream Deck peut faire tout ce que fait la fenêtre : ajouter des sources, choisir les bons réglages pour l'ordinateur, lancer, programmer et arrêter des enregistrements. Par exemple : « Prépare Polyptyque pour enregistrer mes fenêtres Firefox et Discord, puis enregistre ce soir de 21 h à 23 h. »
 
-**1. L'autoriser** : dans Polyptyque, Réglages › « Autoriser le pilotage par d'autres programmes » (désactivé par défaut). Le bouton « Connecter un assistant IA… » qui s'y trouve mène à cette section.
+**1. L'autoriser** : dans Polyptyque, Réglages › « Autoriser le pilotage par d'autres programmes » (désactivé par défaut), puis « Connecter un assistant IA… ».
 
-**2. Connecter l'assistant**
+**2. Choisir l'assistant** : Claude Code, Claude Desktop, Codex, OpenClaw ou Hermes Agent. Cliquer sur **Connecter** : Polyptyque prépare la configuration locale, sans commande à saisir ni fichier à modifier à la main. Suivre ensuite la consigne affichée pour recharger ou relancer l'assistant.
 
-- **Claude Desktop** : dans ses paramètres, section Développeur, bouton de modification de la configuration (« Edit Config »). Ajouter les lignes ci-dessous au fichier, puis redémarrer Claude Desktop. Remplacer `<vous>` par le nom d'utilisateur Windows ; pour la version portable, indiquer le chemin de `current\polyptyque-cli.exe` dans son dossier.
+**3. Vérifier** : le bouton **Copier la demande** prépare « Liste mes scènes dans Polyptyque. ». L'envoyer dans l'assistant : l'état passe de **Configuré · en attente** à **Connecté** quand il utilise un outil Polyptyque.
 
-  ```json
-  {
-    "mcpServers": {
-      "polyptyque": {
-        "command": "C:\\Users\\<vous>\\AppData\\Local\\PolyptyqueApp\\current\\polyptyque-cli.exe",
-        "args": ["mcp"]
-      }
-    }
-  }
-  ```
+**Réparer** actualise une connexion existante, notamment après déplacement de la version portable. **Déconnecter** retire uniquement l'entrée Polyptyque ; relancer l'assistant pour fermer ses sessions encore actives. Une sauvegarde du fichier original est conservée à côté de sa configuration. Les autres serveurs et réglages restent en place ; les commentaires JSON5 et YAML ne sont pas conservés dans le fichier modifié. Si un autre serveur porte déjà le même nom, Polyptyque refuse de le remplacer.
 
-- **Claude Code** : `claude mcp add polyptyque -- "$env:LOCALAPPDATA\PolyptyqueApp\current\polyptyque-cli.exe" mcp` dans PowerShell.
-- **Autres assistants et scripts** : `polyptyque-cli.exe`, à côté de `polyptyque.exe`, répond à chaque commande en JSON (`polyptyque-cli help`).
+La connexion automatique vise les **installations Windows natives sur ce PC**. Si une configuration personnalisée n'est pas détectée, utiliser « Choisir la configuration… ». Les environnements WSL, Docker et les serveurs distants nécessitent une configuration particulière. Polyptyque ne gère ni compte IA, ni clé API, ni abonnement : les échanges restent dans l'assistant habituel.
+
+Pour les autres assistants et les scripts, `polyptyque-cli.exe`, à côté de `polyptyque.exe`, reste accessible en JSON (`polyptyque-cli help`). Configuration MCP manuelle : [docs/control.md](docs/control.md#mcp-server).
 
 **Ce qui reste entre vos mains**
 - Seuls les programmes de cet ordinateur, ouverts avec votre compte Windows, peuvent piloter Polyptyque : jamais une page web, jamais un autre ordinateur.
