@@ -2,11 +2,11 @@ name: Fabrication
 
 on:
   push:
-  pull_request:
+    tags: ['v*']
   workflow_dispatch:
 
-# Fabrication seule : vérification du code et tests se lancent en local,
-# sous Windows, avant chaque publication.
+# Essais et vérifications en local, sous Windows. La fabrication GitHub ne
+# démarre que pour une publication (tag v*) ou sur demande manuelle.
 # Publication d'une version (étiquette « v1.2.3 ») : création de la page de
 # version GitHub, d'où Polyptyque télécharge ses mises à jour.
 permissions:

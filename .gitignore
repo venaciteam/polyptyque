@@ -2,3 +2,5 @@
 *.tmp
 /dist
 /livraison
+/streamdeck/node_modules
+/streamdeck/city.vena.polyptyque.sdPlugin

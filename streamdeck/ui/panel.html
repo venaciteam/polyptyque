@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="fr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Polyptyque</title><link rel="stylesheet" href="panel.css"></head>
+<body>
+  <header><img src="../images/plugin.png" width="32" height="32" alt=""><strong>Polyptyque</strong><span>BÊTA</span></header>
+  <section id="connection" aria-live="polite"><b id="status"></b><p id="detected" class="muted"></p><p id="help"></p></section>
+  <details id="setup" open><summary data-i18n="ui.setup"></summary>
+    <p class="instructions" data-i18n="ui.instructions"></p>
+    <button id="retry" class="secondary" data-i18n="ui.retry"></button>
+    <details id="manual"><summary data-i18n="ui.manual"></summary>
+      <label for="cli" data-i18n="ui.path"></label><input id="cli" type="text" spellcheck="false" placeholder="C:\…\polyptyque-cli.exe">
+      <p class="muted" data-i18n="ui.pathHint"></p><button id="apply" data-i18n="ui.apply"></button><p id="detected-path" class="muted path"></p>
+    </details>
+  </details>
+  <main>
+    <label for="language" data-i18n="ui.language"></label>
+    <select id="language"><option value="auto" data-i18n="ui.auto"></option><option value="fr">Français</option><option value="en">English</option></select>
+    <div id="mode-field"><label for="mode" data-i18n="ui.mode"></label><select id="mode"><option value="toggle" data-i18n="ui.toggle"></option><option value="on" data-i18n="ui.on"></option><option value="off" data-i18n="ui.off"></option></select></div>
+    <div id="scope-field" hidden><label for="scope" data-i18n="ui.scope"></label><select id="scope"><option value="scene" data-i18n="ui.all"></option><option value="source" data-i18n="ui.one"></option></select></div>
+    <div id="scene-field" hidden><label for="scene" data-i18n="ui.scene"></label><select id="scene"></select><p class="muted" data-i18n="ui.sceneNote"></p></div>
+    <div id="source-field" hidden><label for="source" data-i18n="ui.source"></label><select id="source"></select><p class="muted" data-i18n="ui.sourceNote"></p></div>
+    <div id="schedule-field" hidden><label for="schedule" data-i18n="ui.schedule"></label><select id="schedule"></select><p class="muted" data-i18n="ui.scheduleNote"></p></div>
+    <p id="disk-note" class="muted" data-i18n="ui.diskNote" hidden></p>
+    <p id="confirm-note" class="muted" data-i18n="ui.confirm" hidden></p>
+    <p id="question" class="notice" hidden></p><p id="error" class="notice" role="alert" hidden></p>
+    <p id="settings-status" class="muted" role="status" hidden></p>
+    <p class="muted" data-i18n="ui.refresh"></p>
+  </main>
+  <footer data-i18n="ui.version"></footer>
+  <script src="panel.js"></script>
+</body></html>

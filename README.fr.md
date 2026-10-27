@@ -33,6 +33,7 @@
 
 - **[Télécharger l'installateur](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.9/Polyptyque-Setup.exe)** : la version classique, qui s'installe comme un logiciel habituel. Dans le doute, choisir celle-ci.
 - **[Télécharger la version portable](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.9/Polyptyque-portable.zip)** : sans installation, à décompresser dans le dossier de son choix, même sur une clé USB.
+- **[Télécharger le plugin Stream Deck](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.9/city.vena.polyptyque.streamDeckPlugin)** : bêta 0.1.0.2, en français et en anglais. Double-cliquer sur le fichier pour l'installer dans Stream Deck 7.1 ou suivant ; [guide de connexion](streamdeck/README.md#installer-et-connecter).
 
 macOS et Linux : pas encore disponibles.
 
@@ -206,6 +207,12 @@ Pour les autres assistants et les scripts, `polyptyque-cli.exe`, à côté de `p
 
 Référence complète, en anglais, pour les développeurs et les assistants : [docs/control.md](docs/control.md) ; skill pour les assistants : [skills/polyptyque](skills/polyptyque/SKILL.md).
 
+## Stream Deck
+
+Un plugin Windows en bêta propose sept actions avec retour d'état : enregistrement global ou par source, scène, fenêtres, aperçus, programmation et espace disque. Il utilise le même canal local que le pilotage IA, avec Polyptyque 1.0.0-beta.9 ou suivant et Stream Deck 7.1 ou suivant. Installation, réglages et construction du paquet : [streamdeck/README.md](streamdeck/README.md). La publication Marketplace reste à décider après les essais.
+
+Les raccourcis globaux ci-dessus fonctionnent aussi avec l'action Stream Deck **Raccourci clavier**, sans retour d'état.
+
 ## Pour le montage
 
 - **MKV ou MP4** : pendant l'enregistrement, Polyptyque écrit en MKV, un format qui reste lisible même après une coupure. « Convertir en MP4… » crée une copie MP4 à côté, sans perte de qualité, et la conversion peut être automatique en fin d'enregistrement. Le MKV est conservé ; prévoir le double d'espace disque.
@@ -248,6 +255,8 @@ Réglages > « Signaler un problème… » (aussi proposé après un enregistrem
 Seule `polyptyque-windows` dépend du système : un portage vers macOS ou Linux consistera à écrire son équivalent. Agents de code : voir [AGENTS.md](AGENTS.md).
 
 **Compiler et tester**
+
+Le développement et les essais utilisent les builds locaux, sans attendre GitHub. `packaging/fabrication-locale.ps1` prépare l'application sous Windows et le [plugin Stream Deck](streamdeck/README.md#construire-et-vérifier) a sa propre fabrication locale. Les workflows GitHub ne démarrent que pour un tag de publication `v*` ou sur demande manuelle.
 
 ```sh
 cargo test --workspace                                    # tests, dont des sessions simulées (FFmpeg requis)

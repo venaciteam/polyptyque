@@ -18,6 +18,10 @@ The specification is [`docs/cahier-des-charges.md`](docs/cahier-des-charges.md) 
 | `polyptyque-app` | Slint interface (`ui/`) and its controller (`src/controller.rs` and `src/controller/`), demo mode outside Windows, translations (`lang/`) |
 | `polyptyque-cli` | `polyptyque-cli.exe`: JSON command line and MCP server over the command channel |
 
+`streamdeck/` contains the Windows Stream Deck plugin (Node.js 24, Elgato SDK). It uses the shipped CLI (`events` and `call`), with no separate app API. `npm ci`, `npm test`, `npm run test:ui` (installed Chrome), `npm run pack` from that directory. Generated package and previews go to `livraison/`; generated `.sdPlugin` and `node_modules` are ignored. French source and English live together in `src/locales.mjs`, and generate the SDK locale files. Never reload the property inspector to switch languages. Increment the four-part manifest version in `tools/build.mjs` for each new package installed in Stream Deck. Marketplace submission is a separate decision.
+
+Property inspector protocol: outgoing `context` is the **property inspector UUID**, including `setSettings`, `getSettings` and `sendToPlugin`. Incoming settings and snapshot payloads identify the **action context** (`actionInfo.context`). These are distinct: native Stream Deck rejects outgoing messages authenticated with the action context. The UI test host must enforce this and verify persisted scene/source/schedule selections after reopening, including delayed stale snapshots.
+
 ## Build and test
 
 ```sh
@@ -28,7 +32,8 @@ cargo run -p polyptyque-app                                          # outside W
 cargo check --target x86_64-pc-windows-msvc -p polyptyque-cli        # Windows code from macOS/Linux
 ```
 
-- `polyptyque-app` only builds for Windows on Windows (C dependencies). The GitHub workflow builds the Windows installer on every push but runs **no tests**: run them locally.
+- Build and test locally for development iterations; hand the local artifacts to the user without waiting for GitHub. Both GitHub workflows run only on release tags (`v*`) or manual dispatch, never automatically on branch pushes or pull requests. Keep pushing source changes to `dev` normally.
+- `polyptyque-app` only builds for Windows on Windows (C dependencies). The GitHub release workflow builds the Windows installer but runs **no Rust tests**: run them locally. The Stream Deck publication workflow includes its own Node/UI checks.
 - On Windows, `packaging/fabrication-locale.ps1` runs the same build as the workflow (FFmpeg, Velopack installer) without publishing, into `livraison/`; `-SansInstallateur` stops at `dist/Polyptyque`. Releases are still built by the workflow. Clone with `core.autocrlf false`: the sources and catalogs are LF.
 - Demo mode keeps its data in the temporary folder (`polyptyque-demo`). `POLYPTYQUE_LANG=fr|en` forces the language. Its command channel is a Unix socket, so `polyptyque-cli` works against it.
 - Don’t reformat whole files: `cargo fmt --check` reports a few pre-existing differences.

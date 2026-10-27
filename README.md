@@ -32,6 +32,7 @@
 
 - **[Download the installer](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.9/Polyptyque-Setup.exe)**: the standard version, installed like any other program. If in doubt, choose this one.
 - **[Download the portable version](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.9/Polyptyque-portable.zip)**: no installation, unzip it to any folder, even on a USB stick.
+- **[Download the Stream Deck plugin](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.9/city.vena.polyptyque.streamDeckPlugin)**: beta 0.1.0.2, in English and French. Double-click the file to install it in Stream Deck 7.1 or later; [connection guide](streamdeck/README.en.md#install-and-connect).
 
 macOS and Linux: not available yet.
 
@@ -205,6 +206,12 @@ For other assistants and scripts, `polyptyque-cli.exe`, next to `polyptyque.exe`
 
 Full reference for developers and assistants: [docs/control.md](docs/control.md); skill for assistants: [skills/polyptyque](skills/polyptyque/SKILL.md).
 
+## Stream Deck
+
+A beta Windows plugin provides seven actions with live feedback: recording all sources or one source, scenes, windows, previews, scheduled recordings and disk space. It uses the same local command channel as AI control and requires Polyptyque 1.0.0-beta.9 or later and Stream Deck 7.1 or later. Installation, settings and package build: [streamdeck/README.en.md](streamdeck/README.en.md). Marketplace publication will be decided after testing.
+
+The global shortcuts above also work with Stream Deck’s **Hotkey** action, without state feedback.
+
 ## For editing
 
 - **MKV or MP4**: while recording, Polyptyque writes MKV, a format that stays readable even after a power cut. “Convert to MP4…” creates an MP4 copy alongside, losslessly, and conversion can run automatically when a recording ends. The MKV is kept: plan for twice the disk space.
@@ -249,6 +256,8 @@ The report and logs are written in French, so that diagnostics stay searchable i
 Only `polyptyque-windows` depends on the operating system: a port to macOS or Linux would mean writing its equivalent. Code comments and working documents are in French. Coding agents: see [AGENTS.md](AGENTS.md).
 
 **Build and test**
+
+Development and user testing use local builds, without waiting for GitHub. `packaging/fabrication-locale.ps1` builds the Windows app, and the [Stream Deck plugin](streamdeck/README.en.md#build-and-verify) has its own local build. GitHub workflows run only for release tags (`v*`) or a manual dispatch.
 
 ```sh
 cargo test --workspace                                    # tests, including simulated sessions (requires FFmpeg)
