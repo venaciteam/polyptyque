@@ -29,6 +29,7 @@ cargo check --target x86_64-pc-windows-msvc -p polyptyque-cli        # Windows c
 ```
 
 - `polyptyque-app` only builds for Windows on Windows (C dependencies). The GitHub workflow builds the Windows installer on every push but runs **no tests**: run them locally.
+- On Windows, `packaging/fabrication-locale.ps1` runs the same build as the workflow (FFmpeg, Velopack installer) without publishing, into `livraison/`; `-SansInstallateur` stops at `dist/Polyptyque`. Releases are still built by the workflow. Clone with `core.autocrlf false`: the sources and catalogs are LF.
 - Demo mode keeps its data in the temporary folder (`polyptyque-demo`). `POLYPTYQUE_LANG=fr|en` forces the language. Its command channel is a Unix socket, so `polyptyque-cli` works against it.
 - Don’t reformat whole files: `cargo fmt --check` reports a few pre-existing differences.
 

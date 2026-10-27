@@ -149,6 +149,13 @@ pub trait Platform: Send + Sync {
         Vec::new()
     }
 
+    /// Erreurs récentes du pilote graphique et plantages de Polyptyque ou
+    /// de FFmpeg, une ligne chacun (voir `report::SystemEvent::line`), pour
+    /// un rapport de problème. `None` : journaux du système illisibles.
+    fn graphics_driver_events(&self) -> Option<Vec<String>> {
+        None
+    }
+
     /// Ouvre une adresse web dans le navigateur par défaut, ou un fichier
     /// avec son programme habituel.
     fn shell_open(&self, _target: &str) -> anyhow::Result<()> {

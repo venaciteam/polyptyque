@@ -477,7 +477,9 @@ Rendre facile la transmission d'un problème sur GitHub, sans exposer de donnée
 	3. ouvre la page « nouvelle issue » du dépôt, avec le formulaire de la langue de l'interface, pré-rempli (version, Windows, carte graphique).
 
 	Il reste à décrire le problème et à glisser le fichier dans la page. Le rapport peut être ouvert pour le relire avant.
-- **Contenu du rapport** (en français, comme les journaux) : version (installée ou portable), Windows, langue, cartes graphiques, résumé des réglages sans aucun chemin, journaux des trois derniers lancements (un plantage se lit dans le précédent), fin des journaux FFmpeg du dernier enregistrement. Taille plafonnée.
+- **Contenu du rapport** (en français, comme les journaux) : version (installée ou portable), Windows, langue, cartes graphiques, résumé des réglages sans aucun chemin, fins inattendues, erreurs récentes de la carte graphique, journaux des trois derniers lancements (un plantage se lit dans le précédent), fin des journaux FFmpeg du dernier enregistrement. Taille plafonnée.
+- **Fins inattendues** : un témoin (`lancement-en-cours.txt`, à côté de `session-en-cours.toml`) est posé au lancement de l'interface avec le nom de son journal, et retiré à chaque fin normale : fermeture, erreur affichée, installation d'une mise à jour, fermeture de la session Windows. Témoin trouvé au lancement suivant : le journal le note (« lancement précédent terminé sans fermeture normale (journal …) »), et le rapport liste en tête les lancements concernés. Cas visé : Polyptyque fermé d'office par le pilote graphique, plantage, coupure de courant, sans rien dans son propre journal.
+- **Erreurs récentes de la carte graphique** (7 derniers jours, 40 au plus) lues dans les journaux de Windows par `wevtutil`, sans droits d'administrateur : erreurs et avertissements des pilotes NVIDIA, AMD, Intel et de Windows (pilote réinitialisé), programmes fermés par le pilote OpenGL de NVIDIA (l'interface dessine en OpenGL : une réinitialisation du pilote la ferme, quand les programmes en DirectX survivent), plantages et blocages de Polyptyque et de FFmpeg. Nom de l'ordinateur jamais repris ; masquage appliqué comme au reste du rapport.
 - **Masquage** : le dossier personnel est remplacé par `%USERPROFILE%`, et le nom du compte Windows retiré des chemins. Les titres des fenêtres ne sont jamais écrits dans les journaux.
 - Polyptyque n'envoie rien lui-même : la personne joint le fichier. Pas de nouveau flux réseau.
 - **Côté GitHub** : deux formulaires d'issue (`.github/ISSUE_TEMPLATE/`), anglais et français, étiquette `bug` posée par le formulaire (le paramètre `labels` de l'adresse exige des droits que les visiteurs n'ont pas). Les champs se pré-remplissent par leur identifiant dans l'adresse ; les modèles ne sont lus que sur la branche par défaut (`main`).
@@ -829,6 +831,8 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 > - [x] Formulaires reconnus par GitHub sur `main` (2026-10-25) : valides, sans erreur, identifiants `version`, `windows`, `gpu` conformes à l'adresse construite par Polyptyque
 > - [ ] Page pré-remplie vue une fois, connecté à GitHub (la page « nouvelle issue » exige une connexion)
 > - [ ] Validation sur la machine de référence
+> - [x] Fins inattendues (témoin de lancement) et erreurs récentes de la carte graphique dans le rapport (2026-10-27)
+> - [ ] Fin inattendue vue dans un rapport sur la machine de référence (Polyptyque arrêté par le Gestionnaire des tâches, puis relancé)
 
 > [!todo] Étape 3 septies - Arrière-plan ([[#Programmation des enregistrements]]), écrite le 2026-10-25
 > - [x] Icône dans la zone de notification pendant l'arrière-plan : clic, menu Afficher / Quitter, info-bulle, Explorateur redémarré
@@ -942,6 +946,7 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 | 2026-10-25 | Micro activé par un programme : confirmation affichée dans Polyptyque, seule la personne devant l'écran peut accepter (deux minutes, sinon refus) ; titres des fenêtres donnés seulement si plusieurs fenêtres du même programme sont ouvertes ; serveur MCP livré dans ce chantier (`polyptyque-cli mcp`) |
 | 2026-10-27 | Bêta 6 jamais publiée seule : son contenu (arrière-plan) sort avec le pilotage dans la bêta 7, pour tout tester en une fois sur la machine de référence |
 | 2026-10-27 | Publication de la 1.0.0-beta.7 (préversion) : arrière-plan dans la zone de notification (icône près de l'horloge), choix à la fermeture avec une programmation prévue et réglage, lancement au démarrage de Windows en arrière-plan ; pilotage par d'autres programmes (réglage, `polyptyque-cli.exe` à la place de la console, serveur MCP, point rouge et notification d'enregistrement en arrière-plan) |
+| 2026-10-27 | Rapport de problème : **fins inattendues** (témoin de lancement retiré à chaque fin normale) et **erreurs récentes de la carte graphique** lues dans les journaux de Windows. Cas d'origine : bêta 7 fermée d'office par le pilote OpenGL de NVIDIA lors d'une réinitialisation du pilote (erreur matérielle du GPU), invisible dans le journal et le rapport de Polyptyque, retrouvée seulement dans l'Observateur d'événements |
 
 ---
 

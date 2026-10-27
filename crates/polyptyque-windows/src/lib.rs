@@ -154,6 +154,10 @@ impl Platform for WindowsPlatform {
         system_info::graphics_adapters()
     }
 
+    fn graphics_driver_events(&self) -> Option<Vec<String>> {
+        system_info::graphics_driver_events()
+    }
+
     fn uses_twelve_hour_clock(&self) -> bool {
         system_info::uses_twelve_hour_clock()
     }

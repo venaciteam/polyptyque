@@ -3501,6 +3501,9 @@ impl App {
             SessionEnd::Ending => {
                 self.session_ending.set(true);
                 self.finalize_now();
+                // Windows arrête Polyptyque sans revenir dans `main` : fin
+                // normale tout de même.
+                polyptyque_core::launch::end(&paths::launch_marker_file());
                 false
             }
             // Traités juste après, hors du traitement du message de Windows.

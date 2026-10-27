@@ -18,7 +18,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 
 use anyhow::Result;
-use polyptyque_core::{naming, paths, storage};
+use polyptyque_core::{launch, naming, paths, storage};
 use simplelog::{ConfigBuilder, LevelFilter, WriteLogger};
 
 slint::include_modules!();
@@ -26,6 +26,10 @@ slint::include_modules!();
 /// Version installée par une mise à jour, si Polyptyque vient d'être
 /// relancé par elle.
 pub static UPDATED_TO: OnceLock<String> = OnceLock::new();
+
+/// Nom du journal de ce lancement (témoin de lancement, voir
+/// `polyptyque_core::launch`).
+pub static LOG_NAME: OnceLock<String> = OnceLock::new();
 
 /// Argument donné par Windows quand il lance Polyptyque à l'ouverture de
 /// session (voir le réglage « Lancer Polyptyque au démarrage de Windows »).
@@ -74,7 +78,15 @@ fn main() {
     if let Some(root) = paths::portable_root() {
         log::info!("version portable : données dans {}", root.join(paths::PORTABLE_DATA_DIR).display());
     }
-    if let Err(e) = launch(in_background) {
+    let log_name = log.as_ref().and_then(|p| p.file_name()).map(|n| n.to_string_lossy().into_owned());
+    let log_name = LOG_NAME.get_or_init(|| log_name.unwrap_or_default());
+    if let Some(previous) = launch::begin(&paths::launch_marker_file(), log_name) {
+        log::warn!("{} (journal {previous}) : plantage, fermeture forcée ou coupure de courant", launch::UNEXPECTED_END);
+    }
+    let result = launch(in_background);
+    // Erreur ou non, la fin est passée par ici et figure au journal.
+    launch::end(&paths::launch_marker_file());
+    if let Err(e) = result {
         log::error!("{e:#}");
         let log = log.map(|p| p.display().to_string()).unwrap_or_default();
         show_fatal(&tr::tr!("{}\n\nJournal : {}", format!("{e:#}"), log));

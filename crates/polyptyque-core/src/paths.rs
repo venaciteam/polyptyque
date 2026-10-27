@@ -67,6 +67,11 @@ pub fn session_record_file() -> PathBuf {
     local_data_dir().join("session-en-cours.toml")
 }
 
+/// Témoin du lancement en cours de l'interface (voir `launch`).
+pub fn launch_marker_file() -> PathBuf {
+    local_data_dir().join("lancement-en-cours.txt")
+}
+
 /// Créneaux de programmation déjà réglés (voir `schedule::Planner`).
 pub fn schedule_state_file() -> PathBuf {
     local_data_dir().join("programmations-etat.toml")

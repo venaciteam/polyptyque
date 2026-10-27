@@ -73,6 +73,67 @@ pub fn graphics_adapters() -> Vec<String> {
     names
 }
 
+/// Pilotes graphiques suivis dans le journal Système : NVIDIA, AMD, Intel,
+/// et « Display » (pilote réinitialisé par Windows, événement 4101).
+const DRIVER_PROVIDERS: [&str; 9] =
+    ["nvlddmkm", "amdkmdag", "amdwddmg", "igfx", "igfxn", "igfxnd", "igfxncd", "Display", "Microsoft-Windows-DxgKrnl"];
+/// Journal Application : application fermée par le pilote OpenGL de NVIDIA
+/// (l'interface de Polyptyque dessine en OpenGL), plantages et blocages.
+const APPLICATION_PROVIDERS: [&str; 3] = ["NVIDIA OpenGL Driver", "Application Error", "Application Hang"];
+/// Plantages et blocages repris : ceux de Polyptyque et de ses encodeurs.
+const OUR_PROGRAMS: [&str; 3] = ["polyptyque.exe", "polyptyque-cli.exe", "ffmpeg.exe"];
+
+/// Erreurs et avertissements récents des pilotes graphiques, et plantages de
+/// Polyptyque, lus dans les journaux de Windows (`wevtutil`, présent sur
+/// tout Windows et lisible sans droits d'administrateur).
+pub fn graphics_driver_events() -> Option<Vec<String>> {
+    use polyptyque_core::report::{self, DRIVER_EVENTS_DAYS, DRIVER_EVENTS_MAX};
+    let system = query_events("System", &DRIVER_PROVIDERS)?;
+    let application = query_events("Application", &APPLICATION_PROVIDERS)?;
+    let mut lines: Vec<String> = report::parse_events(&system).iter().map(|e| e.line("Système")).collect();
+    lines.extend(
+        report::parse_events(&application)
+            .iter()
+            // Le pilote OpenGL de NVIDIA ne ferme que des programmes qu'il
+            // fait dessiner : toujours repris.
+            .filter(|e| e.provider == "NVIDIA OpenGL Driver" || e.mentions_any(&OUR_PROGRAMS))
+            .map(|e| e.line("Application")),
+    );
+    // Lignes commençant par l'heure : du plus ancien au plus récent.
+    lines.sort();
+    let skip = lines.len().saturating_sub(DRIVER_EVENTS_MAX);
+    log::debug!("rapport : {} événement(s) graphique(s) sur {DRIVER_EVENTS_DAYS} jours", lines.len());
+    Some(lines.split_off(skip))
+}
+
+/// Export XML des erreurs et avertissements (niveaux 1 à 3) de `providers`
+/// dans le journal `log`, sur la période du rapport, les plus récents d'abord.
+fn query_events(log: &str, providers: &[&str]) -> Option<String> {
+    use polyptyque_core::report::{DRIVER_EVENTS_DAYS, DRIVER_EVENTS_MAX};
+    let names = providers.iter().map(|p| format!("@Name='{p}'")).collect::<Vec<_>>().join(" or ");
+    let period_ms = u64::from(DRIVER_EVENTS_DAYS) * 24 * 3600 * 1000;
+    let query = format!(
+        "*[System[Provider[{names}] and (Level=1 or Level=2 or Level=3) and TimeCreated[timediff(@SystemTime) <= {period_ms}]]]"
+    );
+    let output = Command::new("wevtutil")
+        .args(["qe", log])
+        .raw_arg(format!("/q:\"{query}\""))
+        .args(["/rd:true", &format!("/c:{}", DRIVER_EVENTS_MAX * 2), "/f:xml"])
+        .creation_flags(crate::CREATE_NO_WINDOW)
+        .output();
+    match output {
+        Ok(output) if output.status.success() => Some(String::from_utf8_lossy(&output.stdout).into_owned()),
+        Ok(output) => {
+            log::warn!("journal {log} illisible : {}", String::from_utf8_lossy(&output.stderr).trim());
+            None
+        }
+        Err(e) => {
+            log::warn!("journal {log} illisible : {e}");
+            None
+        }
+    }
+}
+
 /// Adresse web (navigateur par défaut) ou fichier (programme habituel).
 pub fn shell_open(target: &str) -> Result<()> {
     let result = unsafe {
@@ -137,4 +198,17 @@ fn registry_dword(path: &str, name: &str) -> Option<u32> {
         )
     };
     (status == ERROR_SUCCESS).then_some(value)
+}
+
+#[cfg(test)]
+mod tests {
+    /// Lit les vrais journaux de ce PC : `cargo test -p polyptyque-windows -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn lists_this_pc_graphics_events() {
+        let events = super::graphics_driver_events().expect("journaux de Windows lisibles");
+        for line in &events {
+            println!("{line}");
+        }
+    }
 }
