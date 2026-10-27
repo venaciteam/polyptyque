@@ -256,6 +256,8 @@ Only `polyptyque-windows` depends on the operating system: a port to macOS or Li
 
 **Build and test**
 
+Development and user testing use local builds, without waiting for GitHub. `packaging/fabrication-locale.ps1` builds the Windows app, and the [Stream Deck plugin](streamdeck/README.en.md#build-and-verify) has its own local build. GitHub workflows run only for release tags (`v*`) or a manual dispatch.
+
 ```sh
 cargo test --workspace                                    # tests, including simulated sessions (requires FFmpeg)
 cargo build --release -p polyptyque-app -p polyptyque-cli

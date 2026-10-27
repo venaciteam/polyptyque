@@ -2,18 +2,11 @@ name: Plugin Stream Deck
 
 on:
   push:
-    branches: [dev, main]
-    paths:
-      - 'streamdeck/**'
-      - 'assets/logo/polyptyque-512.png'
-      - 'crates/polyptyque-app/ui/icons/polyptyque.png'
-      - '.github/workflows/streamdeck.yml'
-      - 'LICENSE'
-  pull_request:
-    paths:
-      - 'streamdeck/**'
-      - '.github/workflows/streamdeck.yml'
+    tags: ['v*']
   workflow_dispatch:
+
+# Tests et paquet de développement en local ; GitHub pour les publications
+# ou une vérification manuelle, pas pour chaque correction poussée.
 
 permissions:
   contents: read

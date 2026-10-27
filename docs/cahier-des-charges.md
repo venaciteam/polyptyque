@@ -748,7 +748,7 @@ La session simulée (`polyptyque-engine/tests`) rejoue des enregistrements compl
 | Interface | [[Slint]] | Apparence décrite dans des fichiers `.slint` séparés de la logique ; compatible GPL v3 ; accessibilité via AccessKit ; aperçus par tampons d'image |
 | Installateur | [[Velopack]] | Un seul `Polyptyque-Setup.exe`, sans question, mises à jour automatiques |
 | Sauvegarde des scènes | Fichier de configuration dans `%APPDATA%\Polyptyque` | |
-| Fabrication des exécutables | GitHub Actions sur machine Windows (fabrication seule) | Vérification du code et tests en local, sous Windows, avant chaque publication |
+| Fabrication des exécutables | En local pendant le développement ; GitHub Actions Windows pour les publications (`v*`) ou sur demande manuelle | Vérification du code et tests en local ; aucun build GitHub automatique sur push de branche ou PR. Même règle pour le plugin Stream Deck |
 
 ### Portage macOS et Linux
 
@@ -878,11 +878,13 @@ Le plugin Windows utilise `polyptyque-cli.exe` livré avec Polyptyque (bêta.9 o
 > - [x] Panneau FR/EN, identité visuelle de Polyptyque, détection de l'installation et chemin portable
 > - [x] Correction du panneau restant en attente malgré des actions fonctionnelles : identifiants panneau/touche distincts, délai de réponse et reprise vérifiés
 > - [x] Authentification native des réglages corrigée (0.1.0.2) : choix confirmé par relecture, persistance des trois cibles après réouverture et anciennes notifications ignorées
+> - [x] Sélection de scène validée par l'utilisateur sur Stream Deck après installation de la 0.1.0.2
 > - [x] Construction et validation Elgato ; tests du modèle, du transport, des traductions SDK, du paquet et du panneau en navigateur
 > - [ ] Validation sur Stream Deck et capture réelle (durée, fenêtre perdue, disque, commandes)
 > - [ ] Décision de publication au Marketplace Elgato
 
 > [!todo] Étape 4 - Publication
+> - [x] Fabrication de développement en local ; workflows GitHub limités aux tags de publication et au lancement manuel
 > - [ ] Dépôt public, première version publiée
 > - [ ] FFmpeg compilé par le projet (plus léger, signable)
 > - [ ] Demande de signature gratuite à SignPath Foundation
@@ -901,6 +903,7 @@ Le plugin Windows utilise `polyptyque-cli.exe` livré avec Polyptyque (bêta.9 o
 
 | Date | Décision |
 |---|---|
+| 2026-10-27 | À la demande de l'utilisateur, builds et tests en local pour les itérations. Les deux workflows GitHub (application et plugin Stream Deck) ne démarrent plus sur push de branche ou PR ; tags v* et lancement manuel conservés pour les publications. Le code continue à être poussé sur dev |
 | 2026-10-27 | Correction Stream Deck 0.1.0.2 après rejet natif des réglages : UUID du panneau pour inscription ET messages sortants, contexte de touche pour les réponses. Choix confirmé par relecture, révision de sauvegarde et rejet des états périmés. La simulation contrôle l'authentification native et la persistance après réouverture |
 | 2026-10-27 | Première correction Stream Deck 0.1.0.1 du panneau en attente : identifiants distincts et état déconnecté. L'usage du contexte de touche dans les messages sortants s'est révélé incorrect dans les logs natifs ; remplacé par 0.1.0.2 |
 | 2026-10-27 | Plugin Stream Deck Windows FR/EN livré séparément, compatible bêta.9 via le CLI existant : même tube local et vérification du compte, aucune nouvelle API publique. Sept actions, identifiants stables, notifications, confirmation par seconde pression sous cinq secondes pour arrêter un enregistrement programmé ; panneau HTML sans rechargement et ressources embarquées. Publication Marketplace à décider après essais |

@@ -32,7 +32,8 @@ cargo run -p polyptyque-app                                          # outside W
 cargo check --target x86_64-pc-windows-msvc -p polyptyque-cli        # Windows code from macOS/Linux
 ```
 
-- `polyptyque-app` only builds for Windows on Windows (C dependencies). The GitHub workflow builds the Windows installer on every push but runs **no tests**: run them locally.
+- Build and test locally for development iterations; hand the local artifacts to the user without waiting for GitHub. Both GitHub workflows run only on release tags (`v*`) or manual dispatch, never automatically on branch pushes or pull requests. Keep pushing source changes to `dev` normally.
+- `polyptyque-app` only builds for Windows on Windows (C dependencies). The GitHub release workflow builds the Windows installer but runs **no Rust tests**: run them locally. The Stream Deck publication workflow includes its own Node/UI checks.
 - On Windows, `packaging/fabrication-locale.ps1` runs the same build as the workflow (FFmpeg, Velopack installer) without publishing, into `livraison/`; `-SansInstallateur` stops at `dist/Polyptyque`. Releases are still built by the workflow. Clone with `core.autocrlf false`: the sources and catalogs are LF.
 - Demo mode keeps its data in the temporary folder (`polyptyque-demo`). `POLYPTYQUE_LANG=fr|en` forces the language. Its command channel is a Unix socket, so `polyptyque-cli` works against it.
 - Don’t reformat whole files: `cargo fmt --check` reports a few pre-existing differences.
