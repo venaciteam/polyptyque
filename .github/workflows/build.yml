@@ -84,6 +84,7 @@ jobs:
           # Titre de la page en anglais, langue de tête du dépôt (« Polyptyque
           # 1.0 beta 5 ») ; les notes sont en anglais puis en français.
           if ($suffix -match '^beta\.(\d+)$') { $title += " beta $($Matches[1])" } elseif ($beta) { $title += " $suffix" }
+          if ($version -eq '1.0.0') { $title = 'v1.0.0 — Première version officielle' }
           $notes = "packaging/notes/v$version.md"
           Write-Host "Version $version, page « $title », bêta : $beta, notes : $(Test-Path $notes)"
           "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
@@ -101,8 +102,16 @@ jobs:
               throw "L'étiquette ${{ github.ref_name }} ne correspond pas à la version $version (Cargo.toml)."
             }
             if (-not (Test-Path $notes)) { throw "Notes de version manquantes : $notes" }
-            # Version précédente : permet des mises à jour partielles, plus légères.
-            vpk download github --repoUrl $repo --token $env:GITHUB_TOKEN --outputDir releases @pre
+            # La première stable n'a pas de stable précédente : publier le
+            # paquet complet, que les copies bêta pourront aussi installer.
+            $previousStable = @(gh release list --repo "${{ github.repository }}" --exclude-drafts --exclude-pre-releases --limit 1 --json tagName | ConvertFrom-Json)
+            if ($LASTEXITCODE -ne 0) { throw 'Lecture des publications précédentes échouée' }
+            if ($beta -or $previousStable.Count -gt 0) {
+              vpk download github --repoUrl $repo --token $env:GITHUB_TOKEN --outputDir releases @pre
+              if ($LASTEXITCODE -ne 0) { throw 'Téléchargement de la version précédente échoué' }
+            } else {
+              Write-Host 'Première version stable : fabrication du paquet complet.'
+            }
           }
           vpk pack --packId $env:PACK_ID --packVersion $version --packDir dist/Polyptyque `
             --mainExe polyptyque.exe --packTitle Polyptyque --packAuthors Polyptyque `
@@ -113,6 +122,18 @@ jobs:
           New-Item -ItemType Directory -Force -Path livraison | Out-Null
           Copy-Item "releases/$env:PACK_ID-win-Setup.exe" livraison/Polyptyque-Setup.exe
           Copy-Item "releases/$env:PACK_ID-win-Portable.zip" livraison/Polyptyque-portable.zip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: streamdeck/package-lock.json
+      - name: Paquet Stream Deck
+        working-directory: streamdeck
+        run: |
+          npm.cmd ci
+          if ($LASTEXITCODE -ne 0) { throw 'Installation des dépendances Stream Deck échouée' }
+          npm.cmd run pack
+          if ($LASTEXITCODE -ne 0) { throw 'Fabrication du plugin Stream Deck échouée' }
       - uses: actions/upload-artifact@v4
         with:
           name: Polyptyque-windows
@@ -133,10 +154,14 @@ jobs:
           # Installateur et version portable sous les noms du README. La mise
           # à jour automatique n'utilise que les paquets (.nupkg) et
           # releases.win.json, qui gardent leur nom.
-          gh release upload "v$env:VERSION" livraison/Polyptyque-Setup.exe livraison/Polyptyque-portable.zip `
+          gh release upload "v$env:VERSION" livraison/Polyptyque-Setup.exe livraison/Polyptyque-portable.zip livraison/city.vena.polyptyque.streamDeckPlugin `
             --repo "${{ github.repository }}"
           if ($LASTEXITCODE -ne 0) { throw "envoi de l'installateur et de la version portable échoué" }
           foreach ($asset in "$env:PACK_ID-win-Setup.exe", "$env:PACK_ID-win-Portable.zip") {
             gh release delete-asset "v$env:VERSION" $asset --repo "${{ github.repository }}" --yes
             if ($LASTEXITCODE -ne 0) { throw "suppression de $asset échouée" }
+          }
+          if ($env:BETA -ne 'True') {
+            gh release edit "v$env:VERSION" --latest --repo "${{ github.repository }}"
+            if ($LASTEXITCODE -ne 0) { throw 'Désignation de la dernière version stable échouée' }
           }

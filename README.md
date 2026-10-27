@@ -17,22 +17,15 @@
   <img src="docs/captures/en/recording.png" alt="Polyptyque during a recording: three sources, each with its preview, sound level and file size" width="860">
 </p>
 
-<!--
-  Links pinned to the current beta: releases/latest/download/ ignores
-  pre-releases and returns 404 until a stable version is published. For each
-  new beta, update the tag and the version line (here and in README.fr.md).
-  When 1.0.0 stable is out, switch to the permanent addresses:
-  https://github.com/venaciteam/polyptyque/releases/latest/download/Polyptyque-Setup.exe
-  https://github.com/venaciteam/polyptyque/releases/latest/download/Polyptyque-portable.zip
--->
+<!-- Permanent links to the latest stable release. Each stable publication must attach all three files below, including the plugin. -->
 
 ## Download
 
-**Windows 10 and 11** (64-bit), version 1.0 beta 9:
+**Windows 10 and 11** (64-bit), official release 1.0.0:
 
-- **[Download the installer](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.9/Polyptyque-Setup.exe)**: the standard version, installed like any other program. If in doubt, choose this one.
-- **[Download the portable version](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.9/Polyptyque-portable.zip)**: no installation, unzip it to any folder, even on a USB stick.
-- **[Download the Stream Deck plugin](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.9/city.vena.polyptyque.streamDeckPlugin)**: beta 0.1.0.2, in English and French. Double-click the file to install it in Stream Deck 7.1 or later; [connection guide](streamdeck/README.en.md#install-and-connect).
+- **[Download the installer](https://github.com/venaciteam/polyptyque/releases/latest/download/Polyptyque-Setup.exe)**: the standard version, installed like any other program. If in doubt, choose this one.
+- **[Download the portable version](https://github.com/venaciteam/polyptyque/releases/latest/download/Polyptyque-portable.zip)**: no installation, unzip it to any folder, even on a USB stick.
+- **[Download the Stream Deck plugin](https://github.com/venaciteam/polyptyque/releases/latest/download/city.vena.polyptyque.streamDeckPlugin)**: beta 0.1.0.2, in English and French. Double-click the file to install it in Stream Deck 7.1 or later; [connection guide](streamdeck/README.en.md#install-and-connect).
 
 macOS and Linux: not available yet.
 

@@ -8,7 +8,7 @@ A Windows plugin in French and English, using Polyptyque’s visual identity. Re
 
 Package **0.1.0.2** fixes saving scene/source/schedule selections and the panel’s communication. Each change is confirmed by reading back Stream Deck’s settings; delayed state updates no longer revert a recent selection. Open the new package to update the installed plugin; action identifiers stay the same.
 
-1. [Download the beta 0.1.0.2 plugin](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.9/city.vena.polyptyque.streamDeckPlugin), open the file and accept installation in Stream Deck.
+1. [Download the beta 0.1.0.2 plugin](https://github.com/venaciteam/polyptyque/releases/latest/download/city.vena.polyptyque.streamDeckPlugin), open the file and accept installation in Stream Deck.
 2. Open Polyptyque. In **Settings**, enable **Allow control by other programs**.
 3. Find the **Polyptyque** category in Stream Deck and drag an action onto a key. The panel shows **Connected to Polyptyque** once it receives live state.
 4. Choose a target for Source, Scene or Scheduled recording. For Recording or Previews, choose **Toggle**, **Enable / start** or **Pause / stop**.
@@ -58,4 +58,4 @@ The plugin uses `polyptyque-cli events` for notifications and `polyptyque-cli ca
 
 ## Distribution
 
-Beta 0.1.0.2 is available as a direct download in Polyptyque’s GitHub prerelease 1.0.0-beta.9, which it supports. An **Elgato Marketplace** submission remains a separate decision; building the package doesn’t submit it. GPL-3.0-or-later, like Polyptyque, with bundled dependency licenses.
+Beta 0.1.0.2 is available as a direct download in Polyptyque’s latest stable release (1.0.0 for the first publication). An **Elgato Marketplace** submission remains a separate decision; building the package doesn’t submit it. GPL-3.0-or-later, like Polyptyque, with bundled dependency licenses.
