@@ -1,4 +1,4 @@
-POLYPTYQUE 1.0 BETA 6
+POLYPTYQUE 1.0 BETA 7
 =====================
 
 Polyptyque records several windows at once, each in its own file, with
@@ -109,6 +109,18 @@ starts" option brings it back in the background after a restart.
 - A scheduled recording only stops what it started. A recording started
   by hand during a time slot is only stopped at the end time if you
   agree; stopping a scheduled recording by hand asks for confirmation.
+
+Control by an AI assistant
+--------------------------
+An AI assistant (Claude or any assistant that supports MCP), a script or a
+Stream Deck can do everything the window does: set Polyptyque up, prepare
+scenes, start and schedule recordings. Off by default: Settings > "Allow
+control by other programs". The "Connect an AI assistant…" button that
+then appears explains how to connect it (polyptyque-cli.exe, next to
+polyptyque.exe). Only programs on this computer, running under this
+Windows account, can use it; the mic only turns on with your approval in
+the window, and a recording always shows (red dot on the icon next to the
+clock and a Windows notification when Polyptyque is in the background).
 
 Good to know
 ------------

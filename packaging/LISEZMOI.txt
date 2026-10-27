@@ -1,4 +1,4 @@
-POLYPTYQUE 1.0 BÊTA 6
+POLYPTYQUE 1.0 BÊTA 7
 =====================
 
 Polyptyque enregistre plusieurs fenêtres en même temps, chacune dans son
@@ -119,6 +119,20 @@ après un redémarrage.
   à la main pendant un créneau n'est arrêté à l'heure de fin que si on
   l'accepte ; arrêter à la main un enregistrement programmé demande
   confirmation.
+
+Pilotage par un assistant IA
+----------------------------
+Un assistant IA (Claude ou tout assistant compatible MCP), un script ou un
+Stream Deck peut faire tout ce que fait la fenêtre : régler Polyptyque,
+préparer les scènes, lancer et programmer les enregistrements. Désactivé
+par défaut : Réglages > « Autoriser le pilotage par d'autres programmes ».
+Le bouton « Connecter un assistant IA… » qui apparaît alors explique
+comment le brancher (polyptyque-cli.exe, à côté de polyptyque.exe).
+Seuls les programmes de cet ordinateur, ouverts avec ce compte Windows, y
+ont accès ; le micro ne s'active qu'avec un accord donné dans la fenêtre,
+et un enregistrement se voit toujours (point rouge sur l'icône près de
+l'horloge et notification de Windows quand Polyptyque est en
+arrière-plan).
 
 À savoir
 --------

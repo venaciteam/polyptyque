@@ -10,7 +10,7 @@ type: guide
 # Polyptyque - Tests du pilotage
 
 > [!abstract] Résumé
-> Tests à mener sur la machine de référence pour le pilotage par d'autres programmes : réglage, canal de commande (tube nommé), mode commande `polyptyque-cli.exe`, garde-fous (micro, enregistrement visible en arrière-plan), serveur MCP avec Claude Desktop, et non-régression de l'interface, dont plusieurs actions ont été réorganisées pour servir aussi au canal.
+> Tests à mener sur la machine de référence, sur la bêta 7, pour le pilotage par d'autres programmes : réglage, canal de commande (tube nommé), mode commande `polyptyque-cli.exe`, garde-fous (micro, enregistrement visible en arrière-plan), serveur MCP avec Claude Desktop, et non-régression de l'interface, dont plusieurs actions ont été réorganisées pour servir aussi au canal.
 > Tout a été vérifié en mode démonstration sur le Mac (socket Unix) ; restent les parties propres à Windows : le tube et ses autorisations, l'icône au point rouge, la notification, le lancement en arrière-plan, les vrais navigateurs et Claude Desktop.
 > Comportement de référence : [[cahier-des-charges#Pilotage par d'autres programmes]] ; commandes : [[control|docs/control.md]].
 
@@ -31,9 +31,9 @@ type: guide
 
 ## Récupérer la fabrication
 
-1. GitHub > dépôt Polyptyque > onglet **Actions** > la dernière exécution verte de la branche `pilotage`. Fabrication vérifiée : [exécution du 2026-10-25](https://github.com/venaciteam/polyptyque/actions/runs/40242057197), [artefact `Polyptyque-windows`](https://github.com/venaciteam/polyptyque/actions/runs/40242057197/artifacts/12617124672) (commit `738150e`).
+1. GitHub > dépôt Polyptyque > onglet **Actions** > la dernière exécution verte de la branche `dev` (le pilotage y a été fusionné le 2026-10-27, avec la préparation de la bêta 7).
 2. En bas de la page, artefact **`Polyptyque-windows`** : il contient `Polyptyque-Setup.exe` et `Polyptyque-portable.zip`. La version portable évite de toucher à la version installée.
-3. Vérifier que le dossier contient `polyptyque-cli.exe` (et plus `polyptyque-console.exe`).
+3. Vérifier que le dossier contient `polyptyque-cli.exe` (et plus `polyptyque-console.exe`), et que les réglages affichent la version 1.0.0-beta.7.
 
 ---
 
@@ -46,7 +46,7 @@ type: guide
 	- Faire : Réglages > « Pilotage » > « Autoriser le pilotage par d'autres programmes », Enregistrer. Relancer `status`.
 	- Attendu : l'état complet en JSON, code **0**. Pendant la commande, une pastille « Pilotage · polyptyque-cli » apparaît un instant en haut.
 - [ ] **A3 - Bouton « Connecter un assistant IA… »**
-	- Attendu : visible seulement réglage activé ; ouvre la section « Piloter Polyptyque avec un assistant IA » du README français (anglais si Polyptyque est en anglais). ⚠️ La section n'existe sur GitHub qu'une fois la branche fusionnée dans `main` : avant, la page s'ouvre en haut du README.
+	- Attendu : visible seulement réglage activé ; ouvre la section « Piloter Polyptyque avec un assistant IA » du README français (anglais si Polyptyque est en anglais). ⚠️ La section n'existe sur GitHub qu'une fois `dev` fusionnée dans `main` : avant, la page s'ouvre en haut du README.
 - [ ] **A4 - Fermé**
 	- Faire : quitter Polyptyque, puis `status`.
 	- Attendu : `not_running`, code **3**.
