@@ -1,0 +1,25 @@
+{
+  "name": "polyptyque-streamdeck",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "test:ui": "node tools/test-ui.mjs",
+    "validate": "streamdeck validate city.vena.polyptyque.sdPlugin",
+    "pack": "npm run build && npm run validate && streamdeck pack city.vena.polyptyque.sdPlugin --output ../livraison --force"
+  },
+  "dependencies": {
+    "@elgato/streamdeck": "3.0.3"
+  },
+  "devDependencies": {
+    "@elgato/cli": "1.10.3",
+    "esbuild": "0.28.2",
+    "playwright-core": "1.64.1"
+  },
+  "overrides": {
+    "zod": "^4.6.6"
+  }
+}

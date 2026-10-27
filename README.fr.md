@@ -206,6 +206,12 @@ Pour les autres assistants et les scripts, `polyptyque-cli.exe`, à côté de `p
 
 Référence complète, en anglais, pour les développeurs et les assistants : [docs/control.md](docs/control.md) ; skill pour les assistants : [skills/polyptyque](skills/polyptyque/SKILL.md).
 
+## Stream Deck
+
+Un plugin Windows en bêta propose sept actions avec retour d'état : enregistrement global ou par source, scène, fenêtres, aperçus, programmation et espace disque. Il utilise le même canal local que le pilotage IA, avec Polyptyque 1.0.0-beta.9 ou suivant et Stream Deck 7.1 ou suivant. Installation, réglages et construction du paquet : [streamdeck/README.md](streamdeck/README.md). La publication Marketplace reste à décider après les essais.
+
+Les raccourcis globaux ci-dessus fonctionnent aussi avec l'action Stream Deck **Raccourci clavier**, sans retour d'état.
+
 ## Pour le montage
 
 - **MKV ou MP4** : pendant l'enregistrement, Polyptyque écrit en MKV, un format qui reste lisible même après une coupure. « Convertir en MP4… » crée une copie MP4 à côté, sans perte de qualité, et la conversion peut être automatique en fin d'enregistrement. Le MKV est conservé ; prévoir le double d'espace disque.

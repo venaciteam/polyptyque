@@ -1,0 +1,41 @@
+name: Plugin Stream Deck
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - 'streamdeck/**'
+      - 'assets/logo/polyptyque-512.png'
+      - 'crates/polyptyque-app/ui/icons/polyptyque.png'
+      - '.github/workflows/streamdeck.yml'
+      - 'LICENSE'
+  pull_request:
+    paths:
+      - 'streamdeck/**'
+      - '.github/workflows/streamdeck.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  plugin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: streamdeck
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: streamdeck/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Polyptyque-StreamDeck-beta
+          path: livraison/city.vena.polyptyque.streamDeckPlugin
+          if-no-files-found: error

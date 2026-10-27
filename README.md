@@ -205,6 +205,12 @@ For other assistants and scripts, `polyptyque-cli.exe`, next to `polyptyque.exe`
 
 Full reference for developers and assistants: [docs/control.md](docs/control.md); skill for assistants: [skills/polyptyque](skills/polyptyque/SKILL.md).
 
+## Stream Deck
+
+A beta Windows plugin provides seven actions with live feedback: recording all sources or one source, scenes, windows, previews, scheduled recordings and disk space. It uses the same local command channel as AI control and requires Polyptyque 1.0.0-beta.9 or later and Stream Deck 7.1 or later. Installation, settings and package build: [streamdeck/README.en.md](streamdeck/README.en.md). Marketplace publication will be decided after testing.
+
+The global shortcuts above also work with Stream Deck’s **Hotkey** action, without state feedback.
+
 ## For editing
 
 - **MKV or MP4**: while recording, Polyptyque writes MKV, a format that stays readable even after a power cut. “Convert to MP4…” creates an MP4 copy alongside, losslessly, and conversion can run automatically when a recording ends. The MKV is kept: plan for twice the disk space.

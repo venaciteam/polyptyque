@@ -504,7 +504,7 @@ Rendre facile la transmission d'un problème sur GitHub, sans exposer de donnée
 ### Pilotage par d'autres programmes
 
 > [!abstract] But
-> Un assistant IA (modèle de langage), un script ou le futur plugin Stream Deck peuvent faire tout ce que fait l'interface : régler Polyptyque à la place de la personne, préparer les scènes, lancer et suivre un enregistrement. Pour qui ne veut pas s'embêter avec les réglages, l'assistant s'en charge.
+> Un assistant IA (modèle de langage), un script ou le plugin Stream Deck peuvent utiliser le canal local : régler Polyptyque à la place de la personne, préparer les scènes, lancer et suivre un enregistrement. Pour qui ne veut pas s'embêter avec les réglages, l'assistant s'en charge. Le plugin propose les actions décrites dans [[#Plugin Stream Deck]].
 
 **Canal de commande**
 
@@ -756,6 +756,18 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 
 ---
 
+## Plugin Stream Deck
+
+Le plugin Windows utilise `polyptyque-cli.exe` livré avec Polyptyque (bêta.9 ou suivante), donc le même canal local et les mêmes vérifications du compte Windows que le pilotage IA. Aucune clé API, aucun serveur web. Le pilotage doit être activé dans les réglages de Polyptyque.
+
+- Sept actions : enregistrement de toute la scène ; enregistrement d'une source ; activation d'une scène ; ouverture des fenêtres de la scène ou d'une source ; aperçus ; activation/suspension d'une programmation choisie ; espace disque.
+- Les actions d'enregistrement, d'aperçus et de programmation proposent bascule, activation seule et arrêt seul. Les cibles sont enregistrées par identifiant ; une cible disparue ou une source absente de la scène active est signalée, jamais remplacée.
+- Retour réel : enregistrement et durée de la session, état de la source et fenêtre perdue/réduite, scène active, aperçus, programmation active, disque disponible et durée restante estimée. État hors ligne explicite, aucune durée extrapolée sans connexion.
+- Arrêter un enregistrement programmé nécessite une seconde pression dans les cinq secondes, avec « Confirmer » sur la touche. La confirmation expire ou s'annule si la scène, la connexion ou le réglage change. Les verrous de Polyptyque restent applicables.
+- Connexion automatique à l'installation standard ; chemin du CLI réglable pour le portable. Une connexion partagée suit les notifications, les listes sont relues périodiquement ; une commande interrompue n'est jamais rejouée automatiquement.
+- Panneau de réglage et touches français/anglais selon Stream Deck, avec choix manuel de langue. Consignes de connexion en haut du panneau, état et erreurs visibles. Palette de Polyptyque et logo à trois panneaux, icônes de catégorie/actions blanches.
+- Livraison initiale : fichier `.streamDeckPlugin` installable, publication Marketplace à décider après les essais. Les raccourcis globaux restent utilisables avec l'action Stream Deck « Raccourci clavier », sans retour d'état.
+
 ## Feuille de route
 
 > [!todo] Étape 0 - Prototype (moteur et console), écrit le 2026-10-20
@@ -860,6 +872,13 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 > - [x] Vérifié en mode démonstration de bout en bout (toutes les commandes, erreurs, confirmations, enregistrement et conversion réels, question du micro acceptée, refusée et sans réponse, MCP des deux époques)
 > - [ ] Validation sur la machine de référence ([[protocole-test-pilotage]])
 
+> [!todo] Étape 3 nonies - Plugin Stream Deck, écrite le 2026-10-27
+> - [x] Sept actions sur le canal local existant, notifications d'état, cibles par identifiant, confirmations et reconnexion sans rejeu
+> - [x] Panneau FR/EN, identité visuelle de Polyptyque, détection de l'installation et chemin portable
+> - [x] Construction et validation Elgato ; tests du modèle, du transport, des traductions SDK, du paquet et du panneau en navigateur
+> - [ ] Validation sur Stream Deck et capture réelle (durée, fenêtre perdue, disque, commandes)
+> - [ ] Décision de publication au Marketplace Elgato
+
 > [!todo] Étape 4 - Publication
 > - [ ] Dépôt public, première version publiée
 > - [ ] FFmpeg compilé par le projet (plus léger, signable)
@@ -868,7 +887,6 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 
 > [!info] Plus tard
 > - Programmation : lancement par Windows à l'heure prévue même logiciel fermé, sortie de veille automatique
-> - Plugin Stream Deck, par le canal de commande
 > - Diffusion en direct (gratuite)
 > - Portage macOS, puis Linux
 > - Réglages d'encodage par source
@@ -880,6 +898,7 @@ Seule une implémentation de `Platform` est à écrire pour chaque système (`po
 
 | Date | Décision |
 |---|---|
+| 2026-10-27 | Plugin Stream Deck Windows FR/EN livré séparément, compatible bêta.9 via le CLI existant : même tube local et vérification du compte, aucune nouvelle API publique. Sept actions, identifiants stables, notifications, confirmation par seconde pression sous cinq secondes pour arrêter un enregistrement programmé ; panneau HTML sans rechargement et ressources embarquées. Publication Marketplace à décider après essais |
 | 2026-10-20 | Développement en [[Rust]], Windows d'abord, architecture multi-systèmes |
 | 2026-10-20 | Son isolé obtenu par **un profil de navigateur dédié par source**, lancé par Polyptyque |
 | 2026-10-20 | Pas de navigateur intégré, pas d'extension de navigateur |
