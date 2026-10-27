@@ -3702,7 +3702,7 @@ dependencies = [
 
 [[package]]
 name = "polyptyque-app"
-version = "1.0.0-beta.8"
+version = "1.0.0-beta.9"
 dependencies = [
  "anyhow",
  "arboard",
@@ -3730,7 +3730,7 @@ dependencies = [
 
 [[package]]
 name = "polyptyque-cli"
-version = "1.0.0-beta.8"
+version = "1.0.0-beta.9"
 dependencies = [
  "embed-resource",
  "polyptyque-core",
@@ -3742,7 +3742,7 @@ dependencies = [
 
 [[package]]
 name = "polyptyque-core"
-version = "1.0.0-beta.8"
+version = "1.0.0-beta.9"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3758,7 +3758,7 @@ dependencies = [
 
 [[package]]
 name = "polyptyque-engine"
-version = "1.0.0-beta.8"
+version = "1.0.0-beta.9"
 dependencies = [
  "anyhow",
  "crossbeam-channel",
@@ -3769,7 +3769,7 @@ dependencies = [
 
 [[package]]
 name = "polyptyque-windows"
-version = "1.0.0-beta.8"
+version = "1.0.0-beta.9"
 dependencies = [
  "anyhow",
  "log",
