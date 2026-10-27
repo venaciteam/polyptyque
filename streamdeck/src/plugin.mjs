@@ -17,7 +17,7 @@ function redraw(entry) {
   if (entry.confirmation.pending) {
     const p = entry.confirmation.pending, snap = client.snapshot();
     if (Date.now() >= p.expires || p.generation !== snap.generation || p.scene !== snap.state?.scene.id ||
-        p.scheduledUntil !== snap.state?.recording.scheduled_until) entry.confirmation.clear();
+        p.scheduledUntil !== snap.state?.recording.scheduled_until) { entry.confirmation.clear(); entry.question = ''; }
     else value = { title: t('key.confirm'), value: t('key.press'), detail: String(Math.ceil((p.expires - Date.now()) / 1000)), tone: 'warning' };
   }
   if (entry.busy) value = { ...value, value: t('key.working') };

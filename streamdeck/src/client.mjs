@@ -102,6 +102,7 @@ export class PolyptyqueClient extends EventEmitter {
         this.retry = setTimeout(() => void this.connect(this.generation), this.retryMs);
       };
       const initial = setTimeout(() => finish('timeout'), 15000);
+      this.drop = finish;
       const lines = new JsonLines(value => {
         if (ended || generation !== this.generation) return;
         if (value.error) return finish(value.error.reason ?? 'unavailable');
@@ -125,7 +126,8 @@ export class PolyptyqueClient extends EventEmitter {
   async call(method, params = {}) {
     if (!this.state) throw failure(this.reason || 'not_running');
     const generation = this.generation;
-    const value = await this.run(this.exe, ['call', method, JSON.stringify(params)]);
+    const timeout = ['recording.start', 'recording.stop', 'scenes.open_windows'].includes(method) ? 320000 : 45000;
+    const value = await this.run(this.exe, ['call', method, JSON.stringify(params)], timeout);
     // Jamais de répétition automatique : une commande peut avoir été exécutée avant la coupure.
     if (generation !== this.generation || !this.state) throw failure('connection_changed');
     return value;
@@ -136,9 +138,17 @@ export class PolyptyqueClient extends EventEmitter {
       const [scenes, sources, schedules] = await Promise.all([
         this.call('scenes.list'), this.call('sources.list', { all: true }), this.call('schedules.list')]);
       if (generation !== this.generation) return;
-      this.catalog = { scenes: scenes.scenes, sources: sources.sources, schedules: schedules.schedules };
+      if (![scenes.scenes, sources.sources, schedules.schedules].every(Array.isArray)) throw failure('invalid_response');
+      this.catalog = {
+        scenes: scenes.scenes.map(({ id, name }) => ({ id, name })),
+        sources: sources.sources.map(({ id, name, scenes }) => ({ id, name, scenes })),
+        schedules: schedules.schedules
+      };
       this.changed();
-    } catch { /* La connexion d'événements reste la source de vérité pour l'état en ligne. */ }
+    } catch (error) {
+      // Un tube d'événements ouvert ne prouve pas qu'une application figée répond encore.
+      if (generation === this.generation && ['timeout', 'not_running', 'control_disabled', 'invalid_response'].includes(error.reason)) this.drop?.(error.reason);
+    }
     finally {
       if (generation === this.generation && !this.closed && this.state) {
         this.catalogTimer = setTimeout(() => void this.refreshCatalog(generation), this.catalogMs);

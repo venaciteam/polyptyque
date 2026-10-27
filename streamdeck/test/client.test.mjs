@@ -50,3 +50,30 @@ test('pilotage désactivé et réponse incorrecte restent hors ligne', async () 
     assert.equal(client.state, null); assert.equal(client.reason, 'control_disabled');
   } finally { client.stop(); }
 });
+test('le panneau ne reçoit ni URL de navigation ni contenu complet des scènes', async () => {
+  let child;
+  const client = new PolyptyqueClient({ locate: async () => 'fake.exe', catalogMs: 10000,
+    launch: () => (child = fakeChild()), run: async (exe, args, timeout) => {
+      assert.equal(timeout, 45000);
+      if (args[1] === 'scenes.list') return { scenes: [{ id: 'a', name: 'Scène', sources: [{ start_url: 'https://private' }] }] };
+      if (args[1] === 'sources.list') return { sources: [{ id: 's', name: 'Source', scenes: ['a'], start_url: 'https://private' }] };
+      return { schedules: [] };
+    } });
+  try {
+    client.start(); await new Promise(r => setImmediate(r));
+    child.stdout.write(JSON.stringify({ event: 'state', data: state }) + '\n');
+    await new Promise(r => setImmediate(r));
+    assert.deepEqual(client.catalog, { scenes: [{ id: 'a', name: 'Scène' }], sources: [{ id: 's', name: 'Source', scenes: ['a'] }], schedules: [] });
+  } finally { client.stop(); }
+});
+test('une application figée ne conserve pas un faux état en ligne', async () => {
+  let child;
+  const client = new PolyptyqueClient({ locate: async () => 'fake.exe', retryMs: 10000,
+    launch: () => (child = fakeChild()), run: async () => { throw Object.assign(new Error('Timeout'), { reason: 'timeout' }); } });
+  try {
+    client.start(); await new Promise(r => setImmediate(r));
+    child.stdout.write(JSON.stringify({ event: 'state', data: state }) + '\n');
+    await new Promise(r => setImmediate(r));
+    assert.equal(client.state, null); assert.equal(client.reason, 'timeout');
+  } finally { client.stop(); }
+});
