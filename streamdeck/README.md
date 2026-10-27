@@ -6,12 +6,14 @@ Plugin Windows en français et en anglais, avec l'identité visuelle de Polyptyq
 
 ## Installer et connecter
 
-Le paquet **0.1.0.1** corrige le panneau qui restait « En attente du plugin » alors que les actions fonctionnaient. Ouvrir le nouveau paquet pour mettre à jour l'installation ; les identifiants des actions restent identiques.
+Le paquet **0.1.0.2** corrige l'enregistrement des choix (scène, source, programmation) et le dialogue du panneau. Chaque changement est confirmé par relecture des réglages de Stream Deck ; un ancien état ne fait plus revenir la sélection en arrière. Ouvrir le nouveau paquet pour mettre à jour l'installation ; les identifiants des actions restent identiques.
 
 1. Ouvrir le fichier `city.vena.polyptyque.streamDeckPlugin` et accepter son installation dans Stream Deck.
 2. Ouvrir Polyptyque. Dans **Réglages**, activer **Autoriser le pilotage par d'autres programmes**.
 3. Dans Stream Deck, trouver la catégorie **Polyptyque**, puis glisser une action sur une touche. Le panneau affiche **Connecté à Polyptyque** quand l'état réel est reçu.
 4. Pour une action Source, Scène ou Programmation, choisir sa cible dans la liste. Pour Aperçus ou Enregistrement, choisir **Basculer**, **Activer / démarrer** ou **Suspendre / arrêter**.
+
+Le message **Réglage enregistré dans Stream Deck** confirme le choix. Pour une scène, cette étape configure la touche ; appuyer ensuite sur la touche pour activer la scène dans Polyptyque.
 
 Le plugin détecte d'abord le Polyptyque ouvert (portable compris), puis son installation standard. Le panneau confirme **Polyptyque détecté automatiquement** ; aucun chemin n'est demandé pour une copie détectée. Avec une version portable non détectée, déplier **Connexion › Chemin manuel (facultatif)**, renseigner le chemin complet de `polyptyque-cli.exe` livré avec elle (dans `current`), puis cliquer sur **Appliquer à toutes les touches**. Laisser ce champ vide pour la détection automatique. Aucun fichier de configuration à modifier. La langue suit Stream Deck ; chaque touche peut imposer français ou anglais.
 
@@ -46,7 +48,7 @@ npm run test:ui
 npm run pack
 ```
 
-`test:ui` utilise Chrome en mode headless, installé sur la machine. La CI utilise Chromium installé par Playwright (`POLYPTYQUE_TEST_BROWSER=chromium`) et exécute aussi ces tests. Ils distinguent l'UUID du panneau du contexte de la touche et vérifient la perte puis la reprise du dialogue. Le paquet et les aperçus sont écrits dans `../livraison/` ; le dossier `.sdPlugin` est généré et ignoré par Git. Installer le **paquet**, pas un lien symbolique vers ce dossier. À chaque nouveau paquet destiné à être installé, incrémenter la version à quatre composantes du manifeste dans `tools/build.mjs` (une version identique peut être ignorée par Stream Deck). La version du plugin est indépendante de celle de Polyptyque.
+`test:ui` utilise Chrome en mode headless, installé sur la machine. La CI utilise Chromium installé par Playwright (`POLYPTYQUE_TEST_BROWSER=chromium`) et exécute aussi ces tests. L'hôte de test authentifie les sorties avec l'UUID du panneau, puis répond avec le contexte de la touche, comme l'hôte natif. Les tests vérifient la persistance des trois cibles après réouverture, les notifications périmées et la perte/reprise du dialogue. Le paquet et les aperçus sont écrits dans `../livraison/` ; le dossier `.sdPlugin` est généré et ignoré par Git. Installer le **paquet**, pas un lien symbolique vers ce dossier. À chaque nouveau paquet destiné à être installé, incrémenter la version à quatre composantes du manifeste dans `tools/build.mjs` (une version identique peut être ignorée par Stream Deck). La version du plugin est indépendante de celle de Polyptyque.
 
 Le manifeste et les fichiers de traduction sont générés depuis `src/locales.mjs`. Les tests vérifient la résolution des traductions par le fournisseur SDK réel, les transitions des actions, les confirmations, les erreurs CLI, les coupures et le dialogue du paquet avec un hôte Stream Deck simulé. Les tests du panneau couvrent les deux langues, la cible supprimée, le pilotage désactivé et le changement de chemin sans rechargement. Il reste à valider les pressions sur un appareil physique et les retours auprès d'une vraie session de capture.
 

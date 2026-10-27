@@ -15,6 +15,8 @@ export const fr = {
     apply: 'Appliquer à toutes les touches', retry: 'Réessayer la connexion', language: 'Langue', auto: 'Automatique (Stream Deck)',
     mode: 'À la pression', toggle: 'Basculer', on: 'Activer / démarrer', off: 'Suspendre / arrêter',
     scene: 'Scène', source: 'Source', schedule: 'Programmation', scope: 'Fenêtres à ouvrir', all: 'Toute la scène active', one: 'Une source de la scène active', choose: 'Choisir…', missing: 'Cible enregistrée introuvable',
+    sceneNote: 'La scène est affectée à cette touche. Appuyer sur la touche pour l’activer dans Polyptyque.',
+    saving: 'Enregistrement du réglage…', saved: 'Réglage enregistré dans Stream Deck.', saveFailed: 'Enregistrement non confirmé. Fermer puis rouvrir ce panneau pour vérifier le choix.',
     confirm: 'Arrêt programmé : appuyer une seconde fois sur la touche dans les 5 secondes pour confirmer.',
     sourceNote: 'La source doit appartenir à la scène active. La durée affichée est celle de la session, y compris si cette source la rejoint plus tard.',
     diskNote: 'Estimation selon le débit et les sources de la scène. La durée réelle dépend du contenu enregistré.',
@@ -22,7 +24,7 @@ export const fr = {
     error: 'Dernière erreur', refresh: 'Les listes se mettent à jour automatiquement.',
     cli_missing: 'Ouvrir Polyptyque pour permettre sa détection automatique. Le chemin manuel est un recours pour les copies portables non détectées.',
     not_running: 'Ouvrir Polyptyque, puis réessayer.', control_disabled: 'Dans les réglages de Polyptyque, activer « Autoriser le pilotage par d’autres programmes ».',
-    version: 'Plugin bêta 0.1.0.1 · Polyptyque 1.0.0-beta.9 ou suivant'
+    version: 'Plugin bêta 0.1.0.2 · Polyptyque 1.0.0-beta.9 ou suivant'
   }
 };
 export const en = {
@@ -41,6 +43,8 @@ export const en = {
     apply: 'Apply to all keys', retry: 'Retry connection', language: 'Language', auto: 'Automatic (Stream Deck)',
     mode: 'On press', toggle: 'Toggle', on: 'Enable / start', off: 'Pause / stop',
     scene: 'Scene', source: 'Source', schedule: 'Scheduled recording', scope: 'Windows to open', all: 'All windows in the active scene', one: 'One source in the active scene', choose: 'Choose…', missing: 'Saved target not found',
+    sceneNote: 'This scene is assigned to the key. Press the key to activate it in Polyptyque.',
+    saving: 'Saving setting…', saved: 'Setting saved in Stream Deck.', saveFailed: 'Save not confirmed. Close and reopen this panel to check your choice.',
     confirm: 'To stop a scheduled recording, press the key again within 5 seconds to confirm.',
     sourceNote: 'The source must be in the active scene. The duration shown is the session’s, even if this source joined later.',
     diskNote: 'Estimated from the bitrate and the scene’s sources. Actual recording time depends on the content.',
@@ -48,7 +52,7 @@ export const en = {
     error: 'Last error', refresh: 'Lists update automatically.',
     cli_missing: 'Open Polyptyque so it can be detected automatically. A manual path is a fallback for undetected portable copies.',
     not_running: 'Open Polyptyque and retry.', control_disabled: 'In Polyptyque’s settings, enable “Allow control by other programs”.',
-    version: 'Beta plugin 0.1.0.1 · Polyptyque 1.0.0-beta.9 or later'
+    version: 'Beta plugin 0.1.0.2 · Polyptyque 1.0.0-beta.9 or later'
   }
 };
 export function translate(lang, key) {

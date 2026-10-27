@@ -20,6 +20,8 @@ The specification is [`docs/cahier-des-charges.md`](docs/cahier-des-charges.md) 
 
 `streamdeck/` contains the Windows Stream Deck plugin (Node.js 24, Elgato SDK). It uses the shipped CLI (`events` and `call`), with no separate app API. `npm ci`, `npm test`, `npm run test:ui` (installed Chrome), `npm run pack` from that directory. Generated package and previews go to `livraison/`; generated `.sdPlugin` and `node_modules` are ignored. French source and English live together in `src/locales.mjs`, and generate the SDK locale files. Never reload the property inspector to switch languages. Increment the four-part manifest version in `tools/build.mjs` for each new package installed in Stream Deck. Marketplace submission is a separate decision.
 
+Property inspector protocol: outgoing `context` is the **property inspector UUID**, including `setSettings`, `getSettings` and `sendToPlugin`. Incoming settings and snapshot payloads identify the **action context** (`actionInfo.context`). These are distinct: native Stream Deck rejects outgoing messages authenticated with the action context. The UI test host must enforce this and verify persisted scene/source/schedule selections after reopening, including delayed stale snapshots.
+
 ## Build and test
 
 ```sh

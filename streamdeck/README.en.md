@@ -6,12 +6,14 @@ A Windows plugin in French and English, using Polyptyque’s visual identity. Re
 
 ## Install and connect
 
-Package **0.1.0.1** fixes the panel staying on “Waiting for the plugin” while actions were working. Open the new package to update the installed plugin; action identifiers stay the same.
+Package **0.1.0.2** fixes saving scene/source/schedule selections and the panel’s communication. Each change is confirmed by reading back Stream Deck’s settings; delayed state updates no longer revert a recent selection. Open the new package to update the installed plugin; action identifiers stay the same.
 
 1. Open `city.vena.polyptyque.streamDeckPlugin` and accept installation in Stream Deck.
 2. Open Polyptyque. In **Settings**, enable **Allow control by other programs**.
 3. Find the **Polyptyque** category in Stream Deck and drag an action onto a key. The panel shows **Connected to Polyptyque** once it receives live state.
 4. Choose a target for Source, Scene or Scheduled recording. For Recording or Previews, choose **Toggle**, **Enable / start** or **Pause / stop**.
+
+**Setting saved in Stream Deck** confirms your choice. Choosing a scene configures the key; press the key to activate the scene in Polyptyque.
 
 The plugin first detects the running copy of Polyptyque (including portable copies), then the standard installation. The panel confirms **Polyptyque detected automatically**; no path is needed for a detected copy. If a portable copy isn’t detected, expand **Connection › Manual path (optional)**, enter the full path to its `polyptyque-cli.exe` (in `current`) and select **Apply to all keys**. Leave this field blank for automatic detection. There are no configuration files to edit. Language follows Stream Deck, with a French/English override per key.
 
@@ -46,7 +48,7 @@ npm run test:ui
 npm run pack
 ```
 
-`test:ui` uses an installed Chrome browser in headless mode. CI installs Chromium through Playwright (`POLYPTYQUE_TEST_BROWSER=chromium`) and also runs these tests, including distinct inspector/action identifiers and panel disconnection/recovery. The package and previews go into `../livraison/`. The `.sdPlugin` directory is generated and ignored by Git. Install the **package**, not a symlink. Increment the four-part manifest version in `tools/build.mjs` for every new installable package; Stream Deck may ignore a package with the same version. Plugin and app versions are independent.
+`test:ui` uses an installed Chrome browser in headless mode. CI installs Chromium through Playwright (`POLYPTYQUE_TEST_BROWSER=chromium`) and also runs these tests. The test host authenticates outgoing messages with the inspector UUID and replies with the action context, matching the native host. Tests cover persisted scene/source/schedule choices after reopening, stale notifications and panel disconnection/recovery. The package and previews go into `../livraison/`. The `.sdPlugin` directory is generated and ignored by Git. Install the **package**, not a symlink. Increment the four-part manifest version in `tools/build.mjs` for every new installable package; Stream Deck may ignore a package with the same version. Plugin and app versions are independent.
 
 The tests cover action state transitions, confirmation expiry/context, CLI errors, disconnects, SDK translation lookup and the built plugin’s communication with a simulated Stream Deck host. Panel tests cover French/English, deleted targets, disabled remote control and CLI path changes without reloading. Physical key presses and feedback from a real capture session still need user testing.
 
