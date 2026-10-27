@@ -85,6 +85,7 @@ fn main() {
     }
     let result = launch(in_background);
     // Erreur ou non, la fin est passée par ici et figure au journal.
+    log::info!("fermeture normale de Polyptyque");
     launch::end(&paths::launch_marker_file());
     if let Err(e) = result {
         log::error!("{e:#}");
@@ -137,7 +138,9 @@ fn init_logging() -> Option<PathBuf> {
     let dir = paths::logs_dir();
     fs::create_dir_all(&dir).ok()?;
     let (date, time) = naming::now_parts();
-    let path = dir.join(format!("polyptyque_{date}_{time}.log"));
+    // Relance dans la même minute (après un plantage, justement) : nouveau
+    // fichier, `… (2).log`, le journal du lancement précédent est gardé.
+    let path = naming::unique_path(&dir, &format!("polyptyque_{date}_{time}"), "log", &Default::default());
     let file = File::create(&path).ok()?;
     let mut builder = ConfigBuilder::new();
     let _ = builder.set_time_offset_to_local();

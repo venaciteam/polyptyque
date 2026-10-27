@@ -247,8 +247,10 @@ pub fn build(info: &ReportInfo, logs_dir: &Path, masker: &Masker) -> String {
                 .collect::<Vec<_>>()
         })
         .filter_map(|rest| {
+            // Le nom peut lui-même contenir des parenthèses : « … (2).log ».
             let name = rest.split_once("(journal ")?.1;
-            Some(name[..name.find(')')?].to_string())
+            let end = name.find(".log)").map(|i| i + 4).or_else(|| name.find(')'))?;
+            Some(name[..end].to_string())
         })
         .collect();
     out.push_str("\nFins inattendues\n----------------\n");
@@ -462,8 +464,9 @@ mod tests {
         fs::write(
             dir.join("polyptyque_2026-10-27_14h48.log"),
             format!(
-                "14:48:28 [WARN] {} (journal polyptyque_2026-10-27_14h47.log) : plantage, fermeture forcée ou coupure de courant\n",
-                launch::UNEXPECTED_END
+                "14:48:28 [WARN] {u} (journal polyptyque_2026-10-27_14h47.log) : plantage, fermeture forcée ou coupure de courant\n\
+                 14:48:59 [WARN] {u} (journal polyptyque_2026-10-27_14h48 (2).log) : plantage, fermeture forcée ou coupure de courant\n",
+                u = launch::UNEXPECTED_END
             ),
         )
         .unwrap();
@@ -477,6 +480,7 @@ mod tests {
         };
         let text = build(&info, &dir, &Masker::new(None, None));
         assert!(text.contains("----------------\npolyptyque_2026-10-27_14h47.log : terminé sans fermeture normale"));
+        assert!(text.contains("\npolyptyque_2026-10-27_14h48 (2).log : terminé sans fermeture normale"));
         assert!(text.contains("-\n2026-10-27 14:48:13 [Application] NVIDIA OpenGL Driver 1 : …\n"));
         let unknown = ReportInfo { driver_events: None, ..info };
         assert!(build(&unknown, &dir, &Masker::new(None, None)).contains("non consultées sur ce système"));
