@@ -749,8 +749,8 @@ export component AssistantsSheet inherits Sheet {
                     font-size: Theme.font-small;
                     vertical-alignment: center;
                 }
-                ActionButton {
-                    text: assistant.configured ? @tr("Réparer") : @tr("Connecter");
+                if !assistant.configured || assistant.needs-repair || root.show-options: ActionButton {
+                    text: assistant.needs-repair ? @tr("Réparer") : assistant.configured ? @tr("Réinstaller la connexion") : @tr("Connecter");
                     kind: assistant.configured ? "secondary" : "primary";
                     enabled: assistant.can-connect && !Bridge.assistants-busy;
                     clicked => { Bridge.configure-assistant(assistant.id, false); }
@@ -791,7 +791,7 @@ export component AssistantsSheet inherits Sheet {
     }
     Field {
         label: @tr("Vérifier depuis l'assistant");
-        hint: @tr("Après avoir chargé la connexion, envoyer cette demande. L'état passe à « Connecté » quand l'assistant utilise un outil Polyptyque.");
+        hint: @tr("Suivre les étapes de l'assistant choisi, puis envoyer cette demande. « Configuration enregistrée » indique que Polyptyque a terminé sa préparation ; « Connecté » apparaît après l'utilisation d'un outil. Aucun clic sur Réparer n'est nécessaire pour terminer la connexion.");
         HorizontalLayout {
             spacing: 10px;
             Text {

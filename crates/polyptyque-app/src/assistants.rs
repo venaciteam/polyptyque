@@ -55,11 +55,11 @@ impl Assistant {
 
     pub fn next_step(self) -> String {
         match self {
-            Self::ClaudeDesktop => tr!("Quitter Claude Desktop, y compris son icône près de l'horloge, puis le rouvrir. Autoriser les outils Polyptyque dans la conversation."),
-            Self::ClaudeCode => tr!("Ouvrir une nouvelle session Claude Code, puis autoriser les outils Polyptyque si demandé."),
-            Self::Codex => tr!("Relancer Codex ou sa connexion MCP, puis ouvrir une nouvelle conversation locale et autoriser les outils Polyptyque si demandé."),
-            Self::OpenClaw => tr!("Recharger la configuration ou relancer la passerelle OpenClaw locale, puis autoriser les outils Polyptyque pour l'agent utilisé."),
-            Self::Hermes => tr!("Dans Hermes Agent, lancer /reload-mcp ou ouvrir une nouvelle session pour charger les outils Polyptyque."),
+            Self::ClaudeDesktop => tr!("1. Quitter Claude Desktop depuis son icône près de l'horloge, puis le rouvrir.\n2. Choisir le mode Claude et ouvrir une nouvelle conversation.\n3. Cliquer sur +, puis Connecteurs : activer Polyptyque s'il est désactivé.\n4. Envoyer « Liste mes scènes dans Polyptyque. » et accepter la demande d'autorisation si elle apparaît."),
+            Self::ClaudeCode => tr!("1. Fermer la session Claude Code en cours, puis en ouvrir une nouvelle.\n2. Saisir /mcp dans cette session et vérifier que polyptyque est disponible.\n3. Envoyer « Liste mes scènes dans Polyptyque. » et accepter la demande d'utilisation des outils si elle apparaît."),
+            Self::Codex => tr!("1. Dans les paramètres de Codex, ouvrir Serveurs MCP et vérifier que polyptyque est activé. Relancer Codex si la connexion n'est pas chargée.\n2. Ouvrir une nouvelle conversation exécutée sur cet ordinateur.\n3. Envoyer « Liste mes scènes dans Polyptyque. » et accepter la demande d'utilisation des outils si elle apparaît."),
+            Self::OpenClaw => tr!("1. Relancer la passerelle OpenClaw qui tourne sur ce PC pour charger la configuration.\n2. Dans son interface de contrôle, ouvrir Settings > MCP et vérifier la présence de polyptyque.\n3. Dans la conversation, ouvrir + > Plugins > Tool access et vérifier que les outils Polyptyque ne sont pas bloqués.\n4. Envoyer « Liste mes scènes dans Polyptyque. »."),
+            Self::Hermes => tr!("1. Dans la conversation Hermes Agent, saisir /reload-mcp pour charger la connexion, ou ouvrir une nouvelle session.\n2. Envoyer « Liste mes scènes dans Polyptyque. ».\n3. Si Hermes demande l'accord pour utiliser un outil Polyptyque, accepter cette demande. Si le rechargement signale une erreur, la connexion n'est pas encore utilisable."),
         }
     }
 }

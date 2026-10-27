@@ -460,7 +460,10 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
 
     let status_timer = Timer::default();
     status_timer.start(TimerMode::Repeated, Duration::from_millis(500), || {
-        with_app(|app| app.tick_status());
+        with_app(|app| {
+            app.tick_status();
+            app.tick_assistants();
+        });
     });
     let preview_timer = Timer::default();
     preview_timer.start(TimerMode::Repeated, Duration::from_millis(100), || {

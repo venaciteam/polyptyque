@@ -75,6 +75,8 @@ polyptyque-cli scenes delete --scene Archive --confirm
 
 For native Windows clients, use **Settings › Allow control by other programs › Connect an AI assistant…** in Polyptyque. It configures Claude Code (user scope), Claude Desktop, Codex, OpenClaw and Hermes Agent directly. Each entry starts the current installation’s `polyptyque-cli.exe` with `mcp` and sets `POLYPTYQUE_ASSISTANT` to identify the connection in Polyptyque. No provider credentials are required by Polyptyque.
 
+“Configuration saved” means the Polyptyque-side setup is complete. Each client has numbered instructions for restarting or reloading, finding its tools, and sending the first request. Repair is shown only for a stale or disabled connection; reinstallation remains in Connection options. The open setup sheet rereads configuration state every two seconds without changing client files.
+
 The setup distinguishes a saved configuration from a live connection: the latter appears after a real tool call. Reload or restart the client as instructed, then send “List my scenes in Polyptyque.” Removing a configuration doesn’t kill running client processes; restart them to close existing sessions.
 
 Custom configuration paths can be selected and are remembered locally. The setup preserves unrelated settings and servers, refuses a conflicting `polyptyque` entry, backs up the original next to the client’s file, and checks for concurrent changes before atomic replacement. JSON5 and YAML are rewritten without comments; TOML comments are preserved. OpenClaw includes, symlinks and network/WSL paths aren’t modified automatically. WSL, Docker, profiles with different runtime environments and remote agents need a separate setup.

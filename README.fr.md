@@ -187,9 +187,9 @@ Un assistant IA (Claude, ou tout assistant compatible MCP), un script ou un Stre
 
 **1. L'autoriser** : dans Polyptyque, Réglages › « Autoriser le pilotage par d'autres programmes » (désactivé par défaut), puis « Connecter un assistant IA… ».
 
-**2. Choisir l'assistant** : Claude Code, Claude Desktop, Codex, OpenClaw ou Hermes Agent. Cliquer sur **Connecter** : Polyptyque prépare la configuration locale, sans commande à saisir ni fichier à modifier à la main. Suivre ensuite la consigne affichée pour recharger ou relancer l'assistant.
+**2. Choisir l'assistant** : Claude Code, Claude Desktop, Codex, OpenClaw ou Hermes Agent. Cliquer sur **Connecter** : Polyptyque prépare la configuration locale, sans commande à saisir ni fichier à modifier à la main. Suivre ensuite les étapes numérotées propres à cet assistant : fermeture ou rechargement, menu des outils et première demande. « Configuration enregistrée » signifie que Polyptyque a terminé sa préparation ; aucun clic sur Réparer n'est nécessaire pour la terminer.
 
-**3. Vérifier** : le bouton **Copier la demande** prépare « Liste mes scènes dans Polyptyque. ». L'envoyer dans l'assistant : l'état passe de **Configuré · en attente** à **Connecté** quand il utilise un outil Polyptyque.
+**3. Vérifier** : le bouton **Copier la demande** prépare « Liste mes scènes dans Polyptyque. ». L'envoyer dans l'assistant : l'état passe de **Configuration enregistrée** à **Connecté** quand il utilise un outil Polyptyque.
 
 **Réparer** actualise une connexion existante, notamment après déplacement de la version portable. **Déconnecter** retire uniquement l'entrée Polyptyque ; relancer l'assistant pour fermer ses sessions encore actives. Une sauvegarde du fichier original est conservée à côté de sa configuration. Les autres serveurs et réglages restent en place ; les commentaires JSON5 et YAML ne sont pas conservés dans le fichier modifié. Si un autre serveur porte déjà le même nom, Polyptyque refuse de le remplacer.
 

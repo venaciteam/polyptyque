@@ -30,12 +30,23 @@ fn render_assistants_sheet() {
         .map(|assistant| AssistantItem {
             id: assistant.id().into(),
             name: assistant.name().into(),
-            state: "Détecté".into(),
-            detail: "Prêt à configurer. Seule la connexion Polyptyque sera ajoutée à cet assistant.".into(),
+            state: if assistant == crate::assistants::Assistant::ClaudeDesktop {
+                "Configuration enregistrée"
+            } else {
+                "Détecté"
+            }
+            .into(),
+            detail: if assistant == crate::assistants::Assistant::ClaudeDesktop {
+                assistant.next_step()
+            } else {
+                "Prêt à configurer. Seule la connexion Polyptyque sera ajoutée à cet assistant.".into()
+            }
+            .into(),
             tone: 0,
-            configured: false,
+            configured: assistant == crate::assistants::Assistant::ClaudeDesktop,
+            needs_repair: false,
             can_connect: true,
-            can_disconnect: false,
+            can_disconnect: assistant == crate::assistants::Assistant::ClaudeDesktop,
         })
         .collect();
     bridge.set_assistants(ModelRc::new(VecModel::from(rows)));

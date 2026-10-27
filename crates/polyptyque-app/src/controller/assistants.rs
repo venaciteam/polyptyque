@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::thread;
+use std::time::{Duration, Instant};
 
 use slint::{ComponentHandle, Model, ModelRc, VecModel};
 use tr::tr;
@@ -15,6 +16,9 @@ pub(super) struct SetupState {
     snapshots: Vec<Snapshot>,
     overrides: HashMap<Assistant, PathBuf>,
     busy: bool,
+    scanning: bool,
+    revision: u64,
+    last_refresh: Option<Instant>,
 }
 
 impl Default for SetupState {
@@ -24,6 +28,9 @@ impl Default for SetupState {
         Self {
             snapshots: Vec::new(),
             busy: false,
+            scanning: false,
+            revision: 0,
+            last_refresh: None,
             overrides: saved.into_iter().filter_map(|(id, path)| Assistant::from_id(&id).map(|a| (a, path))).collect(),
         }
     }
@@ -72,12 +79,31 @@ impl App {
     }
 
     pub(super) fn refresh_assistants(&self) {
-        if self.assistant_setup.borrow().busy {
+        self.scan_assistants(true);
+    }
+
+    pub(super) fn tick_assistants(&self) {
+        if self.with_bridge_value(|b| b.get_sheet() != "assistants") {
+            return;
+        }
+        let due =
+            self.assistant_setup.borrow().last_refresh.is_none_or(|last| last.elapsed() >= Duration::from_secs(2));
+        if due {
+            self.scan_assistants(false);
+        }
+    }
+
+    fn scan_assistants(&self, manual: bool) {
+        if self.assistant_setup.borrow().busy || self.assistant_setup.borrow().scanning {
             return;
         }
         let overrides = self.assistant_setup.borrow().overrides.clone();
-        self.assistant_setup.borrow_mut().busy = true;
-        self.with_bridge(|b| b.set_assistants_busy(true));
+        let revision = self.assistant_setup.borrow().revision;
+        self.assistant_setup.borrow_mut().scanning = true;
+        self.assistant_setup.borrow_mut().last_refresh = Some(Instant::now());
+        if manual {
+            self.with_bridge(|b| b.set_assistants_busy(true));
+        }
         thread::spawn(move || {
             let cli = assistants::cli_path();
             let targets: Vec<_> = assistants::targets()
@@ -90,17 +116,40 @@ impl App {
                     target
                 })
                 .collect();
-            let snapshots = targets
+            let snapshots: Vec<Snapshot> = targets
                 .into_iter()
                 .map(|target| assistants::inspect(target, cli.as_deref().unwrap_or_else(|_| std::path::Path::new(""))))
                 .collect();
             post(move |app| {
                 let mut setup = app.assistant_setup.borrow_mut();
+                setup.scanning = false;
+                // Une lecture lancée avant un clic ne doit pas masquer le
+                // résultat de l'écriture ou du choix de fichier qui a suivi.
+                if setup.revision != revision {
+                    let busy = setup.busy;
+                    setup.last_refresh = None;
+                    drop(setup);
+                    app.with_bridge(|b| b.set_assistants_busy(busy));
+                    return;
+                }
+                let lost = snapshots
+                    .iter()
+                    .find(|new| {
+                        !matches!(new.state, State::Configured | State::Repair)
+                            && setup.snapshots.iter().any(|old| {
+                                old.target.assistant == new.target.assistant
+                                    && matches!(old.state, State::Configured | State::Repair)
+                            })
+                    })
+                    .map(|s| s.target.assistant);
                 setup.snapshots = snapshots;
-                setup.busy = false;
                 drop(setup);
                 app.with_bridge(|b| {
                     b.set_assistants_busy(false);
+                    if let Some(assistant) = lost {
+                        b.set_assistants_message(tr!("La configuration de {} a changé. Son état vient d'être actualisé ; consulter les indications sur sa carte.", assistant.name()).into());
+                        b.set_assistants_message_tone(2);
+                    }
                     if let Err(e) = cli {
                         b.set_assistants_message(e.to_string().into());
                         b.set_assistants_message_tone(3);
@@ -126,7 +175,7 @@ impl App {
                 match snapshot.state {
                     State::Missing => (tr!("Non détecté"), 0),
                     State::Available => (tr!("Détecté"), 0),
-                    State::Configured => (tr!("Configuré · en attente"), 0),
+                    State::Configured => (tr!("Configuration enregistrée"), 0),
                     State::Repair => (tr!("À réparer"), 2),
                     State::Conflict => (tr!("Nom déjà utilisé"), 2),
                     State::Error => (tr!("Configuration à vérifier"), 3),
@@ -134,10 +183,13 @@ impl App {
             };
             AssistantItem {
                 id: assistant.id().into(), name: assistant.name().into(), state: state.into(), tone,
-                detail: if active && matches!(snapshot.state, State::Available | State::Missing) {
+                detail: if active && configured {
+                    tr!("La connexion fonctionne. Les demandes peuvent être faites directement dans cet assistant.")
+                } else if active && matches!(snapshot.state, State::Available | State::Missing) {
                     tr!("La configuration est retirée, mais une session utilise encore Polyptyque. Relancer l'assistant pour terminer la déconnexion.")
                 } else { snapshot.detail.clone() }.into(),
                 configured,
+                needs_repair: snapshot.state == State::Repair,
                 can_connect: cfg!(windows) && matches!(snapshot.state, State::Available | State::Configured | State::Repair),
                 can_disconnect: cfg!(windows) && configured,
             }
@@ -163,7 +215,11 @@ impl App {
                 return;
             }
         };
-        self.assistant_setup.borrow_mut().busy = true;
+        {
+            let mut setup = self.assistant_setup.borrow_mut();
+            setup.busy = true;
+            setup.revision += 1;
+        }
         self.with_bridge(|b| {
             b.set_assistants_busy(true);
             b.set_assistants_message("".into());
@@ -188,7 +244,7 @@ impl App {
                                 assistant.name()
                             )
                         } else {
-                            tr!("Connexion préparée pour {}. {}", assistant.name(), assistant.next_step())
+                            tr!("Configuration enregistrée pour {}. Suivre maintenant les étapes indiquées sur sa carte.", assistant.name())
                         },
                         1,
                     ),
@@ -235,7 +291,12 @@ impl App {
                     self.assistant_message(&tr!("Impossible de conserver le choix de configuration : {}", e), 3);
                     return;
                 }
-                self.assistant_setup.borrow_mut().overrides = overrides;
+                {
+                    let mut setup = self.assistant_setup.borrow_mut();
+                    setup.overrides = overrides;
+                    setup.revision += 1;
+                    setup.last_refresh = None;
+                }
                 self.refresh_assistants();
             }
         }
