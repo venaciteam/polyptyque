@@ -30,7 +30,7 @@ ws.on('connection', socket => { peer = socket; socket.on('message', raw => {
   const value = JSON.parse(raw); commands.push(value);
   // Même contrôle que l'hôte natif : authentification par l'UUID du panneau,
   // puis réponse et notifications avec le contexte de la touche.
-  if (value.event === 'setSettings' && value.context === 'inspector-session-a' && value.action) {
+  if (value.event === 'setSettings' && value.context === 'inspector-session-a' && value.action === `city.vena.polyptyque.${kind}`) {
     const previous = settings; settings = value.payload;
     snapshot(previous); // État du plugin en retard avant l'accusé.
     setTimeout(() => { if (socket.readyState === 1) snapshot(previous); }, 30); // Et après l'accusé.
@@ -73,7 +73,12 @@ try {
   await page.screenshot({ path: '../livraison/streamdeck-settings-en.png', fullPage: true });
   // Le choix est réellement enregistré et retrouvé après fermeture/réouverture.
   for (const [actionKind, field, target] of [['source', 'source', 'source-b'], ['scene', 'scene', 'scene-b'], ['schedule', 'schedule', 'schedule-b']]) {
-    kind = actionKind; snapshot();
+    kind = actionKind;
+    await page.reload();
+    await page.evaluate(({ port, settings, kind }) => window.connectElgatoStreamDeckSocket(String(port), 'inspector-session-a', 'registerPropertyInspector',
+      JSON.stringify({ application: { language: 'fr' } }), JSON.stringify({ context: 'key-a', action: `city.vena.polyptyque.${kind}`, payload: { settings } })),
+    { port: ws.address().port, settings, kind });
+    await page.waitForFunction(() => document.getElementById('status').textContent === 'Connected to Polyptyque');
     await page.waitForFunction(field => !document.getElementById(`${field}-field`).hidden, field);
     await page.locator(`#${field}`).selectOption(target);
     await page.waitForFunction(() => document.getElementById('settings-status').textContent === 'Setting saved in Stream Deck.');
@@ -104,7 +109,7 @@ try {
   await page.locator('#cli').fill('R:\\Portable\\current\\polyptyque-cli.exe'); await page.locator('#apply').click();
   await page.waitForTimeout(100);
   assert.ok(commands.some(c => c.payload?.type === 'connection' && c.payload.cliPath.startsWith('R:')));
-  assert.equal(commands.filter(c => c.event === 'registerPropertyInspector').length, 4);
+  assert.equal(commands.filter(c => c.event === 'registerPropertyInspector').length, 7);
   assert.equal(commands.find(c => c.event === 'registerPropertyInspector').uuid, 'inspector-session-a');
   assert.ok(commands.filter(c => ['sendToPlugin', 'setSettings', 'getSettings'].includes(c.event)).every(c => c.context === 'inspector-session-a' && c.action.startsWith('city.vena.polyptyque.')));
   assert.deepEqual(errors, []);
