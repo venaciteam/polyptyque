@@ -767,7 +767,7 @@ Le plugin Windows utilise `polyptyque-cli.exe` livré avec Polyptyque (bêta.9 o
 - Connexion automatique au Polyptyque ouvert (portable compris), puis à l'installation standard ; détection réussie indiquée explicitement. Chemin du CLI rangé dans « Chemin manuel (facultatif) », recours pour une copie portable non détectée. Une connexion partagée suit les notifications, les listes sont relues périodiquement ; une commande interrompue n'est jamais rejouée automatiquement.
 - Panneau de réglage et touches français/anglais selon Stream Deck, avec choix manuel de langue. Consignes de connexion en haut du panneau, état et erreurs visibles. Palette de Polyptyque et logo à trois panneaux, icônes de catégorie/actions blanches.
 - Le panneau authentifie son inscription et tous ses messages sortants avec son propre UUID ; les réponses portent le contexte de la touche. Une modification est relue dans les réglages réellement conservés par Stream Deck, avec confirmation visible. Une ancienne notification ne doit pas effacer un choix récent ou une sauvegarde confirmée. Configurer une scène affecte la scène à la touche ; l'appui sur la touche l'active. Sans réponse du plugin pendant huit secondes, « Panneau déconnecté » remplace l'attente ou le vert ; une réponse rétablit automatiquement l'état réel.
-- Livraison initiale : fichier `.streamDeckPlugin` installable, publication Marketplace à décider après les essais. Les raccourcis globaux restent utilisables avec l'action Stream Deck « Raccourci clavier », sans retour d'état.
+- Livraison : fichier `.streamDeckPlugin` installable, joint à la préversion GitHub de Polyptyque avec laquelle il est compatible. Lien direct dans les README français et anglais, immédiatement sous les téléchargements de l'application. La bêta 0.1.0.2 du plugin accompagne Polyptyque 1.0.0-beta.9 ; publication Marketplace à décider après les essais. Les raccourcis globaux restent utilisables avec l'action Stream Deck « Raccourci clavier », sans retour d'état.
 
 ## Feuille de route
 
@@ -879,6 +879,7 @@ Le plugin Windows utilise `polyptyque-cli.exe` livré avec Polyptyque (bêta.9 o
 > - [x] Correction du panneau restant en attente malgré des actions fonctionnelles : identifiants panneau/touche distincts, délai de réponse et reprise vérifiés
 > - [x] Authentification native des réglages corrigée (0.1.0.2) : choix confirmé par relecture, persistance des trois cibles après réouverture et anciennes notifications ignorées
 > - [x] Sélection de scène validée par l'utilisateur sur Stream Deck après installation de la 0.1.0.2
+> - [x] Téléchargement direct du plugin bilingue dans les README FR/EN, sous les téléchargements de l'application
 > - [x] Construction et validation Elgato ; tests du modèle, du transport, des traductions SDK, du paquet et du panneau en navigateur
 > - [ ] Validation sur Stream Deck et capture réelle (durée, fenêtre perdue, disque, commandes)
 > - [ ] Décision de publication au Marketplace Elgato
@@ -903,6 +904,7 @@ Le plugin Windows utilise `polyptyque-cli.exe` livré avec Polyptyque (bêta.9 o
 
 | Date | Décision |
 |---|---|
+| 2026-10-27 | À la demande de l'utilisateur, paquet Stream Deck 0.1.0.2 validé ajouté à la préversion GitHub 1.0.0-beta.9 (compatible), avec lien direct sous les téléchargements dans les README FR/EN. Pas de nouvelle version de l'application ni de publication Marketplace ; 99 textes vérifiés dans les deux langues |
 | 2026-10-27 | À la demande de l'utilisateur, builds et tests en local pour les itérations. Les deux workflows GitHub (application et plugin Stream Deck) ne démarrent plus sur push de branche ou PR ; tags v* et lancement manuel conservés pour les publications. Le code continue à être poussé sur dev |
 | 2026-10-27 | Correction Stream Deck 0.1.0.2 après rejet natif des réglages : UUID du panneau pour inscription ET messages sortants, contexte de touche pour les réponses. Choix confirmé par relecture, révision de sauvegarde et rejet des états périmés. La simulation contrôle l'authentification native et la persistance après réouverture |
 | 2026-10-27 | Première correction Stream Deck 0.1.0.1 du panneau en attente : identifiants distincts et état déconnecté. L'usage du contexte de touche dans les messages sortants s'est révélé incorrect dans les logs natifs ; remplacé par 0.1.0.2 |

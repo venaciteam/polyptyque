@@ -33,6 +33,7 @@
 
 - **[Télécharger l'installateur](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.9/Polyptyque-Setup.exe)** : la version classique, qui s'installe comme un logiciel habituel. Dans le doute, choisir celle-ci.
 - **[Télécharger la version portable](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.9/Polyptyque-portable.zip)** : sans installation, à décompresser dans le dossier de son choix, même sur une clé USB.
+- **[Télécharger le plugin Stream Deck](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.9/city.vena.polyptyque.streamDeckPlugin)** : bêta 0.1.0.2, en français et en anglais. Double-cliquer sur le fichier pour l'installer dans Stream Deck 7.1 ou suivant ; [guide de connexion](streamdeck/README.md#installer-et-connecter).
 
 macOS et Linux : pas encore disponibles.
 
