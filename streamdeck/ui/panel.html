@@ -3,12 +3,14 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Polyptyque</title><link rel="stylesheet" href="panel.css"></head>
 <body>
   <header><img src="../images/plugin.png" width="32" height="32" alt=""><strong>Polyptyque</strong><span>BÊTA</span></header>
-  <section id="connection" aria-live="polite"><b id="status" data-i18n="ui.waiting"></b><p id="help"></p></section>
+  <section id="connection" aria-live="polite"><b id="status"></b><p id="detected" class="muted"></p><p id="help"></p></section>
   <details id="setup" open><summary data-i18n="ui.setup"></summary>
     <p class="instructions" data-i18n="ui.instructions"></p>
-    <label for="cli" data-i18n="ui.path"></label><input id="cli" type="text" spellcheck="false" placeholder="C:\…\polyptyque-cli.exe">
-    <p class="muted" data-i18n="ui.pathHint"></p><button id="apply" data-i18n="ui.apply"></button>
-    <button id="retry" class="secondary" data-i18n="ui.retry"></button><p id="detected" class="muted path"></p>
+    <button id="retry" class="secondary" data-i18n="ui.retry"></button>
+    <details id="manual"><summary data-i18n="ui.manual"></summary>
+      <label for="cli" data-i18n="ui.path"></label><input id="cli" type="text" spellcheck="false" placeholder="C:\…\polyptyque-cli.exe">
+      <p class="muted" data-i18n="ui.pathHint"></p><button id="apply" data-i18n="ui.apply"></button><p id="detected-path" class="muted path"></p>
+    </details>
   </details>
   <main>
     <label for="language" data-i18n="ui.language"></label>

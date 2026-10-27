@@ -7,10 +7,11 @@ export const fr = {
   day: { mon: 'lun.', tue: 'mar.', wed: 'mer.', thu: 'jeu.', fri: 'ven.', sat: 'sam.', sun: 'dim.' },
   error: { connecting: 'Connexion…', cli_missing: 'CLI introuvable', not_running: 'Polyptyque fermé', control_disabled: 'Pilotage désactivé', configure: 'À configurer', source_inactive: 'Source absente', target_missing: 'Cible absente', busy: 'Occupé', locked: 'Verrouillé', refused: 'Refusé', declined: 'Refusé', timeout: 'Délai dépassé', unavailable: 'Indisponible', connection_changed: 'Connexion coupée', invalid_response: 'Réponse invalide', not_found: 'Introuvable', ambiguous: 'Cible ambiguë', invalid_request: 'Réglage invalide', internal: 'Erreur', confirmation_required: 'Confirmation requise' },
   ui: {
-    connection: 'Connexion à Polyptyque', connected: 'Connecté à Polyptyque', waiting: 'En attente du plugin…',
+    connection: 'Connexion à Polyptyque', connected: 'Connecté à Polyptyque', waiting: 'En attente du plugin…', panelDisconnected: 'Panneau déconnecté',
     noPlugin: 'Le plugin ne répond pas. Fermer ce panneau puis le rouvrir ; consulter le journal Stream Deck si nécessaire.',
-    setup: 'Connexion', instructions: '1. Ouvrir Polyptyque.\n2. Dans Réglages, activer « Autoriser le pilotage par d’autres programmes ».\n3. Les scènes et sources apparaissent ci-dessous. Pour une version portable non détectée, indiquer son CLI dans Connexion.',
-    path: 'Chemin de polyptyque-cli.exe', pathHint: 'Vide : détection automatique. Le fichier est livré avec Polyptyque.',
+    setup: 'Connexion', instructions: '1. Ouvrir Polyptyque : le plugin le détecte automatiquement.\n2. Dans Réglages, activer « Autoriser le pilotage par d’autres programmes ».\n3. Les scènes et sources apparaissent ci-dessous.',
+    manual: 'Chemin manuel (facultatif)', autoDetected: 'Polyptyque détecté automatiquement.', manualConfigured: 'Chemin personnalisé utilisé.',
+    path: 'Chemin de polyptyque-cli.exe', pathHint: 'Uniquement pour une copie portable non détectée. Laisser vide pour la détection automatique.',
     apply: 'Appliquer à toutes les touches', retry: 'Réessayer la connexion', language: 'Langue', auto: 'Automatique (Stream Deck)',
     mode: 'À la pression', toggle: 'Basculer', on: 'Activer / démarrer', off: 'Suspendre / arrêter',
     scene: 'Scène', source: 'Source', schedule: 'Programmation', scope: 'Fenêtres à ouvrir', all: 'Toute la scène active', one: 'Une source de la scène active', choose: 'Choisir…', missing: 'Cible enregistrée introuvable',
@@ -19,9 +20,9 @@ export const fr = {
     diskNote: 'Estimation selon le débit et les sources de la scène. La durée réelle dépend du contenu enregistré.',
     scheduleNote: 'Une programmation par touche. Suspendre une programmation n’arrête pas l’enregistrement déjà lancé.',
     error: 'Dernière erreur', refresh: 'Les listes se mettent à jour automatiquement.',
-    cli_missing: 'Ouvrir Polyptyque, puis réessayer. Si nécessaire, renseigner le chemin complet de polyptyque-cli.exe.',
+    cli_missing: 'Ouvrir Polyptyque pour permettre sa détection automatique. Le chemin manuel est un recours pour les copies portables non détectées.',
     not_running: 'Ouvrir Polyptyque, puis réessayer.', control_disabled: 'Dans les réglages de Polyptyque, activer « Autoriser le pilotage par d’autres programmes ».',
-    version: 'Plugin bêta 0.1.0 · Polyptyque 1.0.0-beta.9 ou suivant'
+    version: 'Plugin bêta 0.1.0.1 · Polyptyque 1.0.0-beta.9 ou suivant'
   }
 };
 export const en = {
@@ -32,10 +33,11 @@ export const en = {
   day: { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' },
   error: { connecting: 'Connecting…', cli_missing: 'CLI not found', not_running: 'Polyptyque closed', control_disabled: 'Control disabled', configure: 'Set up', source_inactive: 'Source absent', target_missing: 'Target absent', busy: 'Busy', locked: 'Locked', refused: 'Refused', declined: 'Declined', timeout: 'Timed out', unavailable: 'Unavailable', connection_changed: 'Disconnected', invalid_response: 'Invalid response', not_found: 'Not found', ambiguous: 'Ambiguous target', invalid_request: 'Invalid setting', internal: 'Error', confirmation_required: 'Confirm first' },
   ui: {
-    connection: 'Connect to Polyptyque', connected: 'Connected to Polyptyque', waiting: 'Waiting for the plugin…',
+    connection: 'Connect to Polyptyque', connected: 'Connected to Polyptyque', waiting: 'Waiting for the plugin…', panelDisconnected: 'Panel disconnected',
     noPlugin: 'The plugin isn’t responding. Close and reopen this panel; check the Stream Deck log if needed.',
-    setup: 'Connection', instructions: '1. Open Polyptyque.\n2. In Settings, enable “Allow control by other programs”.\n3. Scenes and sources appear below. If your portable copy isn’t detected, enter its CLI path under Connection.',
-    path: 'Path to polyptyque-cli.exe', pathHint: 'Leave blank for automatic detection. This file comes with Polyptyque.',
+    setup: 'Connection', instructions: '1. Open Polyptyque: the plugin detects it automatically.\n2. In Settings, enable “Allow control by other programs”.\n3. Scenes and sources appear below.',
+    manual: 'Manual path (optional)', autoDetected: 'Polyptyque detected automatically.', manualConfigured: 'Using a custom path.',
+    path: 'Path to polyptyque-cli.exe', pathHint: 'Only for an undetected portable copy. Leave blank for automatic detection.',
     apply: 'Apply to all keys', retry: 'Retry connection', language: 'Language', auto: 'Automatic (Stream Deck)',
     mode: 'On press', toggle: 'Toggle', on: 'Enable / start', off: 'Pause / stop',
     scene: 'Scene', source: 'Source', schedule: 'Scheduled recording', scope: 'Windows to open', all: 'All windows in the active scene', one: 'One source in the active scene', choose: 'Choose…', missing: 'Saved target not found',
@@ -44,9 +46,9 @@ export const en = {
     diskNote: 'Estimated from the bitrate and the scene’s sources. Actual recording time depends on the content.',
     scheduleNote: 'One scheduled recording per key. Pausing a schedule doesn’t stop a recording that has already started.',
     error: 'Last error', refresh: 'Lists update automatically.',
-    cli_missing: 'Open Polyptyque and retry. If needed, enter the full path to polyptyque-cli.exe.',
+    cli_missing: 'Open Polyptyque so it can be detected automatically. A manual path is a fallback for undetected portable copies.',
     not_running: 'Open Polyptyque and retry.', control_disabled: 'In Polyptyque’s settings, enable “Allow control by other programs”.',
-    version: 'Beta plugin 0.1.0 · Polyptyque 1.0.0-beta.9 or later'
+    version: 'Beta plugin 0.1.0.1 · Polyptyque 1.0.0-beta.9 or later'
   }
 };
 export function translate(lang, key) {

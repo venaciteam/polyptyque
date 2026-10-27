@@ -33,6 +33,10 @@ jobs:
           cache-dependency-path: streamdeck/package-lock.json
       - run: npm ci
       - run: npm test
+      - run: npx playwright-core install --with-deps chromium
+      - run: npm run test:ui
+        env:
+          POLYPTYQUE_TEST_BROWSER: chromium
       - run: npm run pack
       - uses: actions/upload-artifact@v4
         with:

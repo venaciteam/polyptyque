@@ -10,7 +10,7 @@ test('paquet réel : inscription SDK, touches FR/EN et dialogue du panneau', { t
   await once(server, 'listening');
   let child, socket, stderr = '', messages = [];
   const info = { application: { font: 'Segoe UI', language: 'fr', platform: 'windows', platformVersion: '10', version: '7.4.2' },
-    plugin: { uuid: 'city.vena.polyptyque', version: '0.1.0.0' }, devicePixelRatio: 1, colors: {},
+    plugin: { uuid: 'city.vena.polyptyque', version: '0.1.0.1' }, devicePixelRatio: 1, colors: {},
     devices: [{ id: 'device', name: 'Test', type: 0, size: { columns: 5, rows: 3 } }] };
   const wait = async predicate => {
     for (let n = 0; n < 100; n++) { const message = messages.find(predicate); if (message) return message; await new Promise(r => setTimeout(r, 40)); }

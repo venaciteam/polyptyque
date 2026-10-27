@@ -35,7 +35,7 @@ for (const [name, symbol] of Object.entries(symbols)) {
 }
 await writeFile(`${out}/images/category.svg`, '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><g fill="white"><rect x="3" y="5" width="5" height="18" rx="1"/><rect x="11" y="5" width="5" height="18" rx="1"/><rect x="19" y="5" width="5" height="18" rx="1"/></g></svg>');
 const manifest = {
-  $schema: 'https://schemas.elgato.com/streamdeck/plugins/manifest.json', UUID: 'city.vena.polyptyque', Name: 'Polyptyque', Version: '0.1.0.0',
+  $schema: 'https://schemas.elgato.com/streamdeck/plugins/manifest.json', UUID: 'city.vena.polyptyque', Name: 'Polyptyque', Version: '0.1.0.1',
   Author: 'Venacity', Description: 'Piloter Polyptyque et suivre les enregistrements depuis Stream Deck.', URL: 'https://github.com/venaciteam/polyptyque',
   Category: 'Polyptyque', CategoryIcon: 'images/category', Icon: 'images/plugin', CodePath: 'bin/plugin.js', PropertyInspectorPath: 'ui/panel.html',
   SDKVersion: 3, Software: { MinimumVersion: '7.1' }, OS: [{ Platform: 'windows', MinimumVersion: '10' }], Nodejs: { Version: '24' },
