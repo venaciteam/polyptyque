@@ -43,6 +43,12 @@ test('paquet réel : inscription SDK, touches FR/EN et dialogue du panneau', { t
     await wait(v => v.event === 'setImage' && decodeURIComponent(v.payload.image).includes('Recording'));
     event('keyDown', { settings: { language: 'en' } });
     await wait(v => v.event === 'showAlert');
+    // La pression contient les réglages persistés, même sans didReceiveSettings préalable.
+    const sceneEvent = (name, settings) => socket.send(JSON.stringify({ event: name, action: 'city.vena.polyptyque.scene',
+      context: 'key-scene', device: 'device', payload: { controller: 'Keypad', coordinates: { row: 0, column: 1 }, settings } }));
+    sceneEvent('willAppear', { scene: 'scene-a' }); sceneEvent('propertyInspectorDidAppear', { scene: 'scene-a' });
+    sceneEvent('keyDown', { scene: 'scene-b' });
+    await wait(v => v.event === 'sendToPropertyInspector' && v.payload.context === 'key-scene' && v.payload.settings.scene === 'scene-b');
     assert.equal(child.exitCode, null);
   } finally { child?.kill(); socket?.terminate(); await new Promise(r => server.close(r)); }
 });

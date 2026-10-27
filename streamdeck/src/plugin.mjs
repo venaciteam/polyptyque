@@ -68,7 +68,10 @@ class PolyptyqueAction extends SingletonAction {
     const entry = keys.get(ev.action.id);
     if (!entry || commandRunning) return;
     let snapshot = client.snapshot();
-    const settings = entry.settings;
+    // L'appui fournit les réglages conservés par Stream Deck, même si sa
+    // notification de modification n'a pas encore mis notre cache à jour.
+    const settings = ev.payload.settings ?? entry.settings;
+    entry.settings = settings;
     commandRunning = true; entry.busy = true; entry.error = null; entry.question = ''; redraw(entry);
     let request;
     try {
