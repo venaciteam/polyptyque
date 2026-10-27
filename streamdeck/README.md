@@ -8,7 +8,7 @@ Plugin Windows en français et en anglais, avec l'identité visuelle de Polyptyq
 
 Le paquet **0.1.0.2** corrige l'enregistrement des choix (scène, source, programmation) et le dialogue du panneau. Chaque changement est confirmé par relecture des réglages de Stream Deck ; un ancien état ne fait plus revenir la sélection en arrière. Ouvrir le nouveau paquet pour mettre à jour l'installation ; les identifiants des actions restent identiques.
 
-1. [Télécharger le plugin bêta 0.1.0.2](https://github.com/venaciteam/polyptyque/releases/download/v1.0.0-beta.9/city.vena.polyptyque.streamDeckPlugin), ouvrir le fichier et accepter son installation dans Stream Deck.
+1. [Télécharger le plugin bêta 0.1.0.2](https://github.com/venaciteam/polyptyque/releases/latest/download/city.vena.polyptyque.streamDeckPlugin), ouvrir le fichier et accepter son installation dans Stream Deck.
 2. Ouvrir Polyptyque. Dans **Réglages**, activer **Autoriser le pilotage par d'autres programmes**.
 3. Dans Stream Deck, trouver la catégorie **Polyptyque**, puis glisser une action sur une touche. Le panneau affiche **Connecté à Polyptyque** quand l'état réel est reçu.
 4. Pour une action Source, Scène ou Programmation, choisir sa cible dans la liste. Pour Aperçus ou Enregistrement, choisir **Basculer**, **Activer / démarrer** ou **Suspendre / arrêter**.
@@ -60,4 +60,4 @@ Les ressources distribuées restent immuables ; les réglages sont conservés pa
 
 ## Diffusion
 
-Le paquet bêta 0.1.0.2 est disponible en téléchargement direct dans la préversion GitHub de Polyptyque 1.0.0-beta.9, avec laquelle il est compatible. La candidature au **Marketplace Elgato** reste à décider ; aucune soumission n'est effectuée par la construction du paquet. Licence GPL-3.0-or-later, comme Polyptyque ; licences des dépendances incluses.
+Le paquet bêta 0.1.0.2 est disponible en téléchargement direct dans la dernière version stable de Polyptyque (1.0.0 à sa première publication). La candidature au **Marketplace Elgato** reste à décider ; aucune soumission n'est effectuée par la construction du paquet. Licence GPL-3.0-or-later, comme Polyptyque ; licences des dépendances incluses.

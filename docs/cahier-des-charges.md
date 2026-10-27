@@ -598,6 +598,7 @@ Solution retenue : **[[Velopack]]** (outil d'installation et de mise à jour éc
 | Démarrage de Windows | Option « Lancer Polyptyque au démarrage de Windows », désactivée par défaut (voir [[#Programmation des enregistrements]]) ; inscription retirée à la désinstallation |
 | Mises à jour | Recherche au démarrage puis toutes les 6 h (désactivable) ; proposées d'un clic, téléchargées avec avancement, puis redémarrage ; jamais pendant un enregistrement ou une conversion (sinon installées au prochain démarrage). Source : publications GitHub du dépôt public |
 | Publication | Étiquette `vX.Y.Z` (identique à la version de `Cargo.toml`) : la fabrication publie la version GitHub, avec mise à jour partielle depuis la précédente, notes de version obligatoires (`packaging/notes/vX.Y.Z.md`). Une bêta (`X.Y.Z-beta.N`) est publiée comme préversion GitHub |
+| Première version stable | `1.0.0` : publication officielle, marquée dernière version stable. S'il n'existe aucune stable précédente, fabrication d'un paquet complet ; les copies bêta peuvent aussi le recevoir. Les trois fichiers (installateur, portable, plugin Stream Deck) sont joints à la release pour les liens permanents `releases/latest/download/` des README FR/EN |
 | Liens de téléchargement | En tête du README, liens directs vers l'installateur et la version portable. Épinglés sur l'étiquette de la bêta en cours tant qu'aucune version stable n'existe (`releases/latest/download/` ignore les préversions et renvoie 404), donc à mettre à jour à chaque bêta. **À la sortie de la 1.0.0 stable : passer aux adresses `releases/latest/download/`**, qui suivent ensuite seules chaque version stable |
 | Canaux | Réglage « Mises à jour » : versions stables, versions stables et bêta, ou ne pas rechercher. Tant que l'utilisateur n'a rien choisi, une bêta suit les bêtas puis la version stable, une version stable ne suit que les stables |
 | Surcoût | Environ 7,5 Mo pour l'installateur, 5 Mo pour l'outil de mise à jour |
@@ -886,7 +887,8 @@ Le plugin Windows utilise `polyptyque-cli.exe` livré avec Polyptyque (bêta.9 o
 
 > [!todo] Étape 4 - Publication
 > - [x] Fabrication de développement en local ; workflows GitHub limités aux tags de publication et au lancement manuel
-> - [ ] Dépôt public, première version publiée
+> - [x] Version 1.0.0 officielle validée par l'utilisateur : notes bilingues, liens permanents et plugin joint à la publication
+> - [x] Dépôt public et première version officielle 1.0.0
 > - [ ] FFmpeg compilé par le projet (plus léger, signable)
 > - [ ] Demande de signature gratuite à SignPath Foundation
 > - [ ] Tests d'endurance de 12 h complets (un premier test de 14 h 15 réussi le 2026-10-21 en 1280×720, 30 i/s ; à refaire avec les réglages par défaut, 1920×1080 et 60 i/s)
@@ -904,6 +906,7 @@ Le plugin Windows utilise `polyptyque-cli.exe` livré avec Polyptyque (bêta.9 o
 
 | Date | Décision |
 |---|---|
+| 2026-10-27 | Première stable 1.0.0 approuvée par l'utilisateur après présentation des notes bilingues : README FR/EN sur latest, trois téléchargements joints (plugin encore bêta 0.1.0.2), première stable sans delta requis. Titre : « v1.0.0 — Première version officielle » |
 | 2026-10-27 | À la demande de l'utilisateur, paquet Stream Deck 0.1.0.2 validé ajouté à la préversion GitHub 1.0.0-beta.9 (compatible), avec lien direct sous les téléchargements dans les README FR/EN. Pas de nouvelle version de l'application ni de publication Marketplace ; 99 textes vérifiés dans les deux langues |
 | 2026-10-27 | À la demande de l'utilisateur, builds et tests en local pour les itérations. Les deux workflows GitHub (application et plugin Stream Deck) ne démarrent plus sur push de branche ou PR ; tags v* et lancement manuel conservés pour les publications. Le code continue à être poussé sur dev |
 | 2026-10-27 | Correction Stream Deck 0.1.0.2 après rejet natif des réglages : UUID du panneau pour inscription ET messages sortants, contexte de touche pour les réponses. Choix confirmé par relecture, révision de sauvegarde et rejet des états périmés. La simulation contrôle l'authentification native et la persistance après réouverture |
