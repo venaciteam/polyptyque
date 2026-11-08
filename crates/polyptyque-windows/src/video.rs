@@ -1,9 +1,10 @@
 //! Capture d'une fenêtre par Windows.Graphics.Capture.
 //!
-//! Chaque nouvelle image est copiée, mise à l'échelle (proportions
-//! conservées, bandes noires) et convertie en NV12 BT.709 par le processeur
-//! vidéo de la carte graphique, puis relue en mémoire pour l'encodeur. Les
-//! images ne sont traitées que lorsque le contenu change.
+//! Chaque nouvelle image est copiée, rognée (partie gardée de la fenêtre),
+//! mise à l'échelle (proportions conservées, bandes noires) et convertie en
+//! NV12 BT.709 par le processeur vidéo de la carte graphique, puis relue en
+//! mémoire pour l'encodeur. Les images ne sont traitées que lorsque le
+//! contenu change.
 
 use std::mem::ManuallyDrop;
 use std::sync::{Arc, Once};
@@ -11,6 +12,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context, Result};
+use polyptyque_core::crop::Crop;
 use polyptyque_core::platform::{Nv12Frame, VideoCapture, WindowHandle};
 use polyptyque_core::video::fit_rect;
 use windows::core::Interface;
@@ -70,6 +72,10 @@ pub struct WgcCapture {
     output: ID3D11Texture2D,
     staging: ID3D11Texture2D,
     processor: Option<Processor>,
+    /// Partie de la fenêtre gardée.
+    crop: Crop,
+    /// Taille de la fenêtre à la dernière image.
+    content: Option<(u32, u32)>,
 }
 
 /// Processeur vidéo, propre à une taille d'entrée.
@@ -84,7 +90,7 @@ struct Processor {
 }
 
 impl WgcCapture {
-    pub fn open(handle: WindowHandle, out_w: u32, out_h: u32, capture_cursor: bool) -> Result<Self> {
+    pub fn open(handle: WindowHandle, out_w: u32, out_h: u32, capture_cursor: bool, crop: Crop) -> Result<Self> {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
         }
@@ -155,6 +161,8 @@ impl WgcCapture {
             output,
             staging,
             processor: None,
+            crop,
+            content: None,
         })
     }
 
@@ -171,8 +179,10 @@ impl WgcCapture {
         // fenêtre juste après un redimensionnement).
         let src_w = (content.Width.max(2) as u32).min(desc.Width);
         let src_h = (content.Height.max(2) as u32).min(desc.Height);
-        let (x, y, w, h) = fit_rect(src_w, src_h, self.out_w, self.out_h);
-        let source = RECT { left: 0, top: 0, right: src_w as i32, bottom: src_h as i32 };
+        self.content = Some((src_w, src_h));
+        let (cx, cy, cw, ch) = self.crop.region(src_w, src_h);
+        let (x, y, w, h) = fit_rect(cw, ch, self.out_w, self.out_h);
+        let source = RECT { left: cx as i32, top: cy as i32, right: (cx + cw) as i32, bottom: (cy + ch) as i32 };
         let dest = RECT { left: x as i32, top: y as i32, right: (x + w) as i32, bottom: (y + h) as i32 };
 
         unsafe {
@@ -325,6 +335,10 @@ impl VideoCapture for WgcCapture {
             self.pool_size = content;
         }
         result.map(Some)
+    }
+
+    fn content_size(&self) -> Option<(u32, u32)> {
+        self.content
     }
 }
 

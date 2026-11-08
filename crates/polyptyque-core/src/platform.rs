@@ -9,6 +9,7 @@ use std::process::Command;
 use std::sync::Arc;
 
 use crate::config::BrowserFamily;
+use crate::crop::Crop;
 
 /// Identifiant opaque d'une fenêtre (un `HWND` sous Windows).
 pub type WindowHandle = isize;
@@ -45,6 +46,12 @@ pub trait VideoCapture {
     /// depuis l'appel précédent. Une erreur signifie que la capture est
     /// perdue et doit être recréée.
     fn poll(&mut self) -> anyhow::Result<Option<Nv12Frame>>;
+
+    /// Taille de la fenêtre capturée (pixels), d'après la dernière image ;
+    /// `None` tant qu'aucune n'est arrivée.
+    fn content_size(&self) -> Option<(u32, u32)> {
+        None
+    }
 }
 
 pub struct AudioPacket {
@@ -95,13 +102,16 @@ pub trait Platform: Send + Sync {
     /// Horloge commune, en centaines de nanosecondes.
     fn now_hns(&self) -> u64;
 
-    /// À appeler sur le fil qui utilisera la capture.
+    /// Capture de la partie `crop` de la fenêtre, mise à l'échelle dans
+    /// `width` × `height` (proportions conservées, bandes noires). À appeler
+    /// sur le fil qui utilisera la capture.
     fn open_video_capture(
         &self,
         handle: WindowHandle,
         width: u32,
         height: u32,
         capture_cursor: bool,
+        crop: Crop,
     ) -> anyhow::Result<Box<dyn VideoCapture>>;
 
     /// Son produit par le processus `pid` et ses sous-processus. À appeler

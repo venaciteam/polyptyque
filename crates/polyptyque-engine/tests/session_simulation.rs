@@ -72,7 +72,14 @@ impl Platform for SimPlatform {
         // Décalage arbitraire : l'horloge ne commence pas à zéro.
         5_000_000_000 + self.elapsed_hns()
     }
-    fn open_video_capture(&self, _: WindowHandle, w: u32, h: u32, _: bool) -> Result<Box<dyn VideoCapture>> {
+    fn open_video_capture(
+        &self,
+        _: WindowHandle,
+        w: u32,
+        h: u32,
+        _: bool,
+        _: polyptyque_core::crop::Crop,
+    ) -> Result<Box<dyn VideoCapture>> {
         Ok(Box::new(SimVideo { width: w, height: h, counter: 0 }))
     }
     fn open_audio_capture(&self, _: u32, sample_rate: u32, channels: u16) -> Result<Box<dyn AudioCapture>> {
@@ -171,6 +178,7 @@ fn application(name: &str, title: &str) -> Source {
         name: name.into(),
         capture_cursor: false,
         relaunch: false,
+        crop: Default::default(),
         kind: SourceKind::Application {
             exe_path: PathBuf::from(format!("/sim/{title}")),
             window_class: "Classe".into(),

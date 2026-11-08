@@ -105,8 +105,9 @@ impl Platform for WindowsPlatform {
         width: u32,
         height: u32,
         capture_cursor: bool,
+        crop: polyptyque_core::crop::Crop,
     ) -> anyhow::Result<Box<dyn VideoCapture>> {
-        Ok(Box::new(video::WgcCapture::open(handle, width, height, capture_cursor)?))
+        Ok(Box::new(video::WgcCapture::open(handle, width, height, capture_cursor, crop)?))
     }
 
     fn open_audio_capture(&self, pid: u32, sample_rate: u32, channels: u16) -> anyhow::Result<Box<dyn AudioCapture>> {

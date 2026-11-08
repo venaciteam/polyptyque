@@ -49,6 +49,7 @@ mod background;
 mod assistants;
 mod commands;
 mod control;
+mod crop;
 mod report;
 mod scheduling;
 use scheduling::Prompt;
@@ -270,6 +271,8 @@ pub struct App {
     /// Pilotage par d'autres programmes : canal, programmes connectés.
     control: RefCell<control::ControlState>,
     assistant_setup: RefCell<assistants::SetupState>,
+    /// Éditeur de rognage ouvert.
+    crop: RefCell<Option<crop::CropEditor>>,
 }
 
 /// Enregistrement interrompu trouvé au lancement.
@@ -413,6 +416,7 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
         tray_watch: Cell::new(false),
         control: RefCell::new(control::ControlState::default()),
         assistant_setup: RefCell::new(assistants::SetupState::default()),
+        crop: RefCell::new(None),
     });
     APP.with(|a| *a.borrow_mut() = Some(app.clone()));
     *app.converter.borrow_mut() =
@@ -566,6 +570,30 @@ fn install_callbacks(ui: &AppWindow) {
     });
     b.on_paste_source(|| {
         with_app(|a| a.paste_source());
+    });
+    b.on_open_crop(|id| {
+        with_app(|a| a.open_crop(&id));
+    });
+    b.on_crop_drag_start(|| {
+        with_app(|a| a.crop_drag_start());
+    });
+    b.on_crop_drag(|handle, dx, dy| {
+        with_app(|a| a.crop_drag(handle, dx, dy));
+    });
+    b.on_crop_nudge(|dx, dy| {
+        with_app(|a| a.crop_nudge(dx, dy));
+    });
+    b.on_crop_margin_edited(|side, value| {
+        with_app(|a| a.crop_margin_edited(side, value));
+    });
+    b.on_crop_ratio_selected(|index| {
+        with_app(|a| a.crop_ratio_selected(index));
+    });
+    b.on_crop_reset(|| {
+        with_app(|a| a.crop_reset());
+    });
+    b.on_crop_apply(|| {
+        with_app(|a| a.crop_apply());
     });
     b.on_open_source(|id| {
         with_app(|a| a.open_source(&id));
@@ -740,6 +768,7 @@ impl App {
                     0 | 1 => s.kind_label(),
                     n => tr!("{} · {n} scènes", s.kind_label(), n),
                 };
+                let kind = if s.crop.is_none() { kind } else { tr!("{} · rognée", kind) };
                 SourceItem {
                     id: s.id.as_str().into(),
                     name: s.name.as_str().into(),
@@ -1067,6 +1096,7 @@ impl App {
         // Ici plutôt qu'au rythme de la barre d'état : la fenêtre ouverte
         // par Slint au lancement doit disparaître au plus vite.
         self.hide_at_startup();
+        self.tick_crop();
         let previews = self.previews.borrow();
         for worker in previews.workers() {
             let (frame, state) = worker.take_update();
@@ -3267,6 +3297,7 @@ impl App {
             self.control.borrow_mut().mic_answer = Some(false);
         }
         self.confirm.borrow_mut().take();
+        self.close_crop();
         self.quit_with_schedules.set(false);
         if self.incident.borrow_mut().take().is_some() {
             // Bilan d'un enregistrement interrompu vu : il n'est plus proposé.

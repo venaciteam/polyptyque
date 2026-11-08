@@ -5,7 +5,7 @@ import { Theme } from "theme.slint";
 import { Bridge, AssistantItem, IncidentFile, SceneItem, ScheduleItem, SourceItem, SourceCard, WindowItem } from "bridge.slint";
 import { ActionButton, IconButton, LevelMeter, ListRow, Panel, SourceCardView, Toggle } from "components.slint";
 import {
-    AddApplicationSheet, AddBrowserSheet, AssistantsSheet, BusyOverlay, CloseSchedulesSheet, ConfirmSheet, IncidentSheet, ReportSheet,
+    AddApplicationSheet, AddBrowserSheet, AssistantsSheet, BusyOverlay, CloseSchedulesSheet, ConfirmSheet, CropSheet, IncidentSheet, ReportSheet,
     SceneNameSheet, ScheduleEditorSheet, SchedulePrompt, SchedulesSheet, SettingsSheet, Toast,
 } from "sheets.slint";
 
@@ -437,6 +437,10 @@ component PreviewGrid inherits Rectangle {
         toggle-recording => {
             Bridge.toggle-source(card.id);
         }
+        crop-requested => {
+            Bridge.selected-source = index;
+            Bridge.open-crop(card.id);
+        }
         drag-moved(dx, dy, x, y) => {
             root.drag-from = index;
             root.drag-x = self.x + x;
@@ -584,6 +588,14 @@ component SourceRow inherits Rectangle {
                 enabled: Bridge.can-paste && !Bridge.recording;
                 activated => {
                     Bridge.paste-source();
+                }
+            }
+            MenuSeparator { }
+            MenuItem {
+                title: @tr("Rogner…");
+                enabled: !Bridge.recording;
+                activated => {
+                    Bridge.open-crop(root.source.id);
                 }
             }
         }
@@ -908,6 +920,10 @@ export component AppWindow inherits Window {
         height: root.height;
     }
     if Bridge.sheet == "schedule-new" || Bridge.sheet == "schedule-edit": ScheduleEditorSheet {
+        width: root.width;
+        height: root.height;
+    }
+    if Bridge.sheet == "crop": CropSheet {
         width: root.width;
         height: root.height;
     }

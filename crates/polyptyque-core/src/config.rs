@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use tr::tr;
 
 use crate::browsers::program_name;
+use crate::crop::Crop;
 use crate::naming;
 use crate::paths;
 use crate::platform::{BrowserInstall, WindowInfo};
@@ -454,6 +455,9 @@ pub struct Source {
     /// navigateur géré).
     #[serde(default)]
     pub relaunch: bool,
+    /// Partie de la fenêtre gardée (aperçus et enregistrement).
+    #[serde(default, skip_serializing_if = "Crop::is_none")]
+    pub crop: Crop,
     pub kind: SourceKind,
 }
 
@@ -465,6 +469,7 @@ impl Source {
             name: name.trim().to_string(),
             capture_cursor: true,
             relaunch: true,
+            crop: Default::default(),
             kind: SourceKind::Browser {
                 profile_dir: profiles_root.join(&id),
                 start_url: start_url.map(|u| u.trim().to_string()).filter(|u| !u.is_empty()),
@@ -481,6 +486,7 @@ impl Source {
             name: name.trim().to_string(),
             capture_cursor,
             relaunch,
+            crop: Crop::default(),
             kind: SourceKind::Application {
                 exe_path: window.exe.clone(),
                 window_class: window.class.clone(),
@@ -847,6 +853,7 @@ mod tests {
             name: "Firefox 1".into(),
             capture_cursor: true,
             relaunch: true,
+            crop: Default::default(),
             kind: SourceKind::Browser {
                 profile_dir: PathBuf::from(r"C:\Users\x\AppData\Local\Polyptyque\profils\abc"),
                 start_url: Some("https://example.org".into()),
@@ -862,6 +869,7 @@ mod tests {
             name: "Discord".into(),
             capture_cursor: false,
             relaunch: false,
+            crop: Default::default(),
             kind: SourceKind::Application {
                 exe_path: PathBuf::from(r"C:\Users\x\AppData\Local\Discord\app-1.0\Discord.exe"),
                 window_class: "Chrome_WidgetWin_1".into(),

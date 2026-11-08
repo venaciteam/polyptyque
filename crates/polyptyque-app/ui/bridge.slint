@@ -130,7 +130,7 @@ export global Bridge {
 
     // Feuille ouverte : "", "browser", "application", "settings",
     // "scene-new", "scene-rename", "scene-duplicate", "confirm", "incident", "schedules",
-    // "schedule-new", "schedule-edit".
+    // "schedule-new", "schedule-edit", "crop".
     in-out property <string> sheet;
 
     // Programmation : pastille de la barre du haut (vide : aucune
@@ -278,6 +278,41 @@ export global Bridge {
     callback open-source(string);
     callback restore-window(string);
     callback open-scene-windows();
+
+    // Rognage d'une source (feuille "crop") : aperçu de la fenêtre entière,
+    // taille de la fenêtre en pixels (0 : pas encore connue), marges
+    // retirées de chaque bord en pixels de la fenêtre, format imposé.
+    in property <string> crop-source-id;
+    in property <string> crop-source-name;
+    in property <image> crop-image;
+    in property <bool> crop-has-image;
+    in property <string> crop-placeholder;
+    in property <bool> crop-can-open;
+    in property <bool> crop-can-restore;
+    in property <int> crop-window-width;
+    in property <int> crop-window-height;
+    in-out property <int> crop-left;
+    in-out property <int> crop-top;
+    in-out property <int> crop-right;
+    in-out property <int> crop-bottom;
+    in property <[string]> crop-ratio-choices;
+    in-out property <int> crop-ratio-index;
+    // Poignée que déplacent les flèches du clavier : 0 le cadre entier,
+    // puis 1 à 8 les coins et les bords, dans le sens des aiguilles d'une
+    // montre à partir du coin en haut à gauche.
+    in-out property <int> crop-handle;
+    callback open-crop(string);
+    // Souris enfoncée sur le cadre, puis glissée : poignée et décalage
+    // depuis l'appui, en pixels de la fenêtre.
+    callback crop-drag-start();
+    callback crop-drag(int, int, int);
+    // Flèches : décalage en pixels de la fenêtre.
+    callback crop-nudge(int, int);
+    // Marge saisie : bord (0 gauche, 1 haut, 2 droite, 3 bas) et valeur.
+    callback crop-margin-edited(int, int);
+    callback crop-ratio-selected(int);
+    callback crop-reset();
+    callback crop-apply();
 
     // Enregistrement interrompu (plantage, coupure de courant) : bilan au
     // lancement suivant.
