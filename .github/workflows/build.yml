@@ -1,14 +1,13 @@
 name: Fabrication
 
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
 
-# Essais et vérifications en local, sous Windows. La fabrication GitHub ne
-# démarre que pour une publication (tag v*) ou sur demande manuelle.
-# Publication d'une version (étiquette « v1.2.3 ») : création de la page de
-# version GitHub, d'où Polyptyque télécharge ses mises à jour.
+# SECOURS seulement : les versions se fabriquent et se publient sur le PC avec
+# scripts/publier.ps1 (voir AGENTS.md). Ce workflow ne part qu'à la main :
+# lancé sur une étiquette « v1.2.3 » (gh workflow run build.yml --ref v1.2.3),
+# il publie la page de version GitHub, d'où Polyptyque télécharge ses mises à
+# jour ; lancé sur une branche, il fabrique sans publier.
 permissions:
   contents: write
 

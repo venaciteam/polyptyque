@@ -1,8 +1,7 @@
 name: Plugin Stream Deck
 
 on:
-  push:
-    tags: ['v*']
+  # Secours seulement, à la main : scripts/publier.ps1 fabrique et teste le plugin.
   workflow_dispatch:
 
 # Tests et paquet de développement en local ; GitHub pour les publications
