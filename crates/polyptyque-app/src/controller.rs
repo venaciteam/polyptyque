@@ -50,6 +50,7 @@ mod assistants;
 mod commands;
 mod control;
 mod crop;
+mod plugin;
 mod report;
 mod scheduling;
 use scheduling::Prompt;
@@ -273,6 +274,8 @@ pub struct App {
     assistant_setup: RefCell<assistants::SetupState>,
     /// Éditeur de rognage ouvert.
     crop: RefCell<Option<crop::CropEditor>>,
+    /// Plugin Stream Deck livré avec Polyptyque, et mise à jour proposée.
+    plugin: RefCell<plugin::PluginState>,
 }
 
 /// Enregistrement interrompu trouvé au lancement.
@@ -417,6 +420,7 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
         control: RefCell::new(control::ControlState::default()),
         assistant_setup: RefCell::new(assistants::SetupState::default()),
         crop: RefCell::new(None),
+        plugin: RefCell::new(plugin::PluginState::new()),
     });
     APP.with(|a| *a.borrow_mut() = Some(app.clone()));
     *app.converter.borrow_mut() =
@@ -480,6 +484,13 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
     let update_timer = Timer::default();
     update_timer.start(TimerMode::Repeated, UPDATE_CHECK_INTERVAL, || {
         with_app(|app| app.check_for_updates());
+    });
+    // Plugin Stream Deck : au démarrage, puis souvent (la pastille disparaît
+    // peu après son installation dans Stream Deck).
+    app.check_plugin_update();
+    let plugin_timer = Timer::default();
+    plugin_timer.start(TimerMode::Repeated, plugin::CHECK_INTERVAL, || {
+        with_app(|app| app.check_plugin_update());
     });
 
     // La boucle continue fenêtre cachée (Polyptyque en arrière-plan) :
@@ -645,6 +656,9 @@ fn install_callbacks(ui: &AppWindow) {
     });
     b.on_install_update(|| {
         with_app(|a| a.install_update());
+    });
+    b.on_install_plugin_update(|| {
+        with_app(|a| a.install_plugin_update());
     });
     b.on_open_control_help(|| {
         with_app(|a| a.open_assistants());

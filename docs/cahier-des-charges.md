@@ -779,6 +779,7 @@ Le plugin Windows utilise `polyptyque-cli.exe` livré avec Polyptyque (bêta.9 o
 - Panneau de réglage et touches français/anglais selon Stream Deck, avec choix manuel de langue. Consignes de connexion en haut du panneau, état et erreurs visibles. Palette de Polyptyque et logo à trois panneaux, icônes de catégorie/actions blanches.
 - Le panneau authentifie son inscription et tous ses messages sortants avec son propre UUID ; les réponses portent le contexte de la touche. Une modification est relue dans les réglages réellement conservés par Stream Deck, avec confirmation visible. Une ancienne notification ne doit pas effacer un choix récent ou une sauvegarde confirmée. Configurer une scène affecte la scène à la touche ; l'appui sur la touche l'active. Sans réponse du plugin pendant huit secondes, « Panneau déconnecté » remplace l'attente ou le vert ; une réponse rétablit automatiquement l'état réel.
 - Livraison : fichier `.streamDeckPlugin` installable, joint à la préversion GitHub de Polyptyque avec laquelle il est compatible. Lien direct dans les README français et anglais, immédiatement sous les téléchargements de l'application. La bêta 0.1.0.2 du plugin accompagne Polyptyque 1.0.0-beta.9 ; publication Marketplace à décider après les essais. Les raccourcis globaux restent utilisables avec l'action Stream Deck « Raccourci clavier », sans retour d'état.
+- Mise à jour par Polyptyque : le paquet `.streamDeckPlugin` est aussi livré dans le dossier de l'application et arrive avec ses mises à jour. Toutes les 10 secondes, Polyptyque compare la version du plugin installé (`%APPDATA%\Elgato\StreamDeck\Plugins\city.vena.polyptyque.sdPlugin\manifest.json`) à celle du paquet livré ; s'il est plus ancien, une pastille « Plugin Stream Deck : mise à jour » et un bouton dans les réglages (partie Pilotage) ouvrent le paquet, et Stream Deck demande lui-même la confirmation. Rien n'est proposé si le plugin n'est pas installé, ni téléchargé à part : le plugin proposé est toujours celui qui va avec le CLI de la version installée. La version du manifeste (`tools/build.mjs`) doit donc augmenter à chaque changement du plugin.
 
 ## Feuille de route
 
@@ -893,6 +894,7 @@ Le plugin Windows utilise `polyptyque-cli.exe` livré avec Polyptyque (bêta.9 o
 > - [x] Téléchargement direct du plugin bilingue dans les README FR/EN, sous les téléchargements de l'application
 > - [x] Construction et validation Elgato ; tests du modèle, du transport, des traductions SDK, du paquet et du panneau en navigateur
 > - [ ] Validation sur Stream Deck et capture réelle (durée, fenêtre perdue, disque, commandes)
+> - [x] Plugin livré avec l'application, mise à jour proposée par Polyptyque quand celui installé est plus ancien
 > - [ ] Décision de publication au Marketplace Elgato
 
 > [!todo] Étape 4 - Publication
@@ -1014,6 +1016,7 @@ Le plugin Windows utilise `polyptyque-cli.exe` livré avec Polyptyque (bêta.9 o
 | 2026-11-08 | Clic droit sur une source : jamais de glisser. Slint suit la souris pour tous les boutons, mais ne met `pressed` à vrai et ne note le point de départ qu'au bouton gauche : le glisser ne démarre plus que bouton gauche enfoncé |
 | 2026-11-08 | Rognage par source, comme dans OBS : marges en pixels **depuis chaque bord** (une barre retirée le reste si la fenêtre change de taille, plutôt que des proportions), format libre ou verrouillé (16:9, 4:3, 3:2, 1:1, 4:5, 9:16, 21:9), réglage à la souris, en pixels et au clavier (1 px, 10 px avec <kbd>Maj</kbd>). Mémorisé avec la source ; bloqué pendant un enregistrement ; pas de commande de pilotage pour l'instant. Appliqué par le processeur vidéo de la carte graphique (rectangle source), sans coût supplémentaire |
 | 2026-11-11 | Pastille « Pilotage » stable : le plugin Stream Deck relit scènes, sources et programmations toutes les 4 s par trois appels `polyptyque-cli`, et chacun s'affichait un instant (« polyptyque-cli, polyptyque-cli events »), comme un pilotage en cours. Une connexion n'apparaît qu'après une seconde (ou dès son abonnement à l'état en direct), la pastille n'est redessinée que si son texte change, et le CLI annonce le nom donné par `POLYPTYQUE_CLIENT` (« Stream Deck » pour le plugin ; variable ignorée par un CLI plus ancien) |
+| 2026-11-11 | À la demande de l'utilisatrice, **mise à jour du plugin Stream Deck par Polyptyque** : le paquet est livré dans le dossier de l'application (fabrication locale et workflow de secours), sa version lue dans l'archive, comparée à celle du plugin installé ; pastille et bouton des réglages ouvrent le paquet, Stream Deck confirme. Pas de téléchargement séparé depuis GitHub : le plugin proposé reste celui du CLI installé, sans appel réseau de plus. Rien n'est proposé sans plugin installé |
 
 ---
 

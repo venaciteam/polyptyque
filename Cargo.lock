@@ -3726,6 +3726,7 @@ dependencies = [
  "toml_edit",
  "tr",
  "velopack",
+ "zip",
 ]
 
 [[package]]

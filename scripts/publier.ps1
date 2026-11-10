@@ -112,12 +112,13 @@ vpk pack --packId $packId --packVersion $Version --packDir dist\Polyptyque `
     --runtime win10.0.19041-x64 @releaseNotes --outputDir $releases
 Verifier "vpk pack"
 
-Etape "Plugin Stream Deck"
-Push-Location streamdeck
-npm.cmd ci --no-audit --no-fund; Verifier "npm ci (Stream Deck)"
-if (-not $SansTests) { npm.cmd test; Verifier "npm test (Stream Deck)" }
-npm.cmd run pack; Verifier "npm run pack (Stream Deck)"
-Pop-Location
+if (-not $SansTests) {
+    # Le paquet du plugin est fabriqué par fabrication-locale.ps1 (livré dans dist\Polyptyque).
+    Etape "Tests du plugin Stream Deck"
+    Push-Location streamdeck
+    npm.cmd test; Verifier "npm test (Stream Deck)"
+    Pop-Location
+}
 
 $Sortie = Join-Path (Split-Path $Cible) "sorties\polyptyque-$Version"
 if (Test-Path $Sortie) { Remove-Item -Recurse -Force $Sortie }

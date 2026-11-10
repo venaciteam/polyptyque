@@ -47,6 +47,17 @@ Copy-Item "$ffmpegDir\LICENSE.txt" "$dist\FFMPEG-LICENSE.txt"
 Copy-Item LICENSE "$dist\LICENSE.txt"
 Copy-Item packaging\LISEZMOI.txt $dist\
 Copy-Item packaging\README.txt $dist\
+# Plugin Stream Deck livré avec l'application : proposé en mise à jour quand
+# celui installé dans Stream Deck est plus ancien (Node.js requis).
+Write-Host '== Plugin Stream Deck'
+Push-Location streamdeck
+try {
+    npm.cmd ci --no-audit --no-fund
+    if ($LASTEXITCODE -ne 0) { throw 'npm ci (Stream Deck) a échoué' }
+    npm.cmd run pack
+    if ($LASTEXITCODE -ne 0) { throw 'npm run pack (Stream Deck) a échoué' }
+} finally { Pop-Location }
+Copy-Item livraison\city.vena.polyptyque.streamDeckPlugin $dist\
 if ($SansInstallateur) {
     Write-Host "Programme assemblé dans $dist"
     return

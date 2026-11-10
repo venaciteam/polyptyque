@@ -107,6 +107,45 @@ component UpdatePill inherits Rectangle {
     }
 }
 
+// Plugin Stream Deck plus ancien que celui livré : clic pour l'installer
+// (Stream Deck demande la confirmation).
+component PluginUpdatePill inherits Rectangle {
+    height: 30px;
+    width: row.preferred-width;
+    border-radius: 15px;
+    background: touch.has-hover ? Theme.accent.with-alpha(0.3) : Theme.accent.with-alpha(0.18);
+    border-width: 1px;
+    border-color: Theme.accent.with-alpha(0.6);
+    accessible-role: button;
+    accessible-label: Bridge.plugin-update-text;
+
+    row := HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 14px;
+        spacing: 8px;
+        Image {
+            source: @image-url("icons/up.svg");
+            width: 14px;
+            height: 14px;
+            y: (parent.height - self.height) / 2;
+            colorize: Theme.accent;
+        }
+        Text {
+            text: Bridge.plugin-update-text;
+            color: Theme.text;
+            font-size: Theme.font-small;
+            font-weight: 600;
+            vertical-alignment: center;
+        }
+    }
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            Bridge.install-plugin-update();
+        }
+    }
+}
+
 // Programmation : prochain créneau, ou fin prévue de l'enregistrement
 // programmé ; « Programmer » s'il n'y en a pas. Clic : les programmations.
 component SchedulePill inherits Rectangle {
@@ -315,6 +354,9 @@ component TopBar inherits HorizontalLayout {
         min-width: 0;
     }
     if Bridge.update-state != "": UpdatePill {
+        y: (parent.height - self.height) / 2;
+    }
+    if Bridge.plugin-update-text != "": PluginUpdatePill {
         y: (parent.height - self.height) / 2;
     }
     if Bridge.control-text != "": ControlPill {

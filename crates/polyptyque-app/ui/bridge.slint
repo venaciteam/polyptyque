@@ -105,6 +105,10 @@ export global Bridge {
     in property <string> update-state;
     in property <string> update-text;
     in property <float> update-progress;
+    // Plugin Stream Deck plus ancien que celui livré : texte de la pastille
+    // et explication des réglages, vides s'il est à jour ou absent.
+    in property <string> plugin-update-text;
+    in property <string> plugin-update-detail;
 
     // Pilotage : programmes connectés (« Pilotage · Claude »), vide si
     // aucun.
@@ -339,6 +343,7 @@ export global Bridge {
     callback toggle-previews();
     callback convert-files();
     callback install-update();
+    callback install-plugin-update();
     callback open-mic-privacy();
     // Connexion des assistants installés sur cet ordinateur.
     in property <[AssistantItem]> assistants;

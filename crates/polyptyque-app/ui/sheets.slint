@@ -649,6 +649,19 @@ export component SettingsSheet inherits Sheet {
                         }
                     }
                 }
+                if Bridge.plugin-update-detail != "": Field {
+                    label: @tr("Plugin Stream Deck");
+                    hint: Bridge.plugin-update-detail;
+                    HorizontalLayout {
+                        alignment: start;
+                        ActionButton {
+                            text: @tr("Mettre à jour le plugin Stream Deck");
+                            clicked => {
+                                Bridge.install-plugin-update();
+                            }
+                        }
+                    }
+                }
                 Field {
                     label: @tr("Raccourci : démarrer ou arrêter l'enregistrement");
                     ComboBox {

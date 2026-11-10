@@ -292,10 +292,10 @@ impl App {
             peer.program.as_deref().unwrap_or("inconnu"),
             peer.pid.map(|p| p.to_string()).unwrap_or_else(|| "?".into())
         );
-        self.control.borrow_mut().clients.insert(
-            id,
-            Client { name: None, peer, outgoing, subscribed: false, since: Instant::now() },
-        );
+        self.control
+            .borrow_mut()
+            .clients
+            .insert(id, Client { name: None, peer, outgoing, subscribed: false, since: Instant::now() });
         self.refresh_control_pill();
     }
 
