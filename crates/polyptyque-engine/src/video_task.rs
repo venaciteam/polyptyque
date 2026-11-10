@@ -62,7 +62,7 @@ impl VideoTask {
                 next_search = now + SEARCH_INTERVAL_HNS;
                 let windows = platform.list_windows();
                 if let Some(window) = resolve::find_window(platform.as_ref(), source, &windows) {
-                    match platform.open_video_capture(window.handle, width, height, source.capture_cursor) {
+                    match platform.open_video_capture(window.handle, width, height, source.capture_cursor, source.crop) {
                         Ok(c) => {
                             log::info!(
                                 "[{}] fenêtre rattachée : « {} » ({})",

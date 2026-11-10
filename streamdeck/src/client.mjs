@@ -7,11 +7,14 @@ import { failure } from './errors.mjs';
 
 const exec = promisify(execFile);
 const LIMIT = 2 * 1024 * 1024;
+// Nom annoncé par le CLI à Polyptyque (pastille « Pilotage ») ; ignoré par un CLI plus ancien.
+export const CLIENT_NAME = 'Stream Deck';
+export const cliEnv = () => ({ ...process.env, POLYPTYQUE_CLIENT: CLIENT_NAME });
 
 // Le CLI conserve la vérification du propriétaire du tube, sans FFI dans le plugin.
 export async function runCli(exe, args, timeout = 320000) {
   let stdout;
-  try { ({ stdout } = await exec(exe, args, { windowsHide: true, timeout, maxBuffer: LIMIT, encoding: 'utf8' })); }
+  try { ({ stdout } = await exec(exe, args, { windowsHide: true, timeout, maxBuffer: LIMIT, encoding: 'utf8', env: cliEnv() })); }
   catch (error) {
     try {
       const value = JSON.parse(error.stdout);
@@ -91,7 +94,7 @@ export class PolyptyqueClient extends EventEmitter {
       const exe = await this.locate(this.manual);
       if (this.closed || generation !== this.generation) return;
       this.exe = exe;
-      const child = this.launch(exe, ['events'], { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });
+      const child = this.launch(exe, ['events'], { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'], env: cliEnv() });
       this.child = child;
       let ended = false;
       const finish = (reason) => {

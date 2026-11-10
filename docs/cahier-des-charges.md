@@ -399,6 +399,16 @@ Inspirée d'[[OBS Studio]], volontairement allégée, thème sombre.
 	- avec les flèches du panneau des sources (seul moyen au clavier ou avec un lecteur d'écran) ;
 	- par **glisser-déposer**, dans la liste comme dans la grille. Le glisser démarre après 8 px de déplacement bouton enfoncé : un simple clic reste un clic, et un appui sur un bouton d'une carte (enregistrement, ouvrir ou rétablir la fenêtre) ne déplace jamais la carte. Pendant le glisser, la source reste atténuée à sa place ; un trait (liste) ou un cadre (grille) montre où elle arrivera, et dans la grille une version réduite de la carte suit le pointeur. Relâcher hors de la liste ou de la grille annule. La source déplacée devient la source sélectionnée.
 	- Bloqué pendant un enregistrement, comme les flèches. La liste ne défile pas seule pendant un glisser : pour un grand déplacement, la grille montre toutes les sources.
+	- Seul le bouton gauche déplace une source : un clic droit (ligne ou carte) ouvre son menu, sans jamais démarrer de glisser ni afficher la main qui attrape.
+- **Rognage d'une source** (clic droit sur sa ligne ou sa carte > « Rogner… ») : ne garder qu'une partie de la fenêtre, dans tous les sens.
+	- La fenêtre de rognage montre la fenêtre entière (aperçu en direct, sans rognage) ; la zone gardée est encadrée, le reste assombri, avec les tiers pour cadrer. Le cadre se déplace d'un bloc ; ses quatre bords et ses quatre coins le redimensionnent.
+	- **Format** au choix : libre, 16:9, 4:3, 3:2, 1:1, 4:5, 9:16, 21:9. Un format verrouillé est gardé pendant le redimensionnement (coin ou bord opposé fixe ; pour un bord, la zone reste centrée sur l'autre axe). Choisir un format ramène la zone à la plus grande zone de ce format, centrée dans la zone gardée jusque-là.
+	- **Marges en pixels** de la fenêtre, saisies pour chaque bord (gauche, haut, droite, bas) ; une marge saisie déplace ce bord comme à la souris. Taille de la zone gardée et de la fenêtre affichées.
+	- **Clavier** : flèches pour déplacer d'un pixel, <kbd>Maj</kbd> + flèches pour 10 pixels ; la poignée déplacée est le cadre entier, ou le bord ou le coin choisi (clic sur une poignée, ou <kbd>Tab</kbd> / <kbd>Maj</kbd> + <kbd>Tab</kbd> pour passer de l'un à l'autre, la poignée choisie est mise en évidence) ; <kbd>Entrée</kbd> applique, <kbd>Échap</kbd> annule.
+	- La zone ne descend jamais sous 16 × 16 pixels et ne sort jamais de la fenêtre. « Réinitialiser » retire les marges (le format choisi reste).
+	- Rien n'est enregistré avant « Appliquer ». Le rognage est **mémorisé avec la source** (réglages) : aperçus, enregistrements et toutes les scènes qui partagent la source l'utilisent, et une fenêtre rouverte est rognée exactement de la même manière. La liste des sources indique « rognée ».
+	- Les marges sont comptées depuis chaque bord : si la fenêtre change de taille, une barre retirée le reste. La vidéo garde la définition des réglages : une zone d'un autre format y est centrée entre des bandes noires.
+	- Bloqué pendant un enregistrement (un fichier ne change pas de dimensions en cours de route). Fenêtre introuvable ou réduite : la fenêtre de rognage propose de l'ouvrir ou de la rétablir. Pas de commande de pilotage pour l'instant.
 - Niveau sonore affiché **en permanence**, pas seulement pendant l'enregistrement : chaque source écoute le son de son programme (même capture que l'enregistrement, seule la crête est gardée). Dès que le moteur écoute la source (enregistrement, préparation, finalisation), cette écoute s'arrête et la carte affiche le niveau du moteur. Indépendant du réglage des aperçus.
 - Barre du haut : pastille de la programmation (voir [[#Programmation des enregistrements]]), pastille du micro (avec son niveau pendant l'enregistrement), pastille de la conversion MP4 en cours et pastille « Pilotage » tant qu'un programme est connecté (voir [[#Pilotage par d'autres programmes]]).
 - **Barre d'état** : espace disque libre, autonomie estimée, charge processeur et carte graphique, images perdues.
@@ -542,7 +552,7 @@ Rendre facile la transmission d'un problème sur GitHub, sans exposer de donnée
 	- en arrière-plan, l'icône de la zone de notification porte un point rouge pendant tout enregistrement, et un enregistrement qui démarre affiche une notification de Windows (l'icône peut être rangée sous « ^ ») ;
 	- le message de démarrage nomme le programme qui l'a demandé (« Demandé par « Claude ». ») ;
 	- aucune commande ne cache la fenêtre.
-- **Pastille « Pilotage »** dans la barre du haut tant qu'un programme est connecté, avec son nom ; un clic ouvre les réglages.
+- **Pastille « Pilotage »** dans la barre du haut tant qu'un programme est connecté, avec son nom ; un clic ouvre les réglages. Une connexion n'y figure qu'après une seconde, sauf abonnement à l'état en direct : les appels éclair d'un programme qui interroge Polyptyque en boucle ne la font pas grandir. Un programme qui passe par `polyptyque-cli` donne son nom par `POLYPTYQUE_CLIENT` (le plugin Stream Deck : « Stream Deck »).
 - **Titres des fenêtres** : la liste des fenêtres ouvertes ne donne que le programme de chaque fenêtre, et son titre seulement quand plusieurs fenêtres du même programme sont ouvertes (un titre peut être privé : objet d'un courriel, nom d'une conversation ; un assistant en ligne l'envoie à son fournisseur).
 - **Journal** : chaque commande reçue, avec le programme qui l'envoie (nom annoncé et exécutable) ; jamais les titres des fenêtres.
 
@@ -769,6 +779,7 @@ Le plugin Windows utilise `polyptyque-cli.exe` livré avec Polyptyque (bêta.9 o
 - Panneau de réglage et touches français/anglais selon Stream Deck, avec choix manuel de langue. Consignes de connexion en haut du panneau, état et erreurs visibles. Palette de Polyptyque et logo à trois panneaux, icônes de catégorie/actions blanches.
 - Le panneau authentifie son inscription et tous ses messages sortants avec son propre UUID ; les réponses portent le contexte de la touche. Une modification est relue dans les réglages réellement conservés par Stream Deck, avec confirmation visible. Une ancienne notification ne doit pas effacer un choix récent ou une sauvegarde confirmée. Configurer une scène affecte la scène à la touche ; l'appui sur la touche l'active. Sans réponse du plugin pendant huit secondes, « Panneau déconnecté » remplace l'attente ou le vert ; une réponse rétablit automatiquement l'état réel.
 - Livraison : fichier `.streamDeckPlugin` installable, joint à la préversion GitHub de Polyptyque avec laquelle il est compatible. Lien direct dans les README français et anglais, immédiatement sous les téléchargements de l'application. La bêta 0.1.0.2 du plugin accompagne Polyptyque 1.0.0-beta.9 ; publication Marketplace à décider après les essais. Les raccourcis globaux restent utilisables avec l'action Stream Deck « Raccourci clavier », sans retour d'état.
+- Mise à jour par Polyptyque : le paquet `.streamDeckPlugin` est aussi livré dans le dossier de l'application et arrive avec ses mises à jour. Toutes les 10 secondes, Polyptyque compare la version du plugin installé (`%APPDATA%\Elgato\StreamDeck\Plugins\city.vena.polyptyque.sdPlugin\manifest.json`) à celle du paquet livré ; s'il est plus ancien, une pastille « Plugin Stream Deck : mise à jour » et un bouton dans les réglages (partie Pilotage) ouvrent le paquet, et Stream Deck demande lui-même la confirmation. Rien n'est proposé si le plugin n'est pas installé, ni téléchargé à part : le plugin proposé est toujours celui qui va avec le CLI de la version installée. La version du manifeste (`tools/build.mjs`) doit donc augmenter à chaque changement du plugin.
 
 ## Feuille de route
 
@@ -883,6 +894,7 @@ Le plugin Windows utilise `polyptyque-cli.exe` livré avec Polyptyque (bêta.9 o
 > - [x] Téléchargement direct du plugin bilingue dans les README FR/EN, sous les téléchargements de l'application
 > - [x] Construction et validation Elgato ; tests du modèle, du transport, des traductions SDK, du paquet et du panneau en navigateur
 > - [ ] Validation sur Stream Deck et capture réelle (durée, fenêtre perdue, disque, commandes)
+> - [x] Plugin livré avec l'application, mise à jour proposée par Polyptyque quand celui installé est plus ancien
 > - [ ] Décision de publication au Marketplace Elgato
 
 > [!todo] Étape 4 - Publication
@@ -893,7 +905,16 @@ Le plugin Windows utilise `polyptyque-cli.exe` livré avec Polyptyque (bêta.9 o
 > - [ ] Demande de signature gratuite à SignPath Foundation
 > - [ ] Tests d'endurance de 12 h complets (un premier test de 14 h 15 réussi le 2026-10-21 en 1280×720, 30 i/s ; à refaire avec les réglages par défaut, 1920×1080 et 60 i/s)
 
+> [!todo] Étape 5 - Rognage des sources, écrite le 2026-11-08
+> - [x] Clic droit sur une source : menu seulement, plus de glisser ni de main qui attrape (le glisser comparait la souris au point du dernier clic gauche et pouvait rester bloqué)
+> - [x] Rognage par source : marges depuis chaque bord, format libre ou verrouillé, appliqué par la carte graphique avant la mise à l'échelle (aperçus et enregistrement)
+> - [x] Fenêtre de rognage : aperçu de la fenêtre entière, cadre à poignées, marges en pixels, clavier (flèches, <kbd>Maj</kbd>, <kbd>Tab</kbd>, <kbd>Entrée</kbd>)
+> - [x] Rognage mémorisé avec la source, partagé par les scènes qui la contiennent
+> - [x] Calculs du rognage testés (marges, format, poignées, bords de la fenêtre, saisie)
+> - [ ] Vérifié sur la machine de référence (fenêtre réelle, enregistrement rogné, réouverture)
+
 > [!info] Plus tard
+> - Rognage par le pilotage (CLI, Stream Deck)
 > - Programmation : lancement par Windows à l'heure prévue même logiciel fermé, sortie de veille automatique
 > - Diffusion en direct (gratuite)
 > - Portage macOS, puis Linux
@@ -991,6 +1012,11 @@ Le plugin Windows utilise `polyptyque-cli.exe` livré avec Polyptyque (bêta.9 o
 | 2026-10-27 | Connexion des assistants dans Polyptyque : le bouton remplace le renvoi GitHub par la détection et la configuration de Claude Code, Claude Desktop, Codex, OpenClaw et Hermes Agent. Fichiers natifs des clients, sauvegarde exacte et conflits refusés ; réparation et retrait sans toucher aux autres serveurs. Configuration préparée distincte d’une connexion réellement utilisée. Windows natif seulement pour le parcours automatique ; pas de chat intégré ni de gestion des abonnements |
 | 2026-10-27 | Retour utilisateur sur Claude Desktop : scènes et commandes accessibles, mais « autoriser les outils » et « Configuré · en attente » ambigus. Remplacés par des étapes numérotées propres aux cinq assistants et « Configuration enregistrée ». Réparer réservé à une configuration qui le nécessite ; état des fichiers relu pendant l'ouverture de la feuille sans écriture automatique |
 | 2026-10-27 | Préversion **1.0.0-beta.9** : connexion intégrée des cinq assistants, étapes propres aux clients et états explicites ; regroupe le pilotage, l'arrière-plan et les diagnostics des bêtas 6 à 8 non publiées. README français/anglais et notes bilingues synchronisés ; publication GitHub en préversion, pas de 1.0 stable |
+
+| 2026-11-08 | Clic droit sur une source : jamais de glisser. Slint suit la souris pour tous les boutons, mais ne met `pressed` à vrai et ne note le point de départ qu'au bouton gauche : le glisser ne démarre plus que bouton gauche enfoncé |
+| 2026-11-08 | Rognage par source, comme dans OBS : marges en pixels **depuis chaque bord** (une barre retirée le reste si la fenêtre change de taille, plutôt que des proportions), format libre ou verrouillé (16:9, 4:3, 3:2, 1:1, 4:5, 9:16, 21:9), réglage à la souris, en pixels et au clavier (1 px, 10 px avec <kbd>Maj</kbd>). Mémorisé avec la source ; bloqué pendant un enregistrement ; pas de commande de pilotage pour l'instant. Appliqué par le processeur vidéo de la carte graphique (rectangle source), sans coût supplémentaire |
+| 2026-11-11 | Pastille « Pilotage » stable : le plugin Stream Deck relit scènes, sources et programmations toutes les 4 s par trois appels `polyptyque-cli`, et chacun s'affichait un instant (« polyptyque-cli, polyptyque-cli events »), comme un pilotage en cours. Une connexion n'apparaît qu'après une seconde (ou dès son abonnement à l'état en direct), la pastille n'est redessinée que si son texte change, et le CLI annonce le nom donné par `POLYPTYQUE_CLIENT` (« Stream Deck » pour le plugin ; variable ignorée par un CLI plus ancien) |
+| 2026-11-11 | À la demande de l'utilisatrice, **mise à jour du plugin Stream Deck par Polyptyque** : le paquet est livré dans le dossier de l'application (fabrication locale et workflow de secours), sa version lue dans l'archive, comparée à celle du plugin installé ; pastille et bouton des réglages ouvrent le paquet, Stream Deck confirme. Pas de téléchargement séparé depuis GitHub : le plugin proposé reste celui du CLI installé, sans appel réseau de plus. Rien n'est proposé sans plugin installé |
 
 ---
 

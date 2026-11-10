@@ -1,14 +1,13 @@
 name: Fabrication
 
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
 
-# Essais et vérifications en local, sous Windows. La fabrication GitHub ne
-# démarre que pour une publication (tag v*) ou sur demande manuelle.
-# Publication d'une version (étiquette « v1.2.3 ») : création de la page de
-# version GitHub, d'où Polyptyque télécharge ses mises à jour.
+# SECOURS seulement : les versions se fabriquent et se publient sur le PC avec
+# scripts/publier.ps1 (voir AGENTS.md). Ce workflow ne part qu'à la main :
+# lancé sur une étiquette « v1.2.3 » (gh workflow run build.yml --ref v1.2.3),
+# il publie la page de version GitHub, d'où Polyptyque télécharge ses mises à
+# jour ; lancé sur une branche, il fabrique sans publier.
 permissions:
   contents: write
 
@@ -47,6 +46,19 @@ jobs:
         run: |
           Invoke-WebRequest -Uri $env:FFMPEG_URL -OutFile ffmpeg.zip
           Expand-Archive ffmpeg.zip -DestinationPath ffmpeg
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: streamdeck/package-lock.json
+      # Plugin livré aussi avec l'application (mise à jour proposée par Polyptyque).
+      - name: Paquet Stream Deck
+        working-directory: streamdeck
+        run: |
+          npm.cmd ci
+          if ($LASTEXITCODE -ne 0) { throw 'Installation des dépendances Stream Deck échouée' }
+          npm.cmd run pack
+          if ($LASTEXITCODE -ne 0) { throw 'Fabrication du plugin Stream Deck échouée' }
       - name: Assemblage
         shell: pwsh
         run: |
@@ -59,6 +71,7 @@ jobs:
           Copy-Item LICENSE "$dist/LICENSE.txt"
           Copy-Item packaging/LISEZMOI.txt $dist/
           Copy-Item packaging/README.txt $dist/
+          Copy-Item livraison/city.vena.polyptyque.streamDeckPlugin $dist/
           & "$dist/ffmpeg.exe" -hide_banner -version | Select-Object -First 1
           & "$dist/ffmpeg.exe" -hide_banner -encoders | Select-String -Pattern "nvenc|amf|qsv|libx264"
       - uses: actions/setup-dotnet@v4
@@ -122,18 +135,6 @@ jobs:
           New-Item -ItemType Directory -Force -Path livraison | Out-Null
           Copy-Item "releases/$env:PACK_ID-win-Setup.exe" livraison/Polyptyque-Setup.exe
           Copy-Item "releases/$env:PACK_ID-win-Portable.zip" livraison/Polyptyque-portable.zip
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-          cache-dependency-path: streamdeck/package-lock.json
-      - name: Paquet Stream Deck
-        working-directory: streamdeck
-        run: |
-          npm.cmd ci
-          if ($LASTEXITCODE -ne 0) { throw 'Installation des dépendances Stream Deck échouée' }
-          npm.cmd run pack
-          if ($LASTEXITCODE -ne 0) { throw 'Fabrication du plugin Stream Deck échouée' }
       - uses: actions/upload-artifact@v4
         with:
           name: Polyptyque-windows

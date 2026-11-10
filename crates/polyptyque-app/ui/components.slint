@@ -2,7 +2,7 @@
 
 import { ScrollView } from "std-widgets.slint";
 import { Theme } from "theme.slint";
-import { SourceCard } from "bridge.slint";
+import { Bridge, SourceCard } from "bridge.slint";
 
 // Bouton avec texte et icône facultative.
 // Genres : "primary", "secondary", "danger", "ghost".
@@ -163,9 +163,12 @@ export component Panel inherits Rectangle {
     }
 }
 
-// Zone cliquable qui sait aussi glisser : bouton enfoncé, au-delà d'un
-// petit déplacement, le clic devient un glisser (le clic n'est alors pas
-// envoyé). Sous les boutons d'une carte, elle ne reçoit jamais leurs clics.
+// Zone cliquable qui sait aussi glisser : bouton gauche enfoncé, au-delà
+// d'un petit déplacement, le clic devient un glisser (le clic n'est alors
+// pas envoyé). Sous les boutons d'une carte, elle ne reçoit jamais leurs
+// clics. Le clic droit ne fait qu'ouvrir un menu : Slint suit aussi la
+// souris quand ce bouton est enfoncé (`moved`), mais seul le bouton gauche
+// met `pressed` à vrai et note le point de départ.
 export component DragDetector inherits TouchArea {
     // Glisser permis (sinon : simple zone cliquable).
     in property <bool> draggable;
@@ -187,16 +190,20 @@ export component DragDetector inherits TouchArea {
         }
     }
     moved => {
-        if !self.dragging && root.draggable
+        if self.pressed && !self.dragging && root.draggable
             && (abs(self.mouse-x - self.pressed-x) > root.threshold || abs(self.mouse-y - self.pressed-y) > root.threshold) {
             self.dragging = true;
         }
-        if self.dragging {
+        if self.pressed && self.dragging {
             root.drag-moved(self.mouse-x - self.pressed-x, self.mouse-y - self.pressed-y, self.mouse-x, self.mouse-y);
         }
     }
     pointer-event(event) => {
         if event.button == PointerEventButton.right && event.kind == PointerEventKind.down {
+            if self.dragging {
+                self.dragging = false;
+                root.drag-cancelled();
+            }
             root.right-press(self.mouse-x, self.mouse-y);
         }
         if event.button == PointerEventButton.left && event.kind == PointerEventKind.up && self.dragging {
@@ -336,11 +343,25 @@ export component SourceCardView inherits Rectangle {
     callback open-window();
     callback restore-window();
     callback toggle-recording();
+    callback crop-requested();
     callback drag-moved(length, length, length, length);
     callback drag-ended();
     callback drag-cancelled();
 
     property <bool> recording: root.card.recording;
+
+    // Clic droit sur la carte (hors de ses boutons).
+    menu := ContextMenuArea {
+        Menu {
+            MenuItem {
+                title: @tr("Rogner…");
+                enabled: !Bridge.recording;
+                activated => {
+                    root.crop-requested();
+                }
+            }
+        }
+    }
 
     border-radius: Theme.radius;
     background: Theme.surface;
@@ -354,6 +375,9 @@ export component SourceCardView inherits Rectangle {
     DragDetector {
         draggable: root.draggable;
         mouse-cursor: self.dragging ? grabbing : default;
+        right-press(x, y) => {
+            menu.show({ x: x, y: y });
+        }
         drag-moved(dx, dy, x, y) => {
             root.drag-moved(dx, dy, x, y);
         }

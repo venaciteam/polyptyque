@@ -26,6 +26,7 @@ toml_edit = "0.25"
 toml.workspace = true
 sys-locale.workspace = true
 tr.workspace = true
+zip = { version = "8.6", default-features = false, features = ["deflate"] }
 
 [target.'cfg(windows)'.dependencies]
 arboard = { version = "3.7", default-features = false }

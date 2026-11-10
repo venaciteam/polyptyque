@@ -1,6 +1,6 @@
 // Fenêtres modales : ajout de sources, scènes, réglages, confirmations.
 
-import { ComboBox, LineEdit, CheckBox, ListView, ScrollView, Spinner } from "std-widgets.slint";
+import { ComboBox, LineEdit, CheckBox, ListView, ScrollView, SpinBox, Spinner } from "std-widgets.slint";
 import { Theme } from "theme.slint";
 import { Bridge, ScheduleItem } from "bridge.slint";
 import { ActionButton, Field, Footer, IconButton, LevelMeter, Note, Sheet, ListRow, Toggle } from "components.slint";
@@ -649,6 +649,19 @@ export component SettingsSheet inherits Sheet {
                         }
                     }
                 }
+                if Bridge.plugin-update-detail != "": Field {
+                    label: @tr("Plugin Stream Deck");
+                    hint: Bridge.plugin-update-detail;
+                    HorizontalLayout {
+                        alignment: start;
+                        ActionButton {
+                            text: @tr("Mettre à jour le plugin Stream Deck");
+                            clicked => {
+                                Bridge.install-plugin-update();
+                            }
+                        }
+                    }
+                }
                 Field {
                     label: @tr("Raccourci : démarrer ou arrêter l'enregistrement");
                     ComboBox {
@@ -1260,6 +1273,459 @@ export component SchedulePrompt inherits Sheet {
             kind: "primary";
             clicked => {
                 Bridge.prompt-accepted();
+            }
+        }
+    }
+}
+
+// Poignée du cadre de rognage, centrée sur (cx, cy).
+component CropKnob inherits Rectangle {
+    in property <length> cx;
+    in property <length> cy;
+    in property <bool> selected;
+    x: root.cx - self.width / 2;
+    y: root.cy - self.height / 2;
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    background: root.selected ? Theme.accent : #ffffff;
+    border-width: 1px;
+    border-color: root.selected ? #ffffff : Theme.accent;
+}
+
+// Marge retirée d'un bord, en pixels de la fenêtre.
+component MarginField inherits Field {
+    // 0 gauche, 1 haut, 2 droite, 3 bas.
+    in property <int> side;
+    in property <int> maximum;
+    in property <bool> enabled;
+    in-out property <int> value;
+    horizontal-stretch: 1;
+    SpinBox {
+        minimum: 0;
+        maximum: root.maximum;
+        enabled: root.enabled;
+        value <=> root.value;
+        edited(value) => {
+            Bridge.crop-margin-edited(root.side, value);
+        }
+    }
+}
+
+// Rognage d'une source : la fenêtre entière, la zone gardée encadrée (le
+// reste assombri). Le cadre se déplace d'un bloc, ses bords et ses coins le
+// redimensionnent, à la souris ou au clavier ; les marges se saisissent
+// aussi en pixels. Rien n'est enregistré avant « Appliquer ».
+export component CropSheet inherits Sheet {
+    title: @tr("Rogner « {} »", Bridge.crop-source-name);
+    sheet-width: min(root.width - 48px, 980px);
+    close => {
+        Bridge.close-sheet();
+    }
+    init => {
+        keys.focus();
+    }
+
+    // Ce que déplacent les flèches du clavier.
+    property <string> handle-name: Bridge.crop-handle == 1 ? @tr("le coin en haut à gauche")
+        : Bridge.crop-handle == 2 ? @tr("le bord du haut")
+        : Bridge.crop-handle == 3 ? @tr("le coin en haut à droite")
+        : Bridge.crop-handle == 4 ? @tr("le bord de droite")
+        : Bridge.crop-handle == 5 ? @tr("le coin en bas à droite")
+        : Bridge.crop-handle == 6 ? @tr("le bord du bas")
+        : Bridge.crop-handle == 7 ? @tr("le coin en bas à gauche")
+        : Bridge.crop-handle == 8 ? @tr("le bord de gauche")
+        : @tr("le cadre entier");
+    property <int> kept-width: Bridge.crop-window-width - Bridge.crop-left - Bridge.crop-right;
+    property <int> kept-height: Bridge.crop-window-height - Bridge.crop-top - Bridge.crop-bottom;
+
+    keys := FocusScope {
+        min-height: column.min-height;
+        preferred-height: column.preferred-height;
+        key-pressed(event) => {
+            if event.text == Key.Return {
+                Bridge.crop-apply();
+                return accept;
+            }
+            if !stage.active {
+                return reject;
+            }
+            if event.text == Key.LeftArrow {
+                Bridge.crop-nudge(event.modifiers.shift ? -10 : -1, 0);
+                return accept;
+            }
+            if event.text == Key.RightArrow {
+                Bridge.crop-nudge(event.modifiers.shift ? 10 : 1, 0);
+                return accept;
+            }
+            if event.text == Key.UpArrow {
+                Bridge.crop-nudge(0, event.modifiers.shift ? -10 : -1);
+                return accept;
+            }
+            if event.text == Key.DownArrow {
+                Bridge.crop-nudge(0, event.modifiers.shift ? 10 : 1);
+                return accept;
+            }
+            if event.text == Key.Backtab || (event.text == Key.Tab && event.modifiers.shift) {
+                Bridge.crop-handle = Math.mod(Bridge.crop-handle + 8, 9);
+                return accept;
+            }
+            if event.text == Key.Tab {
+                Bridge.crop-handle = Math.mod(Bridge.crop-handle + 1, 9);
+                return accept;
+            }
+            return reject;
+        }
+
+        column := VerticalLayout {
+            width: parent.width;
+            height: parent.height;
+            spacing: 14px;
+
+            stage := Rectangle {
+                height: 400px;
+                background: Theme.preview-background;
+                border-radius: Theme.radius-small;
+                clip: true;
+
+                property <bool> known: Bridge.crop-window-width > 0 && Bridge.crop-window-height > 0;
+                property <bool> active: self.known && Bridge.crop-has-image;
+                property <float> win-w: max(1, Bridge.crop-window-width);
+                property <float> win-h: max(1, Bridge.crop-window-height);
+                // Longueur à l'écran d'un pixel de la fenêtre.
+                property <length> unit: min((self.width - 32px) / self.win-w, (self.height - 32px) / self.win-h);
+                property <length> img-w: self.win-w * self.unit;
+                property <length> img-h: self.win-h * self.unit;
+                property <length> img-x: (self.width - self.img-w) / 2;
+                property <length> img-y: (self.height - self.img-h) / 2;
+                // Zone gardée, à l'écran.
+                property <length> cx: self.img-x + Bridge.crop-left * self.unit;
+                property <length> cy: self.img-y + Bridge.crop-top * self.unit;
+                property <length> cw: max(0, self.win-w - Bridge.crop-left - Bridge.crop-right) * self.unit;
+                property <length> ch: max(0, self.win-h - Bridge.crop-top - Bridge.crop-bottom) * self.unit;
+
+                // Poignée sous le pointeur : 0 dans le cadre, 1 à 8 coins et
+                // bords, -1 ailleurs.
+                pure function hit(x: length, y: length) -> int {
+                    let t = 9px;
+                    let left = abs(x - self.cx) <= t;
+                    let right = abs(x - (self.cx + self.cw)) <= t;
+                    let top = abs(y - self.cy) <= t;
+                    let bottom = abs(y - (self.cy + self.ch)) <= t;
+                    let along-x = x >= self.cx - t && x <= self.cx + self.cw + t;
+                    let along-y = y >= self.cy - t && y <= self.cy + self.ch + t;
+                    if top && left {
+                        return 1;
+                    }
+                    if top && right {
+                        return 3;
+                    }
+                    if bottom && right {
+                        return 5;
+                    }
+                    if bottom && left {
+                        return 7;
+                    }
+                    if top && along-x {
+                        return 2;
+                    }
+                    if right && along-y {
+                        return 4;
+                    }
+                    if bottom && along-x {
+                        return 6;
+                    }
+                    if left && along-y {
+                        return 8;
+                    }
+                    if x > self.cx && x < self.cx + self.cw && y > self.cy && y < self.cy + self.ch {
+                        return 0;
+                    }
+                    return -1;
+                }
+                pure function cursor-for(handle: int) -> MouseCursor {
+                    if handle == 0 {
+                        return MouseCursor.move;
+                    }
+                    if handle == 1 || handle == 5 {
+                        return MouseCursor.nwse-resize;
+                    }
+                    if handle == 3 || handle == 7 {
+                        return MouseCursor.nesw-resize;
+                    }
+                    if handle == 2 || handle == 6 {
+                        return MouseCursor.ns-resize;
+                    }
+                    if handle == 4 || handle == 8 {
+                        return MouseCursor.ew-resize;
+                    }
+                    return MouseCursor.default;
+                }
+
+                if stage.active: Image {
+                    x: stage.img-x;
+                    y: stage.img-y;
+                    width: stage.img-w;
+                    height: stage.img-h;
+                    source: Bridge.crop-image;
+                    image-fit: fill;
+                }
+
+                if stage.active: Rectangle {
+                    // Parties retirées, assombries.
+                    Rectangle {
+                        x: stage.img-x;
+                        y: stage.img-y;
+                        width: stage.img-w;
+                        height: stage.cy - stage.img-y;
+                        background: #000000b8;
+                    }
+                    Rectangle {
+                        x: stage.img-x;
+                        y: stage.cy + stage.ch;
+                        width: stage.img-w;
+                        height: stage.img-y + stage.img-h - stage.cy - stage.ch;
+                        background: #000000b8;
+                    }
+                    Rectangle {
+                        x: stage.img-x;
+                        y: stage.cy;
+                        width: stage.cx - stage.img-x;
+                        height: stage.ch;
+                        background: #000000b8;
+                    }
+                    Rectangle {
+                        x: stage.cx + stage.cw;
+                        y: stage.cy;
+                        width: stage.img-x + stage.img-w - stage.cx - stage.cw;
+                        height: stage.ch;
+                        background: #000000b8;
+                    }
+                    // Tiers, pour cadrer.
+                    for i in [1, 2]: Rectangle {
+                        x: stage.cx + stage.cw * i / 3;
+                        y: stage.cy;
+                        width: 1px;
+                        height: stage.ch;
+                        background: #ffffff38;
+                    }
+                    for i in [1, 2]: Rectangle {
+                        x: stage.cx;
+                        y: stage.cy + stage.ch * i / 3;
+                        width: stage.cw;
+                        height: 1px;
+                        background: #ffffff38;
+                    }
+                    Rectangle {
+                        x: stage.cx;
+                        y: stage.cy;
+                        width: stage.cw;
+                        height: stage.ch;
+                        border-width: Bridge.crop-handle == 0 ? 3px : 2px;
+                        border-color: Theme.accent;
+                    }
+                    // Bord choisi pour le clavier.
+                    if Bridge.crop-handle == 2: Rectangle {
+                        x: stage.cx;
+                        y: stage.cy - 2px;
+                        width: stage.cw;
+                        height: 4px;
+                        background: Theme.accent;
+                    }
+                    if Bridge.crop-handle == 4: Rectangle {
+                        x: stage.cx + stage.cw - 2px;
+                        y: stage.cy;
+                        width: 4px;
+                        height: stage.ch;
+                        background: Theme.accent;
+                    }
+                    if Bridge.crop-handle == 6: Rectangle {
+                        x: stage.cx;
+                        y: stage.cy + stage.ch - 2px;
+                        width: stage.cw;
+                        height: 4px;
+                        background: Theme.accent;
+                    }
+                    if Bridge.crop-handle == 8: Rectangle {
+                        x: stage.cx - 2px;
+                        y: stage.cy;
+                        width: 4px;
+                        height: stage.ch;
+                        background: Theme.accent;
+                    }
+                    CropKnob {
+                        cx: stage.cx;
+                        cy: stage.cy;
+                        selected: Bridge.crop-handle == 1;
+                    }
+                    CropKnob {
+                        cx: stage.cx + stage.cw / 2;
+                        cy: stage.cy;
+                        selected: Bridge.crop-handle == 2;
+                    }
+                    CropKnob {
+                        cx: stage.cx + stage.cw;
+                        cy: stage.cy;
+                        selected: Bridge.crop-handle == 3;
+                    }
+                    CropKnob {
+                        cx: stage.cx + stage.cw;
+                        cy: stage.cy + stage.ch / 2;
+                        selected: Bridge.crop-handle == 4;
+                    }
+                    CropKnob {
+                        cx: stage.cx + stage.cw;
+                        cy: stage.cy + stage.ch;
+                        selected: Bridge.crop-handle == 5;
+                    }
+                    CropKnob {
+                        cx: stage.cx + stage.cw / 2;
+                        cy: stage.cy + stage.ch;
+                        selected: Bridge.crop-handle == 6;
+                    }
+                    CropKnob {
+                        cx: stage.cx;
+                        cy: stage.cy + stage.ch;
+                        selected: Bridge.crop-handle == 7;
+                    }
+                    CropKnob {
+                        cx: stage.cx;
+                        cy: stage.cy + stage.ch / 2;
+                        selected: Bridge.crop-handle == 8;
+                    }
+                }
+
+                // Pas encore d'image : fenêtre recherchée, réduite ou fermée.
+                if !stage.active: VerticalLayout {
+                    alignment: center;
+                    spacing: 12px;
+                    padding: 24px;
+                    Text {
+                        text: Bridge.crop-placeholder != "" ? Bridge.crop-placeholder : @tr("Recherche de la fenêtre…");
+                        color: Theme.text-faint;
+                        horizontal-alignment: center;
+                        wrap: word-wrap;
+                    }
+                    if Bridge.crop-can-open || Bridge.crop-can-restore: HorizontalLayout {
+                        alignment: center;
+                        ActionButton {
+                            text: Bridge.crop-can-restore ? @tr("Rétablir la fenêtre") : @tr("Ouvrir la fenêtre");
+                            icon: Bridge.crop-can-restore ? @image-url("icons/restore.svg") : @image-url("icons/launch.svg");
+                            has-icon: true;
+                            clicked => {
+                                if Bridge.crop-can-restore {
+                                    Bridge.restore-window(Bridge.crop-source-id);
+                                } else {
+                                    Bridge.open-source(Bridge.crop-source-id);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                touch := TouchArea {
+                    enabled: stage.active;
+                    // Poignée attrapée à l'appui (-1 : aucune).
+                    property <int> grabbed: -1;
+                    mouse-cursor: stage.cursor-for(self.pressed ? self.grabbed : stage.hit(self.mouse-x, self.mouse-y));
+                    pointer-event(event) => {
+                        if event.button == PointerEventButton.left && event.kind == PointerEventKind.down {
+                            keys.focus();
+                            self.grabbed = stage.hit(self.mouse-x, self.mouse-y);
+                            if self.grabbed >= 0 {
+                                Bridge.crop-handle = self.grabbed;
+                                Bridge.crop-drag-start();
+                            }
+                        }
+                    }
+                    moved => {
+                        if self.pressed && self.grabbed >= 0 {
+                            Bridge.crop-drag(
+                                self.grabbed,
+                                Math.round((self.mouse-x - self.pressed-x) / stage.unit),
+                                Math.round((self.mouse-y - self.pressed-y) / stage.unit));
+                        }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 12px;
+                Field {
+                    label: @tr("Format");
+                    horizontal-stretch: 2;
+                    ComboBox {
+                        model: Bridge.crop-ratio-choices;
+                        current-index <=> Bridge.crop-ratio-index;
+                        selected(value) => {
+                            Bridge.crop-ratio-selected(self.current-index);
+                            keys.focus();
+                        }
+                    }
+                }
+                MarginField {
+                    label: @tr("Gauche (px)");
+                    side: 0;
+                    maximum: stage.known ? Bridge.crop-window-width : 100000;
+                    enabled: stage.known;
+                    value <=> Bridge.crop-left;
+                }
+                MarginField {
+                    label: @tr("Haut (px)");
+                    side: 1;
+                    maximum: stage.known ? Bridge.crop-window-height : 100000;
+                    enabled: stage.known;
+                    value <=> Bridge.crop-top;
+                }
+                MarginField {
+                    label: @tr("Droite (px)");
+                    side: 2;
+                    maximum: stage.known ? Bridge.crop-window-width : 100000;
+                    enabled: stage.known;
+                    value <=> Bridge.crop-right;
+                }
+                MarginField {
+                    label: @tr("Bas (px)");
+                    side: 3;
+                    maximum: stage.known ? Bridge.crop-window-height : 100000;
+                    enabled: stage.known;
+                    value <=> Bridge.crop-bottom;
+                }
+            }
+
+            if stage.known: Text {
+                text: @tr("Zone gardée : {} × {} pixels, sur une fenêtre de {} × {}.", root.kept-width, root.kept-height, Bridge.crop-window-width, Bridge.crop-window-height);
+                color: Theme.text-muted;
+                font-size: Theme.font-small;
+                wrap: word-wrap;
+            }
+            Note {
+                text: @tr("Au clavier : les flèches déplacent {} d'un pixel (Maj : 10 pixels), Tab passe au bord ou au coin suivant, Entrée applique. Si la fenêtre change de taille, les marges restent comptées depuis chaque bord. Une zone qui n'a pas le format de l'enregistrement y est centrée entre des bandes noires.", root.handle-name);
+            }
+
+            Footer {
+                ActionButton {
+                    text: @tr("Réinitialiser");
+                    kind: "ghost";
+                    clicked => {
+                        Bridge.crop-reset();
+                        keys.focus();
+                    }
+                }
+                ActionButton {
+                    text: @tr("Annuler");
+                    kind: "ghost";
+                    clicked => {
+                        Bridge.close-sheet();
+                    }
+                }
+                ActionButton {
+                    text: @tr("Appliquer");
+                    kind: "primary";
+                    clicked => {
+                        Bridge.crop-apply();
+                    }
+                }
             }
         }
     }

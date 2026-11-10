@@ -148,7 +148,7 @@ msgid "{} Hours or minutes of {}"
 msgstr "{} sur un cadran de {}"
 
 # Pluriel de l'interface, recopié du code.
-#: polyptyque-app/ui/components.slint:494
+#: polyptyque-app/ui/components.slint:518
 msgid "{n} perdue"
 msgid_plural "{n} perdues"
 msgstr[0] "{n} perdue"

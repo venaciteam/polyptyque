@@ -32,9 +32,9 @@ cargo run -p polyptyque-app                                          # outside W
 cargo check --target x86_64-pc-windows-msvc -p polyptyque-cli        # Windows code from macOS/Linux
 ```
 
-- Build and test locally for development iterations; hand the local artifacts to the user without waiting for GitHub. Both GitHub workflows run only on release tags (`v*`) or manual dispatch, never automatically on branch pushes or pull requests. Keep pushing source changes to `dev` normally.
-- `polyptyque-app` only builds for Windows on Windows (C dependencies). The GitHub release workflow builds the Windows installer but runs **no Rust tests**: run them locally. The Stream Deck publication workflow includes its own Node/UI checks.
-- On Windows, `packaging/fabrication-locale.ps1` runs the same build as the workflow (FFmpeg, Velopack installer) without publishing, into `livraison/`; `-SansInstallateur` stops at `dist/Polyptyque`. Releases are still built by the workflow. Clone with `core.autocrlf false`: the sources and catalogs are LF.
+- Build and test locally for development iterations; hand the local artifacts to the user without waiting for GitHub. Both GitHub workflows are a manual fallback only (`workflow_dispatch`): nothing runs automatically, not even on tags. Keep pushing source changes to `dev` normally.
+- `polyptyque-app` only builds for Windows on Windows (C dependencies). `scripts/publier.ps1` runs the Rust tests and the Stream Deck `npm test` before building; the fallback workflow runs no Rust tests. The Stream Deck publication workflow includes its own Node/UI checks.
+- On Windows, `packaging/fabrication-locale.ps1` runs the same build as the workflow (FFmpeg, Velopack installer) without publishing, into `livraison/`; `-SansInstallateur` stops at `dist/Polyptyque`. Releases are built and published on the PC by `scripts/publier.ps1` (see below). Clone with `core.autocrlf false`: the sources and catalogs are LF.
 - Demo mode keeps its data in the temporary folder (`polyptyque-demo`). `POLYPTYQUE_LANG=fr|en` forces the language. Its command channel is a Unix socket, so `polyptyque-cli` works against it.
 - Don’t reformat whole files: `cargo fmt --check` reports a few pre-existing differences.
 
@@ -55,5 +55,5 @@ cargo check --target x86_64-pc-windows-msvc -p polyptyque-cli        # Windows c
 
 ## Branches and releases
 
-- Work on `dev`; `main` only receives merges from `dev`. A release is a `vX.Y.Z` tag on the merge commit of `main` (version in `Cargo.toml`, notes in `packaging/notes/vX.Y.Z.md`); the workflow then publishes it.
-- Documentation-only commits carry `[skip ci]`, but never the commit that receives a release tag (the publication would be skipped too).
+- Work on `dev`; `main` only receives merges from `dev`. A release is a `vX.Y.Z` tag on the merge commit of `main` (version in `Cargo.toml`, notes in `packaging/notes/vX.Y.Z.md`).
+- Publishing, on the Windows PC: version commit on `dev`, `merge --no-ff` into `main`, push both, then `.\scripts\publier.ps1 -Essai` and `.\scripts\publier.ps1`. The script builds `origin/main` in a clean copy (`%LOCALAPPDATA%\venacity-build\polyptyque`), runs the tests, packs with Velopack (deltas from the previous release), tags `origin/main`, publishes the release and uploads `Polyptyque-Setup.exe`, `Polyptyque-portable.zip` and `city.vena.polyptyque.streamDeckPlugin` under the fixed names used by the README links. GitHub Actions is only a manual fallback (`gh workflow run build.yml --ref vX.Y.Z`).

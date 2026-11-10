@@ -57,6 +57,7 @@ polyptyque-cli mcp
 - Messages are in Polyptyque’s language (French or English, per its Language setting); command names, parameter names and JSON keys are always English and stable.
 - `commands` prints the full catalog as JSON (English descriptions, parameter types and allowed values).
 - `events` subscribes to the live status and prints one JSON line per notification (`{"event": "state" | "message", "data": …}`) until the connection is lost.
+- `POLYPTYQUE_CLIENT` (optional) is the name the command line announces to Polyptyque, shown in its “Remote control” pill (default: `polyptyque-cli`, or `polyptyque-cli events`). A program that drives Polyptyque through the command line sets it to its own name; the Stream Deck plugin uses `Stream Deck`. Connections shorter than one second aren’t shown in the pill, unless they subscribe to the live status.
 
 Examples:
 

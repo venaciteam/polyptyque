@@ -12,6 +12,7 @@ mod format;
 mod i18n;
 mod meter;
 mod preview;
+mod streamdeck;
 mod update;
 #[cfg(test)]
 mod ui_snapshot;

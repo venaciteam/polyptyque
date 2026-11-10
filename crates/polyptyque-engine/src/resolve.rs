@@ -306,7 +306,14 @@ mod tests {
         fn now_hns(&self) -> u64 {
             0
         }
-        fn open_video_capture(&self, _: WindowHandle, _: u32, _: u32, _: bool) -> Result<Box<dyn VideoCapture>> {
+        fn open_video_capture(
+            &self,
+            _: WindowHandle,
+            _: u32,
+            _: u32,
+            _: bool,
+            _: polyptyque_core::crop::Crop,
+        ) -> Result<Box<dyn VideoCapture>> {
             unimplemented!()
         }
         fn open_audio_capture(&self, _: u32, _: u32, _: u16) -> Result<Box<dyn AudioCapture>> {
@@ -334,7 +341,7 @@ mod tests {
     }
 
     fn source(kind: SourceKind) -> Source {
-        Source { id: "x".into(), name: "x".into(), capture_cursor: true, relaunch: false, kind }
+        Source { id: "x".into(), name: "x".into(), capture_cursor: true, relaunch: false, crop: Default::default(), kind }
     }
 
     #[test]

@@ -13,6 +13,8 @@ use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use polyptyque_core::config::{BrowserFamily, BrowserRef, Config, Scene, Source};
+use polyptyque_core::crop::Crop;
+use polyptyque_core::video::fit_rect;
 use polyptyque_core::platform::*;
 
 struct DemoWindow {
@@ -23,6 +25,8 @@ struct DemoWindow {
     exe: &'static str,
     /// Teinte de l'image (chrominance U, V).
     tint: (u8, u8),
+    /// Taille de la fausse fenêtre, en pixels.
+    size: (u32, u32),
 }
 
 const CHROME: WindowHandle = 2;
@@ -35,6 +39,7 @@ const WINDOWS: [DemoWindow; 4] = [
         class: "MozillaWindowClass",
         exe: "/demo/firefox.exe",
         tint: (96, 168),
+        size: (1920, 1080),
     },
     DemoWindow {
         handle: 2,
@@ -42,6 +47,7 @@ const WINDOWS: [DemoWindow; 4] = [
         class: "Chrome_WidgetWin_1",
         exe: "/demo/chrome.exe",
         tint: (168, 150),
+        size: (1600, 1000),
     },
     DemoWindow {
         handle: 3,
@@ -49,8 +55,9 @@ const WINDOWS: [DemoWindow; 4] = [
         class: "Chrome_WidgetWin_1",
         exe: "/demo/Discord.exe",
         tint: (176, 112),
+        size: (1280, 800),
     },
-    DemoWindow { handle: 4, title: ("Notes", "Notes"), class: "Notepad", exe: "/demo/notepad.exe", tint: (128, 128) },
+    DemoWindow { handle: 4, title: ("Notes", "Notes"), class: "Notepad", exe: "/demo/notepad.exe", tint: (128, 128), size: (900, 700) },
 ];
 
 impl DemoWindow {
@@ -195,9 +202,12 @@ impl Platform for DemoPlatform {
         width: u32,
         height: u32,
         _: bool,
+        crop: Crop,
     ) -> Result<Box<dyn VideoCapture>> {
-        let tint = WINDOWS.iter().find(|w| w.handle == handle).map_or((128, 128), |w| w.tint);
-        Ok(Box::new(DemoVideo { start: self.start, width, height, tint }))
+        let window = WINDOWS.iter().find(|w| w.handle == handle);
+        let tint = window.map_or((128, 128), |w| w.tint);
+        let size = window.map_or((1280, 720), |w| w.size);
+        Ok(Box::new(DemoVideo { start: self.start, width, height, tint, size, crop }))
     }
 
     fn open_audio_capture(&self, pid: u32, sample_rate: u32, channels: u16) -> Result<Box<dyn AudioCapture>> {
@@ -266,32 +276,49 @@ impl Platform for DemoPlatform {
     }
 }
 
-/// Image animée : dégradé teinté et barre lumineuse qui défile.
+/// Image animée : dégradé teinté, quadrillage (un trait tous les dixièmes de
+/// la fenêtre, pour voir le rognage) et barre lumineuse qui défile.
 struct DemoVideo {
     start: Instant,
     width: u32,
     height: u32,
     tint: (u8, u8),
+    size: (u32, u32),
+    crop: Crop,
 }
 
 impl VideoCapture for DemoVideo {
     fn poll(&mut self) -> Result<Option<Nv12Frame>> {
         let (w, h) = (self.width as usize, self.height as usize);
+        let (win_w, win_h) = self.size;
+        let (cx, cy, cw, ch) = self.crop.region(win_w, win_h);
+        let (fx, fy, fw, fh) = fit_rect(cw, ch, self.width, self.height);
         let t = self.start.elapsed().as_secs_f32();
-        let bar = ((t * 0.25).fract() * w as f32) as usize;
-        let mut frame = vec![0u8; w * h * 3 / 2];
-        for y in 0..h {
-            for x in 0..w {
-                let base = 40.0 + 70.0 * (y as f32 / h as f32) + 25.0 * ((x as f32 / w as f32) * TAU + t).sin();
-                let glow = if x.abs_diff(bar) < w / 24 { 90.0 } else { 0.0 };
-                frame[y * w + x] = (base + glow).clamp(16.0, 235.0) as u8;
+        let bar = (t * 0.25).fract();
+        let mut frame = vec![16u8; w * h * 3 / 2];
+        for y in fy as usize..(fy + fh) as usize {
+            // Position dans la fenêtre, de 0 à 1.
+            let v = (cy as f32 + (y - fy as usize) as f32 * ch as f32 / fh as f32) / win_h as f32;
+            for x in fx as usize..(fx + fw) as usize {
+                let u = (cx as f32 + (x - fx as usize) as f32 * cw as f32 / fw as f32) / win_w as f32;
+                let base = 40.0 + 70.0 * v + 25.0 * (u * TAU + t).sin();
+                let glow = if (u - bar).abs() < 1.0 / 24.0 { 90.0 } else { 0.0 };
+                let grid = (u * 10.0).fract() < 0.004 || (v * 10.0).fract() < 0.006;
+                frame[y * w + x] = if grid { 200.0 } else { (base + glow).clamp(16.0, 235.0) } as u8;
             }
         }
-        for pair in frame[w * h..].chunks_exact_mut(2) {
-            pair[0] = self.tint.0;
-            pair[1] = self.tint.1;
+        frame[w * h..].fill(128);
+        for y in (fy / 2) as usize..((fy + fh) / 2) as usize {
+            for pair in frame[w * h + y * w + fx as usize..][..fw as usize].chunks_exact_mut(2) {
+                pair[0] = self.tint.0;
+                pair[1] = self.tint.1;
+            }
         }
         Ok(Some(Arc::new(frame)))
+    }
+
+    fn content_size(&self) -> Option<(u32, u32)> {
+        Some(self.size)
     }
 }
 
