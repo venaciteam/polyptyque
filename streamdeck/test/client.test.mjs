@@ -16,6 +16,16 @@ test('exécution sans shell et récupération des codes d’erreur JSON malgré 
   await assert.rejects(runCli(process.execPath, ['-e', 'console.log(JSON.stringify({error:{reason:"confirmation_required",message:"Stop?",question:"Stop?"}}));process.exit(7)']),
     e => e.reason === 'confirmation_required' && e.question === 'Stop?');
 });
+test('le CLI se présente à Polyptyque comme « Stream Deck »', async () => {
+  const value = await runCli(process.execPath, ['-e', 'console.log(JSON.stringify({client:process.env.POLYPTYQUE_CLIENT}))']);
+  assert.equal(value.client, 'Stream Deck');
+  let options;
+  const client = new PolyptyqueClient({ locate: async () => 'fake.exe', launch: (exe, args, opts) => { options = opts; return fakeChild(); } });
+  try {
+    client.start(); await new Promise(r => setImmediate(r));
+    assert.equal(options.env.POLYPTYQUE_CLIENT, 'Stream Deck');
+  } finally { client.stop(); }
+});
 const state = { scene: { id: 'a' }, sources: [], recording: { active: false } };
 function fakeChild() {
   const child = new EventEmitter(); child.stdout = new PassThrough(); child.kill = () => {};

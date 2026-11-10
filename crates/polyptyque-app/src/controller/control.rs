@@ -34,6 +34,10 @@ const POLL: Duration = Duration::from_millis(100);
 /// Attente maximale d'une lecture par le fil d'une connexion : c'est aussi
 /// le plus long délai avant l'envoi d'une réponse.
 const READ_SLICE: Duration = Duration::from_millis(40);
+/// Une connexion n'apparaît dans la pastille « Pilotage » qu'après ce délai
+/// (sauf abonnement à l'état en direct) : les appels éclair d'un programme
+/// qui interroge Polyptyque en boucle ne la font pas clignoter.
+const PILL_DELAY: Duration = Duration::from_secs(1);
 
 /// Vérifie si une commande longue est terminée : son résultat, ou `None`.
 pub(super) type Check = Box<dyn Fn(&App) -> Option<CommandResult>>;
@@ -67,6 +71,8 @@ struct Client {
     peer: Peer,
     outgoing: Sender<String>,
     subscribed: bool,
+    /// Heure de la connexion (délai avant la pastille).
+    since: Instant,
 }
 
 /// Commande longue en attente de son résultat.
@@ -110,6 +116,8 @@ pub(super) struct ControlState {
     poll_timer: Option<Timer>,
     /// Dernier état envoyé aux abonnés.
     last_state: String,
+    /// Texte affiché dans la pastille « Pilotage ».
+    pill_text: String,
     messages: VecDeque<(u64, i32, String)>,
     message_seq: u64,
     pub start_request: Option<StartRequest>,
@@ -284,7 +292,10 @@ impl App {
             peer.program.as_deref().unwrap_or("inconnu"),
             peer.pid.map(|p| p.to_string()).unwrap_or_else(|| "?".into())
         );
-        self.control.borrow_mut().clients.insert(id, Client { name: None, peer, outgoing, subscribed: false });
+        self.control.borrow_mut().clients.insert(
+            id,
+            Client { name: None, peer, outgoing, subscribed: false, since: Instant::now() },
+        );
         self.refresh_control_pill();
     }
 
@@ -321,27 +332,36 @@ impl App {
             // Le prochain état part, même inchangé.
             self.control.borrow_mut().last_state.clear();
         }
+        self.update_control_pill();
     }
 
     pub(super) fn control_client_names(&self) -> Vec<String> {
         self.control.borrow().clients.values().filter_map(|c| c.name.clone()).collect()
     }
 
-    /// Pastille « Pilotage » : les programmes connectés.
+    /// Programmes connectés : pastille « Pilotage » et assistants.
     fn refresh_control_pill(&self) {
-        let names: Vec<String> = {
-            let control = self.control.borrow();
-            let mut names: Vec<String> = control.clients.values().map(label).collect();
-            names.sort();
-            names.dedup();
-            names
-        };
-        let text = match names.as_slice() {
-            [] => String::new(),
-            names => tr!("Pilotage · {}", names.join(", ")),
-        };
-        self.with_bridge(|b| b.set_control_text(text.into()));
+        self.update_control_pill();
         self.refresh_assistant_rows();
+    }
+
+    /// Pastille « Pilotage » : les programmes connectés depuis au moins
+    /// `PILL_DELAY`, ou abonnés à l'état en direct. Redessinée seulement si
+    /// son texte change (appelée aussi toutes les 100 ms).
+    fn update_control_pill(&self) {
+        let text = {
+            let control = self.control.borrow();
+            let now = Instant::now();
+            pill_text(control.clients.values().filter(|c| shown_in_pill(c, now)).map(label).collect())
+        };
+        {
+            let mut control = self.control.borrow_mut();
+            if control.pill_text == text {
+                return;
+            }
+            control.pill_text = text.clone();
+        }
+        self.with_bridge(|b| b.set_control_text(text.into()));
     }
 
     // ----- Requêtes -------------------------------------------------------------
@@ -412,6 +432,8 @@ impl App {
             }
         }
         self.control.borrow_mut().pending.extend(still);
+        // Connexions qui viennent de dépasser le délai de la pastille.
+        self.update_control_pill();
     }
 
     /// Envoie la réponse ; un objet réussi reçoit les messages affichés par
@@ -502,6 +524,48 @@ impl App {
 
 fn label(client: &Client) -> String {
     client.name.clone().or_else(|| client.peer.program.clone()).unwrap_or_else(|| tr!("un programme"))
+}
+
+/// Une connexion figure dans la pastille si elle est abonnée à l'état en
+/// direct ou ouverte depuis au moins `PILL_DELAY`.
+fn shown_in_pill(client: &Client, now: Instant) -> bool {
+    client.subscribed || now.saturating_duration_since(client.since) >= PILL_DELAY
+}
+
+/// Texte de la pastille : noms triés, sans doublon ; vide sans programme.
+fn pill_text(mut names: Vec<String>) -> String {
+    names.sort();
+    names.dedup();
+    match names.as_slice() {
+        [] => String::new(),
+        names => tr!("Pilotage · {}", names.join(", ")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn client(subscribed: bool, since: Instant) -> Client {
+        let (outgoing, _) = mpsc::channel();
+        Client { name: Some("Stream Deck".into()), peer: Peer::default(), outgoing, subscribed, since }
+    }
+
+    #[test]
+    fn appels_eclair_hors_de_la_pastille() {
+        let now = Instant::now();
+        assert!(!shown_in_pill(&client(false, now), now));
+        assert!(shown_in_pill(&client(false, now), now + PILL_DELAY));
+        // Abonné à l'état en direct : affiché tout de suite.
+        assert!(shown_in_pill(&client(true, now), now));
+    }
+
+    #[test]
+    fn noms_tries_sans_doublon() {
+        assert_eq!(pill_text(Vec::new()), "");
+        let text = pill_text(vec!["Stream Deck".into(), "Claude".into(), "Stream Deck".into()]);
+        assert!(text.ends_with("Claude, Stream Deck"), "{text}");
+    }
 }
 
 /// Niveau d'un message, d'après sa couleur à l'écran.

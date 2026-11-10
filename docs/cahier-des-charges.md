@@ -552,7 +552,7 @@ Rendre facile la transmission d'un problème sur GitHub, sans exposer de donnée
 	- en arrière-plan, l'icône de la zone de notification porte un point rouge pendant tout enregistrement, et un enregistrement qui démarre affiche une notification de Windows (l'icône peut être rangée sous « ^ ») ;
 	- le message de démarrage nomme le programme qui l'a demandé (« Demandé par « Claude ». ») ;
 	- aucune commande ne cache la fenêtre.
-- **Pastille « Pilotage »** dans la barre du haut tant qu'un programme est connecté, avec son nom ; un clic ouvre les réglages.
+- **Pastille « Pilotage »** dans la barre du haut tant qu'un programme est connecté, avec son nom ; un clic ouvre les réglages. Une connexion n'y figure qu'après une seconde, sauf abonnement à l'état en direct : les appels éclair d'un programme qui interroge Polyptyque en boucle ne la font pas grandir. Un programme qui passe par `polyptyque-cli` donne son nom par `POLYPTYQUE_CLIENT` (le plugin Stream Deck : « Stream Deck »).
 - **Titres des fenêtres** : la liste des fenêtres ouvertes ne donne que le programme de chaque fenêtre, et son titre seulement quand plusieurs fenêtres du même programme sont ouvertes (un titre peut être privé : objet d'un courriel, nom d'une conversation ; un assistant en ligne l'envoie à son fournisseur).
 - **Journal** : chaque commande reçue, avec le programme qui l'envoie (nom annoncé et exécutable) ; jamais les titres des fenêtres.
 
@@ -1013,6 +1013,7 @@ Le plugin Windows utilise `polyptyque-cli.exe` livré avec Polyptyque (bêta.9 o
 
 | 2026-11-08 | Clic droit sur une source : jamais de glisser. Slint suit la souris pour tous les boutons, mais ne met `pressed` à vrai et ne note le point de départ qu'au bouton gauche : le glisser ne démarre plus que bouton gauche enfoncé |
 | 2026-11-08 | Rognage par source, comme dans OBS : marges en pixels **depuis chaque bord** (une barre retirée le reste si la fenêtre change de taille, plutôt que des proportions), format libre ou verrouillé (16:9, 4:3, 3:2, 1:1, 4:5, 9:16, 21:9), réglage à la souris, en pixels et au clavier (1 px, 10 px avec <kbd>Maj</kbd>). Mémorisé avec la source ; bloqué pendant un enregistrement ; pas de commande de pilotage pour l'instant. Appliqué par le processeur vidéo de la carte graphique (rectangle source), sans coût supplémentaire |
+| 2026-11-11 | Pastille « Pilotage » stable : le plugin Stream Deck relit scènes, sources et programmations toutes les 4 s par trois appels `polyptyque-cli`, et chacun s'affichait un instant (« polyptyque-cli, polyptyque-cli events »), comme un pilotage en cours. Une connexion n'apparaît qu'après une seconde (ou dès son abonnement à l'état en direct), la pastille n'est redessinée que si son texte change, et le CLI annonce le nom donné par `POLYPTYQUE_CLIENT` (« Stream Deck » pour le plugin ; variable ignorée par un CLI plus ancien) |
 
 ---
 

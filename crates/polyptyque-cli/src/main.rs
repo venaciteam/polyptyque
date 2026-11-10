@@ -97,10 +97,21 @@ fn unknown(words: &str, pretty: bool) -> i32 {
     )
 }
 
+/// Nom annoncé à Polyptyque (pastille « Pilotage ») : `POLYPTYQUE_CLIENT`
+/// s'il est donné (programme qui passe par le CLI, comme le plugin Stream
+/// Deck), sinon `default`.
+fn client_name(default: &str) -> String {
+    std::env::var("POLYPTYQUE_CLIENT")
+        .ok()
+        .map(|name| name.trim().to_string())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| default.to_string())
+}
+
 /// Envoie une commande et écrit sa réponse.
 fn execute(method: &str, params: Value, timeout: Duration, pretty: bool) -> i32 {
     let result = channel::connect().and_then(|mut client| {
-        client.call("hello", json!({ "client": "polyptyque-cli" }), Duration::from_secs(10))?;
+        client.call("hello", json!({ "client": client_name("polyptyque-cli") }), Duration::from_secs(10))?;
         client.call(method, params, timeout + Duration::from_secs(5))
     });
     match result {
@@ -137,7 +148,7 @@ fn events(pretty: bool) -> i32 {
         Err(e) => return output::fail(&e, pretty),
     };
     let subscribed = client
-        .call("hello", json!({ "client": "polyptyque-cli events" }), Duration::from_secs(10))
+        .call("hello", json!({ "client": client_name("polyptyque-cli events") }), Duration::from_secs(10))
         .and_then(|_| client.call("subscribe", json!({}), Duration::from_secs(10)));
     match subscribed {
         Ok(result) => output::print(&json!({ "event": "state", "data": result["state"] }), pretty),
