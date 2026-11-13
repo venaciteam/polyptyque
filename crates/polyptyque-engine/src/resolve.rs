@@ -55,6 +55,52 @@ pub fn find_window(platform: &dyn Platform, source: &Source, windows: &[WindowIn
     }
 }
 
+/// Pour le journal, quand la fenêtre d'un navigateur reste introuvable : le
+/// navigateur tourne-t-il sur le profil, et quelles fenêtres de sa classe
+/// existent (cachées comprises), avec ce qui a pu les écarter. Jamais de
+/// titre ni de ligne de commande. `None` pour une application.
+pub fn explain_missing(platform: &dyn Platform, source: &Source) -> Option<String> {
+    let SourceKind::Browser { profile_dir, browser, .. } = &source.kind else {
+        return None;
+    };
+    let class = window_class(browser.family);
+    let mut lines = vec![format!(
+        "navigateur actif sur le profil : {}",
+        if profile_in_use(source) { "oui" } else { "non (ou inconnu)" }
+    )];
+    let mut command_lines: HashMap<u32, Option<String>> = HashMap::new();
+    let windows = platform.window_diagnostics(class);
+    if windows.is_empty() {
+        lines.push(format!("aucune fenêtre {class}"));
+    }
+    for w in &windows {
+        let mut flags = Vec::new();
+        flags.push(if w.visible { "visible" } else { "cachée" });
+        if w.cloaked {
+            flags.push("masquée par Windows");
+        }
+        if w.owned {
+            flags.push("rattachée à une autre fenêtre");
+        }
+        if w.tool_window {
+            flags.push("fenêtre outil");
+        }
+        if !w.has_title {
+            flags.push("sans titre");
+        }
+        if w.minimized {
+            flags.push("réduite");
+        }
+        let profile = match command_lines.entry(w.pid).or_insert_with(|| platform.process_command_line(w.pid)) {
+            None => "ligne de commande illisible",
+            Some(line) if command_line_uses_profile(line, profile_dir) => "ce profil",
+            Some(_) => "autre profil",
+        };
+        lines.push(format!("fenêtre {:#x}, processus {} : {} ; {profile}", w.handle, w.pid, flags.join(", ")));
+    }
+    Some(lines.join("\n  "))
+}
+
 /// Fenêtres des navigateurs des sources (leurs profils dédiés), à fermer en
 /// quittant Polyptyque. Les applications n'en font jamais partie.
 ///
@@ -300,6 +346,19 @@ mod tests {
                 _ => None,
             }
         }
+        fn window_diagnostics(&self, _: &str) -> Vec<WindowDiagnostic> {
+            let w = |handle, pid, visible, cloaked| WindowDiagnostic {
+                handle,
+                pid,
+                visible,
+                cloaked,
+                owned: false,
+                tool_window: false,
+                has_title: true,
+                minimized: false,
+            };
+            vec![w(1, 10, true, false), w(2, 11, true, true), w(3, 12, false, false)]
+        }
         fn detect_browsers(&self) -> Vec<BrowserInstall> {
             vec![]
         }
@@ -360,6 +419,31 @@ mod tests {
             },
         });
         assert_eq!(find_window(&FakePlatform, &src, &windows).map(|w| w.handle), Some(2));
+    }
+
+    #[test]
+    fn missing_browser_window_is_explained_without_titles() {
+        let src = source(SourceKind::Browser {
+            profile_dir: PathBuf::from(r"C:\p\abc"),
+            start_url: None,
+            browser: BrowserRef {
+                name: "Firefox".into(),
+                exe_path: PathBuf::from(r"C:\ff\firefox.exe"),
+                family: BrowserFamily::Gecko,
+            },
+        });
+        let report = explain_missing(&FakePlatform, &src).unwrap();
+        assert!(report.contains("processus 10 : visible ; autre profil"), "{report}");
+        assert!(report.contains("processus 11 : visible, masquée par Windows ; ce profil"), "{report}");
+        assert!(report.contains("processus 12 : cachée ; ligne de commande illisible"), "{report}");
+
+        let application = source(SourceKind::Application {
+            exe_path: r"C:\x\app.exe".into(),
+            window_class: "Classe".into(),
+            window_title: "Titre".into(),
+            launch_args: vec![],
+        });
+        assert!(explain_missing(&FakePlatform, &application).is_none());
     }
 
     #[test]

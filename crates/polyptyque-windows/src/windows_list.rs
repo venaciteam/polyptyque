@@ -3,7 +3,7 @@
 use std::ffi::c_void;
 
 use anyhow::{bail, Result};
-use polyptyque_core::platform::{WindowHandle, WindowInfo};
+use polyptyque_core::platform::{WindowDiagnostic, WindowHandle, WindowInfo};
 use windows::core::BOOL;
 use windows::Win32::Foundation::{HWND, LPARAM, POINT, RECT, TRUE, WPARAM};
 use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED};
@@ -44,6 +44,34 @@ pub(crate) fn list_including_hidden(own_pid: u32) -> Vec<WindowInfo> {
         let _ = EnumWindows(Some(collect), LPARAM(&mut handles as *mut Vec<HWND> as isize));
     }
     handles.into_iter().filter_map(|w| describe(w, true)).filter(|w| w.pid != own_pid).collect()
+}
+
+/// Fenêtres de premier niveau de la classe `class`, cachées comprises, avec
+/// ce qui peut les écarter de [`list`] (journal seulement).
+pub fn diagnostics(class: &str) -> Vec<WindowDiagnostic> {
+    let mut handles: Vec<HWND> = Vec::new();
+    unsafe {
+        let _ = EnumWindows(Some(collect), LPARAM(&mut handles as *mut Vec<HWND> as isize));
+    }
+    handles
+        .into_iter()
+        .filter(|&w| class_name(w) == class)
+        .map(|window| unsafe {
+            let mut pid = 0u32;
+            GetWindowThreadProcessId(window, Some(&mut pid));
+            let ex_style = GetWindowLongW(window, GWL_EXSTYLE) as u32;
+            WindowDiagnostic {
+                handle: window.0 as WindowHandle,
+                pid,
+                visible: IsWindowVisible(window).as_bool(),
+                cloaked: is_cloaked(window),
+                owned: GetWindow(window, GW_OWNER).is_ok_and(|owner| !owner.is_invalid()),
+                tool_window: ex_style & WS_EX_TOOLWINDOW.0 != 0,
+                has_title: !text(window).trim().is_empty(),
+                minimized: IsIconic(window).as_bool(),
+            }
+        })
+        .collect()
 }
 
 unsafe extern "system" fn collect(window: HWND, lparam: LPARAM) -> BOOL {

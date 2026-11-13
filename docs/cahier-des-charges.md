@@ -202,6 +202,9 @@ Au lancement de Polyptyque (réglage « Ouvrir les fenêtres de la scène au lan
 	
 	En cas d'ambiguïté, la fenêtre utilisée le plus récemment est retenue, sans question (à revoir si des erreurs de reconnaissance apparaissent).
 3. Chaque source affiche son état : **connectée**, **en attente**, **introuvable**.
+	- **Introuvable** veut dire que la fenêtre n'est pas reconnue. Une capture qui échoue alors que la fenêtre existe n'est pas une fenêtre introuvable : l'aperçu réessaie toutes les 2 s, puis affiche « Aperçu impossible » avec l'erreur après trois échecs d'affilée, jusqu'à la première image reçue.
+	- « Ouvrir la fenêtre » sur une source dont le programme tourne déjà (Firefox actif sur le profil, ou lancé il y a moins de 20 s) ne relance rien : l'aperçu de la source est remplacé par un neuf, qui recherche la fenêtre tout de suite (même si l'ancien est resté bloqué dans une capture).
+	- Le journal explique une fenêtre de navigateur introuvable depuis plus de 15 s, et l'état au moment d'un clic sur « Ouvrir la fenêtre » : navigateur actif ou non sur le profil, et pour chaque fenêtre de sa classe (cachées comprises), processus, visible ou non, masquée par Windows, rattachée, sans titre, réduite, profil reconnu ou ligne de commande illisible. Jamais de titre ni de ligne de commande. Une capture interrompue, impossible ou lente à s'ouvrir (2 s et plus) y est aussi notée.
 
 > [!tip] Pourquoi c'est fiable pour les navigateurs
 > L'identifiant d'une fenêtre change à chaque ouverture, et le titre d'une fenêtre de navigateur change avec l'onglet affiché. Le dossier de profil, lui, ne change jamais : c'est la clé de reconnaissance.
@@ -913,6 +916,14 @@ Le plugin Windows utilise `polyptyque-cli.exe` livré avec Polyptyque (bêta.9 o
 > - [x] Calculs du rognage testés (marges, format, poignées, bords de la fenêtre, saisie)
 > - [ ] Vérifié sur la machine de référence (fenêtre réelle, enregistrement rogné, réouverture)
 
+> [!todo] Étape 5 bis - Aperçu « Introuvable » alors que la fenêtre est ouverte, écrite le 2026-11-13
+> - [x] Constat : vignette BFMTV « Introuvable » et « Ouvrir la fenêtre » refusé (Firefox actif sur le profil), alors que Polyptyque avait reconnu la fenêtre au lancement et l'a fermée en quittant ; cause non visible, l'erreur de l'aperçu n'allait pas au journal
+> - [x] Capture interrompue distinguée d'une fenêtre absente : nouvel essai, puis « Aperçu impossible » avec l'erreur
+> - [x] « Ouvrir la fenêtre » sur un programme déjà lancé : aperçu de la source recréé, recherche immédiate
+> - [x] Journal : explication des fenêtres de navigateur introuvables, captures interrompues, impossibles ou lentes
+> - [x] Vérifié sur la machine de référence : nouvelle recherche par la commande `sources.open_window`, fenêtre retrouvée
+> - [ ] Cause d'origine, d'après le journal du prochain incident
+
 > [!info] Plus tard
 > - Rognage par le pilotage (CLI, Stream Deck)
 > - Programmation : lancement par Windows à l'heure prévue même logiciel fermé, sortie de veille automatique
@@ -1017,6 +1028,7 @@ Le plugin Windows utilise `polyptyque-cli.exe` livré avec Polyptyque (bêta.9 o
 | 2026-11-08 | Rognage par source, comme dans OBS : marges en pixels **depuis chaque bord** (une barre retirée le reste si la fenêtre change de taille, plutôt que des proportions), format libre ou verrouillé (16:9, 4:3, 3:2, 1:1, 4:5, 9:16, 21:9), réglage à la souris, en pixels et au clavier (1 px, 10 px avec <kbd>Maj</kbd>). Mémorisé avec la source ; bloqué pendant un enregistrement ; pas de commande de pilotage pour l'instant. Appliqué par le processeur vidéo de la carte graphique (rectangle source), sans coût supplémentaire |
 | 2026-11-11 | Pastille « Pilotage » stable : le plugin Stream Deck relit scènes, sources et programmations toutes les 4 s par trois appels `polyptyque-cli`, et chacun s'affichait un instant (« polyptyque-cli, polyptyque-cli events »), comme un pilotage en cours. Une connexion n'apparaît qu'après une seconde (ou dès son abonnement à l'état en direct), la pastille n'est redessinée que si son texte change, et le CLI annonce le nom donné par `POLYPTYQUE_CLIENT` (« Stream Deck » pour le plugin ; variable ignorée par un CLI plus ancien) |
 | 2026-11-11 | À la demande de l'utilisatrice, **mise à jour du plugin Stream Deck par Polyptyque** : le paquet est livré dans le dossier de l'application (fabrication locale et workflow de secours), sa version lue dans l'archive, comparée à celle du plugin installé ; pastille et bouton des réglages ouvrent le paquet, Stream Deck confirme. Pas de téléchargement séparé depuis GitHub : le plugin proposé reste celui du CLI installé, sans appel réseau de plus. Rien n'est proposé sans plugin installé |
+| 2026-11-13 | Vignette « Introuvable » alors que la fenêtre était ouverte et reconnue : l'aperçu confondait une **capture interrompue** et une fenêtre absente, et son erreur n'allait pas au journal. Les deux sont désormais distinguées (« Aperçu impossible » après trois échecs), « Ouvrir la fenêtre » sur un programme déjà lancé **recrée l'aperçu de la source** au lieu de demander de patienter, et le journal explique les cas suspects (sans titre de fenêtre). La cause d'origine reste à confirmer au prochain incident |
 
 ---
 

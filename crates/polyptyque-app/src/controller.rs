@@ -2817,13 +2817,33 @@ impl App {
         }
         match resolve::launch_once(&source) {
             Ok(true) => self.toast(&tr!("Ouverture de « {} »…", source.name), 1),
-            Ok(false) => self.toast(
-                &tr!(
-                    "« {} » est déjà en train de s'ouvrir (ou de se fermer) : patienter quelques secondes.",
-                    source.name
-                ),
-                2,
-            ),
+            Ok(false) => {
+                // Le programme tourne déjà sur cette source : c'est l'aperçu
+                // qui ne voit pas sa fenêtre. Un aperçu neuf la recherche
+                // tout de suite (et remplace une capture restée bloquée).
+                let restarted = self.previews.borrow_mut().restart_source(&self.platform, &source);
+                if restarted {
+                    log::info!("[{}] déjà ouvert : nouvelle recherche de la fenêtre", source.name);
+                    if let Some(details) = resolve::explain_missing(self.platform.as_ref(), &source) {
+                        log::info!("[{}] état au moment du clic :\n  {details}", source.name);
+                    }
+                    self.toast(
+                        &tr!(
+                            "« {} » est déjà ouvert (ou en train de s'ouvrir) : nouvelle recherche de sa fenêtre…",
+                            source.name
+                        ),
+                        1,
+                    );
+                } else {
+                    self.toast(
+                        &tr!(
+                            "« {} » est déjà en train de s'ouvrir (ou de se fermer) : patienter quelques secondes.",
+                            source.name
+                        ),
+                        2,
+                    );
+                }
+            }
             Err(e) => self.toast(&tr!("Impossible d'ouvrir « {} » : {}", source.name, format!("{e:#}")), 3),
         }
     }

@@ -91,6 +91,10 @@ impl Platform for WindowsPlatform {
         process::command_line(pid)
     }
 
+    fn window_diagnostics(&self, class: &str) -> Vec<polyptyque_core::platform::WindowDiagnostic> {
+        windows_list::diagnostics(class)
+    }
+
     fn detect_browsers(&self) -> Vec<BrowserInstall> {
         browsers::detect()
     }

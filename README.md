@@ -21,7 +21,7 @@
 
 ## Download
 
-**Windows 10 and 11** (64-bit), official release 1.1.0:
+**Windows 10 and 11** (64-bit), official release 1.1.1:
 
 - **[Download the installer](https://github.com/venaciteam/polyptyque/releases/latest/download/Polyptyque-Setup.exe)**: the standard version, installed like any other program. If in doubt, choose this one.
 - **[Download the portable version](https://github.com/venaciteam/polyptyque/releases/latest/download/Polyptyque-portable.zip)**: no installation, unzip it to any folder, even on a USB stick.
