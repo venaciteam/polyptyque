@@ -1,5 +1,5 @@
-POLYPTYQUE 1.0 BETA 8
-=====================
+POLYPTYQUE 1.1.1
+================
 
 Polyptyque records several windows at once, each in its own file, with
 only that window's sound.
@@ -70,6 +70,9 @@ Using Polyptyque
 6. The round button on each preview starts or stops that source alone,
    even during a recording (a source added mid-recording starts a new
    file).
+7. Right-click a source > "Crop…": trim pixels from each edge (bars,
+   banners). The crop applies to previews and recordings, and is saved
+   with the source.
 
 Keyboard shortcuts (customizable in Settings, active even when Polyptyque
 is in the background):

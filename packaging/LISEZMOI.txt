@@ -1,5 +1,5 @@
-POLYPTYQUE 1.0 BÊTA 8
-=====================
+POLYPTYQUE 1.1.1
+================
 
 Polyptyque enregistre plusieurs fenêtres en même temps, chacune dans son
 propre fichier, avec uniquement le son de cette fenêtre.
@@ -76,6 +76,9 @@ Utilisation
 6. Le bouton rond de chaque aperçu démarre ou arrête cette seule source,
    même pendant un enregistrement (une source ajoutée en cours de route
    commence un nouveau fichier).
+7. Clic droit sur une source → « Rogner… » : retirer des pixels sur chaque
+   bord (barres, bandeaux). Le rognage vaut pour les aperçus et les
+   enregistrements, et reste mémorisé avec la source.
 
 Raccourcis clavier (modifiables dans les réglages, actifs même quand
 Polyptyque est en arrière-plan) :
