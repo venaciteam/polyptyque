@@ -23,6 +23,23 @@ pub struct WindowInfo {
     pub exe: PathBuf,
 }
 
+/// État d'une fenêtre de premier niveau, pour le journal quand la fenêtre
+/// d'une source reste introuvable (voir [`Platform::window_diagnostics`]).
+/// Jamais de titre : il ne va pas au journal.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WindowDiagnostic {
+    pub handle: WindowHandle,
+    pub pid: u32,
+    pub visible: bool,
+    /// Masquée par Windows (bureau virtuel, application suspendue…).
+    pub cloaked: bool,
+    /// Rattachée à une autre fenêtre (boîte de dialogue, par exemple).
+    pub owned: bool,
+    pub tool_window: bool,
+    pub has_title: bool,
+    pub minimized: bool,
+}
+
 /// Périphérique d'entrée audio (micro).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AudioDevice {
@@ -97,6 +114,13 @@ pub trait Platform: Send + Sync {
         anyhow::bail!(tr::tr!("non disponible sur ce système"))
     }
     fn process_command_line(&self, pid: u32) -> Option<String>;
+
+    /// Toutes les fenêtres de premier niveau de la classe `class`, cachées
+    /// comprises, avec ce qui peut les écarter de [`Platform::list_windows`].
+    /// Sert seulement au journal.
+    fn window_diagnostics(&self, _class: &str) -> Vec<WindowDiagnostic> {
+        Vec::new()
+    }
     fn detect_browsers(&self) -> Vec<BrowserInstall>;
 
     /// Horloge commune, en centaines de nanosecondes.

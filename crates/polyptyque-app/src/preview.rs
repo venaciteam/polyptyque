@@ -28,6 +28,12 @@ const PREVIEW_SIZES: [(u32, u32); 3] = [(640, 360), (960, 540), (1280, 720)];
 /// Environ 10 images par seconde : fluide à l'œil, négligeable en calcul.
 const FRAME_INTERVAL: Duration = Duration::from_millis(100);
 const SEARCH_INTERVAL: Duration = Duration::from_secs(2);
+/// Captures interrompues d'affilée avant d'afficher « Aperçu impossible ».
+const MAX_FAILURES: u32 = 3;
+/// Ouverture de capture assez lente pour être notée au journal.
+const SLOW_OPEN: Duration = Duration::from_secs(2);
+/// Absence de fenêtre assez longue pour être expliquée au journal.
+const EXPLAIN_AFTER: Duration = Duration::from_secs(15);
 /// Définition de l'aperçu de l'éditeur de rognage (fenêtre entière).
 const WHOLE_SIZE: (u32, u32) = (1280, 720);
 
@@ -144,6 +150,22 @@ impl PreviewManager {
         self.size.store(pack(size), Ordering::Relaxed);
     }
 
+    /// Remplace l'aperçu d'une source par un neuf, qui cherche sa fenêtre
+    /// tout de suite. L'ancien fil s'arrête de lui-même, même s'il est resté
+    /// bloqué dans une capture. Faux si cette source n'a pas d'aperçu.
+    pub fn restart_source(&mut self, platform: &Arc<dyn Platform>, source: &Source) -> bool {
+        let Some(index) = self.workers.iter().position(|w| w.source_id == source.id) else {
+            return false;
+        };
+        match spawn(platform, source, self.size.clone(), false) {
+            Some(worker) => {
+                self.workers[index] = worker;
+                true
+            }
+            None => false,
+        }
+    }
+
     pub fn stop(&mut self) {
         self.workers.clear();
     }
@@ -157,17 +179,26 @@ fn run(
     size: Arc<AtomicU64>,
     whole: bool,
 ) {
+    // Vrai si l'état a changé.
     let set_state = |state: PreviewState| {
         let mut slot = lock(&slot);
-        if slot.state != state {
+        let changed = slot.state != state;
+        if changed {
             slot.state = state;
             slot.state_changed = true;
         }
+        changed
     };
+    let name = &source.name;
     let mut capture: Option<(Box<dyn VideoCapture>, WindowHandle)> = None;
     let mut capture_size = unpack(size.load(Ordering::Relaxed));
     let mut next_search = Instant::now();
     let mut next_minimized_check = Instant::now();
+    // Captures interrompues d'affilée, sans image reçue entre-temps.
+    let mut failures = 0u32;
+    // Depuis quand la fenêtre est introuvable, et si le journal l'a expliqué.
+    let mut missing_since: Option<Instant> = None;
+    let mut explained = false;
 
     while !stop.load(Ordering::Relaxed) {
         let now = Instant::now();
@@ -178,37 +209,74 @@ fn run(
             capture = None;
             next_search = now;
         }
+        let failing = failures >= MAX_FAILURES;
         if capture.is_none() && now >= next_search {
             next_search = now + SEARCH_INTERVAL;
             let windows = platform.list_windows();
             match resolve::find_window(platform.as_ref(), &source, &windows) {
                 Some(window) => {
+                    if missing_since.take().is_some() && explained {
+                        log::info!("[{name}] aperçu : fenêtre retrouvée");
+                    }
+                    explained = false;
                     let (width, height) = capture_size;
                     let crop = if whole { Crop::default() } else { source.crop };
-                    match platform.open_video_capture(window.handle, width, height, source.capture_cursor, crop) {
+                    let started = Instant::now();
+                    let opened = platform.open_video_capture(window.handle, width, height, source.capture_cursor, crop);
+                    let took = started.elapsed();
+                    if took >= SLOW_OPEN {
+                        log::warn!("[{name}] aperçu : ouverture de la capture lente ({:.1} s)", took.as_secs_f32());
+                    }
+                    match opened {
                         Ok(c) => {
                             capture = Some((c, window.handle));
-                            set_state(PreviewState::Live);
+                            // Après des échecs répétés, l'erreur reste affichée
+                            // jusqu'à la première image.
+                            if !failing {
+                                set_state(PreviewState::Live);
+                            }
                         }
-                        Err(e) => set_state(PreviewState::Failed(format!("{e:#}"))),
+                        Err(e) => {
+                            let message = format!("{e:#}");
+                            if set_state(PreviewState::Failed(message.clone())) {
+                                log::warn!("[{name}] aperçu impossible : {message}");
+                            }
+                        }
                     }
                 }
-                None => set_state(PreviewState::Missing),
+                None => {
+                    set_state(PreviewState::Missing);
+                    let since = *missing_since.get_or_insert(now);
+                    // Au lancement, la fenêtre met quelques secondes à
+                    // apparaître : on n'explique que les absences qui durent.
+                    if !explained && now.duration_since(since) >= EXPLAIN_AFTER {
+                        explained = true;
+                        match resolve::explain_missing(platform.as_ref(), &source) {
+                            Some(details) => log::info!("[{name}] aperçu : fenêtre introuvable\n  {details}"),
+                            None => log::info!("[{name}] aperçu : fenêtre introuvable"),
+                        }
+                    }
+                }
             }
         }
 
-        let mut lost = false;
+        let (mut lost, mut interrupted) = (false, false);
         if let Some((c, handle)) = capture.as_mut() {
             if !platform.is_window_alive(*handle) {
                 lost = true;
             } else {
-                if now >= next_minimized_check {
+                if now >= next_minimized_check && !failing {
                     next_minimized_check = now + Duration::from_millis(500);
                     let minimized = platform.is_window_minimized(*handle);
                     set_state(if minimized { PreviewState::Minimized } else { PreviewState::Live });
                 }
                 match c.poll() {
                     Ok(Some(frame)) => {
+                        if failing {
+                            log::info!("[{name}] aperçu rétabli");
+                            set_state(PreviewState::Live);
+                        }
+                        failures = 0;
                         let (width, height) = capture_size;
                         let mut buffer = SharedPixelBuffer::<Rgba8Pixel>::new(width, height);
                         nv12_to_rgba(&frame, width as usize, height as usize, buffer.make_mut_bytes());
@@ -225,13 +293,32 @@ fn run(
                     }
                     Ok(None) => {}
                     Err(e) => {
-                        log::debug!("aperçu de {} interrompu : {e:#}", source.name);
-                        lost = true;
+                        // La fenêtre existe toujours : ce n'est pas elle qui
+                        // manque, c'est la capture. Nouvel essai dans 2 s ;
+                        // après plusieurs échecs, l'erreur est affichée.
+                        let message = format!("{e:#}");
+                        failures += 1;
+                        if failures == 1 {
+                            log::info!("[{name}] aperçu interrompu : {message}");
+                        }
+                        if failures >= MAX_FAILURES {
+                            if set_state(PreviewState::Failed(message.clone())) {
+                                log::warn!("[{name}] aperçu impossible après {failures} essais : {message}");
+                            }
+                        } else {
+                            set_state(PreviewState::Searching);
+                        }
+                        interrupted = true;
                     }
                 }
             }
         }
+        if interrupted {
+            capture = None;
+            next_search = now + SEARCH_INTERVAL;
+        }
         if lost {
+            // Fenêtre fermée.
             capture = None;
             set_state(PreviewState::Missing);
             next_search = now + SEARCH_INTERVAL;
