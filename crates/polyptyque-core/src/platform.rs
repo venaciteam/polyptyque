@@ -160,6 +160,13 @@ pub trait Platform: Send + Sync {
     /// fenêtre, pas de propagation du Ctrl+C…).
     fn prepare_encoder_process(&self, command: &mut Command);
 
+    /// Rattache un FFmpeg auxiliaire (conversion, réparation, lecture des
+    /// pistes, essai d'encodeur) à Polyptyque : il est arrêté avec lui,
+    /// plantage compris, au lieu de lui survivre s'il reste figé. À appeler
+    /// juste après son lancement. Jamais pour un FFmpeg d'enregistrement,
+    /// qui doit pouvoir terminer son fichier seul.
+    fn end_helper_with_polyptyque(&self, _child: &std::process::Child) {}
+
     /// Empêche la mise en veille et affine la précision des minuteries
     /// pendant un enregistrement. À appeler depuis le fil principal.
     fn begin_recording_session(&self);

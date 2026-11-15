@@ -56,7 +56,9 @@ pub fn inspect(platform: &dyn Platform, ffmpeg: &Path, path: &Path) -> Result<Me
     platform.prepare_encoder_process(&mut command);
     // Sans fichier de sortie, FFmpeg décrit l'entrée puis s'arrête en erreur :
     // c'est attendu.
-    let output = command.output().with_context(|| tr!("lancement de {}", ffmpeg.display()))?;
+    let child = command.spawn().with_context(|| tr!("lancement de {}", ffmpeg.display()))?;
+    platform.end_helper_with_polyptyque(&child);
+    let output = child.wait_with_output().with_context(|| tr!("lancement de {}", ffmpeg.display()))?;
     let text = String::from_utf8_lossy(&output.stderr);
     let info = parse_media_info(&text);
     if info.video_streams == 0 && info.audio_streams == 0 {
@@ -345,6 +347,7 @@ fn remux_file(
     command.args(&args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     platform.prepare_encoder_process(&mut command);
     let mut child = command.spawn().with_context(|| tr!("lancement de {}", ffmpeg.display()))?;
+    platform.end_helper_with_polyptyque(&child);
 
     // Les erreurs sont lues à part pour que FFmpeg ne bloque jamais dessus.
     let stderr = child.stderr.take().map(|mut pipe| {
