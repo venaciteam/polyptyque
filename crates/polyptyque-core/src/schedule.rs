@@ -490,6 +490,8 @@ pub struct Planner {
     changed: Vec<(String, DateTime<Utc>)>,
     /// Créneaux réglés modifiés depuis le dernier enregistrement sur le disque.
     dirty: bool,
+    /// La dernière écriture de l'état a échoué (erreur déjà signalée).
+    save_failing: bool,
 }
 
 impl Planner {
@@ -508,15 +510,29 @@ impl Planner {
         (Planner { done, ..Planner::default() }, warning)
     }
 
-    /// Enregistre les créneaux réglés, s'ils ont changé.
+    /// Enregistre les créneaux réglés, s'ils ont changé. Écriture
+    /// impossible : retentée au prochain appel ; l'erreur n'est renvoyée
+    /// qu'une fois tant que l'écriture échoue (appelé deux fois par
+    /// seconde, le journal n'en est pas inondé).
     pub fn save_if_changed(&mut self, path: &Path) -> Result<()> {
         if !self.dirty {
             return Ok(());
         }
-        self.dirty = false;
-        let text =
-            toml::to_string_pretty(&PlannerFile { done: self.done.clone() }).context("état des programmations")?;
-        storage::write_atomic(path, text.as_bytes())
+        let written = toml::to_string_pretty(&PlannerFile { done: self.done.clone() })
+            .context("état des programmations")
+            .and_then(|text| storage::write_atomic(path, text.as_bytes()));
+        match written {
+            Ok(()) => {
+                self.dirty = false;
+                self.save_failing = false;
+                Ok(())
+            }
+            Err(_) if self.save_failing => Ok(()),
+            Err(e) => {
+                self.save_failing = true;
+                Err(e)
+            }
+        }
     }
 
     /// Créneau dont l'enregistrement en cours dépend.
@@ -998,6 +1014,29 @@ mod tests {
         // Le souvenir périmé est effacé.
         planner.save_if_changed(&path).unwrap();
         assert!(!fs::read_to_string(&path).unwrap().contains("2026-10-23"));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn failed_state_write_is_retried() {
+        let dir = std::env::temp_dir().join(format!("polyptyque-schedule-{}", new_id()));
+        let path = dir.join("programmation.toml");
+        // Un dossier à la place du fichier : écriture impossible.
+        fs::create_dir_all(&path).unwrap();
+        let schedules = [weekly("21:00", "22:00", &ALL)];
+        let mut planner = Planner::default();
+        let action = planner.tick(&schedules, paris(2026, 10, 23, 21, 10), &Paris, false, false);
+        let Some(Action::AskMissed(slot)) = action else { panic!("{action:?}") };
+        planner.give_up(&slot);
+        assert!(planner.save_if_changed(&path).is_err());
+        // Échec déjà signalé : pas de nouvelle erreur, mais nouvel essai.
+        assert!(planner.save_if_changed(&path).is_ok());
+        fs::remove_dir(&path).unwrap();
+        planner.save_if_changed(&path).unwrap();
+        // Après un redémarrage, le créneau refusé n'est pas reproposé.
+        let (mut planner, warning) = Planner::load(&path);
+        assert_eq!(warning, None);
+        assert_eq!(planner.tick(&schedules, paris(2026, 10, 23, 21, 11), &Paris, false, false), None);
         fs::remove_dir_all(dir).unwrap();
     }
 
