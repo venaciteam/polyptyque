@@ -840,6 +840,9 @@ impl App {
             Some(reference) => Some(self.find_source(reference, Some(&scene))?.id),
             None => None,
         };
+        if scene.source_ids.is_empty() {
+            return Err(refused(tr!("Ajouter d'abord au moins une source à cette scène.")));
+        }
         if scene.id != active.id {
             self.select_scene(&scene.id);
         }
