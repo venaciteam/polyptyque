@@ -195,6 +195,30 @@ fn run_job(polyptyque: &mut Polyptyque, job: &Job) -> Value {
     json!({ "jsonrpc": "2.0", "id": job.id, "result": result })
 }
 
+/// Exécute les appels d'outils un par un. Un appel annulé pendant qu'il
+/// attendait son tour n'est pas exécuté du tout (un `recording_stop`
+/// annulé ne doit pas couper l'enregistrement plus tard) ; annulé pendant
+/// son exécution, il se termine mais sa réponse n'est pas envoyée.
+fn work(
+    queue: impl IntoIterator<Item = Job>,
+    cancelled: &Mutex<HashSet<String>>,
+    mut run: impl FnMut(&Job) -> Value,
+    mut send: impl FnMut(&Value),
+) {
+    let take = |job: &Job| cancelled.lock().map(|mut c| c.remove(&job.id.to_string())).unwrap_or(false);
+    for job in queue {
+        if take(&job) {
+            continue;
+        }
+        let response = run(&job);
+        // Requête annulée entre-temps : plus aucun message pour elle.
+        if take(&job) {
+            continue;
+        }
+        send(&response);
+    }
+}
+
 /// Sert les requêtes jusqu'à la fermeture de l'entrée standard.
 pub fn serve() -> i32 {
     // Descriptions des outils et messages du mode commande : en anglais,
@@ -208,14 +232,7 @@ pub fn serve() -> i32 {
         let cancelled = cancelled.clone();
         thread::spawn(move || {
             let mut polyptyque = Polyptyque { client: None, presented_as: String::new() };
-            for job in queue {
-                let response = run_job(&mut polyptyque, &job);
-                // Requête annulée : plus aucun message pour elle.
-                if cancelled.lock().map(|mut c| c.remove(&job.id.to_string())).unwrap_or(false) {
-                    continue;
-                }
-                output.send(&response);
-            }
+            work(queue, &cancelled, |job| run_job(&mut polyptyque, job), |response| output.send(response));
         })
     };
     // Nom du client annoncé par `initialize` (ancienne époque).
@@ -334,6 +351,41 @@ mod tests {
             assert!(name.len() <= 64 && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'));
             assert_eq!(tool["inputSchema"]["type"], "object");
         }
+    }
+
+    fn job(id: i64, tool: &str) -> Job {
+        Job { id: json!(id), modern: false, client: "MCP".into(), command: catalog::find(tool), arguments: json!({}) }
+    }
+
+    #[test]
+    fn cancelled_calls_are_not_run() {
+        let cancelled = Mutex::new(HashSet::new());
+        let (jobs, queue) = mpsc::channel();
+        jobs.send(job(1, "status")).unwrap();
+        jobs.send(job(2, "recording_stop")).unwrap();
+        jobs.send(job(3, "status")).unwrap();
+        drop(jobs);
+        let mut ran = Vec::new();
+        let mut sent = Vec::new();
+        work(
+            queue,
+            &cancelled,
+            |job| {
+                ran.push(job.id.clone());
+                // Pendant le premier appel, le client annule le deuxième
+                // (encore dans la file) et le premier lui-même.
+                if job.id == json!(1) {
+                    cancelled.lock().unwrap().extend([json!(1).to_string(), json!(2).to_string()]);
+                }
+                json!({ "id": job.id })
+            },
+            |response| sent.push(response["id"].clone()),
+        );
+        // Le premier s'est terminé sans réponse, le deuxième n'a pas été
+        // exécuté, le troisième normalement.
+        assert_eq!(ran, vec![json!(1), json!(3)]);
+        assert_eq!(sent, vec![json!(3)]);
+        assert!(cancelled.lock().unwrap().is_empty());
     }
 
     #[test]

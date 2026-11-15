@@ -303,8 +303,24 @@ impl Schedule {
         let days: Vec<NaiveDate> = match &self.repeat {
             Repeat::Once { date } => vec![*date],
             // Deux semaines : tous les cas d'une répétition hebdomadaire,
-            // et toute programmation unique proche.
-            Repeat::Weekly { .. } => (-1..=14).filter_map(|o| today.checked_add_signed(Duration::days(o))).collect(),
+            // et toute programmation unique proche. Une programmation unique
+            // plus lointaine est comparée à sa date (et aux jours voisins,
+            // pour les créneaux qui passent minuit).
+            Repeat::Weekly { .. } => {
+                let mut days: Vec<NaiveDate> =
+                    (-1..=14).filter_map(|o| today.checked_add_signed(Duration::days(o))).collect();
+                let last = days.last().copied().unwrap_or(today);
+                for other in others.iter().filter(|o| o.enabled && o.id != self.id) {
+                    if let Repeat::Once { date } = &other.repeat {
+                        if *date >= last {
+                            days.extend([date.pred_opt(), Some(*date), date.succ_opt()].into_iter().flatten());
+                        }
+                    }
+                }
+                days.sort_unstable();
+                days.dedup();
+                days
+            }
         };
         let mine: Vec<_> = days.iter().filter(|d| self.runs_on(**d)).map(|d| self.naive_interval(*d)).collect();
         for other in others.iter().filter(|o| o.enabled && o.id != self.id) {
@@ -364,8 +380,14 @@ fn resolve<Tz: TimeZone>(tz: &Tz, naive: NaiveDateTime) -> DateTime<Utc> {
     match tz.from_local_datetime(&naive) {
         LocalResult::Single(t) | LocalResult::Ambiguous(t, _) => t.with_timezone(&Utc),
         LocalResult::None => {
-            // Décalage en vigueur juste avant le saut.
-            let before = tz.offset_from_utc_datetime(&(naive - Duration::hours(3))).fix();
+            // Décalage en vigueur juste avant le saut : celui de l'heure
+            // locale trois heures plus tôt (lue comme une heure locale, et
+            // non universelle, pour valoir aussi loin de UTC).
+            let earlier = naive - Duration::hours(3);
+            let before = match tz.from_local_datetime(&earlier).earliest() {
+                Some(t) => t.offset().fix(),
+                None => tz.offset_from_utc_datetime(&earlier).fix(),
+            };
             Utc.from_utc_datetime(&(naive - Duration::seconds(i64::from(before.local_minus_utc()))))
         }
     }
@@ -468,6 +490,8 @@ pub struct Planner {
     changed: Vec<(String, DateTime<Utc>)>,
     /// Créneaux réglés modifiés depuis le dernier enregistrement sur le disque.
     dirty: bool,
+    /// La dernière écriture de l'état a échoué (erreur déjà signalée).
+    save_failing: bool,
 }
 
 impl Planner {
@@ -486,15 +510,29 @@ impl Planner {
         (Planner { done, ..Planner::default() }, warning)
     }
 
-    /// Enregistre les créneaux réglés, s'ils ont changé.
+    /// Enregistre les créneaux réglés, s'ils ont changé. Écriture
+    /// impossible : retentée au prochain appel ; l'erreur n'est renvoyée
+    /// qu'une fois tant que l'écriture échoue (appelé deux fois par
+    /// seconde, le journal n'en est pas inondé).
     pub fn save_if_changed(&mut self, path: &Path) -> Result<()> {
         if !self.dirty {
             return Ok(());
         }
-        self.dirty = false;
-        let text =
-            toml::to_string_pretty(&PlannerFile { done: self.done.clone() }).context("état des programmations")?;
-        storage::write_atomic(path, text.as_bytes())
+        let written = toml::to_string_pretty(&PlannerFile { done: self.done.clone() })
+            .context("état des programmations")
+            .and_then(|text| storage::write_atomic(path, text.as_bytes()));
+        match written {
+            Ok(()) => {
+                self.dirty = false;
+                self.save_failing = false;
+                Ok(())
+            }
+            Err(_) if self.save_failing => Ok(()),
+            Err(e) => {
+                self.save_failing = true;
+                Err(e)
+            }
+        }
     }
 
     /// Créneau dont l'enregistrement en cours dépend.
@@ -761,6 +799,29 @@ mod tests {
     }
 
     #[test]
+    fn clock_changes_far_from_utc() {
+        use chrono_tz::Australia::Sydney;
+        use chrono_tz::Pacific::Auckland;
+        // Sydney, dimanche 04/10/2026 : à 02:00 (UTC+10), on passe à 03:00
+        // (UTC+11). 02:30 n'existe pas : 03:30.
+        let s = weekly("02:30", "05:00", &ALL);
+        let slot = s.slot_on(date(2026, 10, 4), &Sydney).unwrap();
+        assert_eq!(slot.start, Sydney.with_ymd_and_hms(2026, 10, 4, 3, 30, 0).single().unwrap());
+        assert_eq!(slot.start, utc(2026, 10, 3, 16, 30));
+        // Auckland, dimanche 27/09/2026 : à 02:00 (UTC+12), on passe à 03:00
+        // (UTC+13).
+        let slot = s.slot_on(date(2026, 9, 27), &Auckland).unwrap();
+        assert_eq!(slot.start, Auckland.with_ymd_and_hms(2026, 9, 27, 3, 30, 0).single().unwrap());
+        assert_eq!(slot.start, utc(2026, 9, 26, 14, 30));
+        // Retour à l'heure d'hiver (Sydney, dimanche 05/04/2026 : à 03:00,
+        // on revient à 02:00) : 02:30 existe deux fois, la première (UTC+11).
+        assert_eq!(s.slot_on(date(2026, 4, 5), &Sydney).unwrap().start, utc(2026, 4, 4, 15, 30));
+        // Auckland, dimanche 05/04/2026 : à 03:00, on revient à 02:00 (UTC+13
+        // puis UTC+12).
+        assert_eq!(s.slot_on(date(2026, 4, 5), &Auckland).unwrap().start, utc(2026, 4, 4, 13, 30));
+    }
+
+    #[test]
     fn distant_once_schedule_is_upcoming() {
         // Une date lointaine (au-delà de la semaine examinée pour une
         // répétition) reste à venir : liste, pastille, anti-veille.
@@ -809,6 +870,28 @@ mod tests {
         assert_eq!(off.validate(&[morning], now, &Paris), Ok(()));
         // Elle-même ne compte pas.
         assert_eq!(daily.validate(&others, now, &Paris), Ok(()));
+    }
+
+    #[test]
+    fn weekly_schedule_meets_a_distant_once_schedule() {
+        let now = paris(2026, 10, 23, 12, 0);
+        // Mardi 23/02/2027, bien au-delà des deux semaines examinées.
+        let distant = once("21:30", "23:00", date(2027, 2, 23));
+        assert_eq!(
+            weekly("21:00", "22:00", &[2]).validate(std::slice::from_ref(&distant), now, &Paris),
+            Err(ScheduleError::Overlap(distant.id.clone()))
+        );
+        // Un autre jour de la semaine : pas de chevauchement.
+        assert_eq!(weekly("21:00", "22:00", &[3]).validate(std::slice::from_ref(&distant), now, &Paris), Ok(()));
+        // La nuit du lundi déborde sur le mardi matin.
+        let morning = once("01:00", "02:00", date(2027, 2, 23));
+        assert!(matches!(
+            weekly("23:00", "03:00", &[1]).validate(std::slice::from_ref(&morning), now, &Paris),
+            Err(ScheduleError::Overlap(_))
+        ));
+        // Une programmation unique déjà passée ne gêne pas.
+        let past = once("21:30", "23:00", date(2026, 10, 13));
+        assert_eq!(weekly("21:00", "22:00", &[2]).validate(&[past], now, &Paris), Ok(()));
     }
 
     #[test]
@@ -931,6 +1014,29 @@ mod tests {
         // Le souvenir périmé est effacé.
         planner.save_if_changed(&path).unwrap();
         assert!(!fs::read_to_string(&path).unwrap().contains("2026-10-23"));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn failed_state_write_is_retried() {
+        let dir = std::env::temp_dir().join(format!("polyptyque-schedule-{}", new_id()));
+        let path = dir.join("programmation.toml");
+        // Un dossier à la place du fichier : écriture impossible.
+        fs::create_dir_all(&path).unwrap();
+        let schedules = [weekly("21:00", "22:00", &ALL)];
+        let mut planner = Planner::default();
+        let action = planner.tick(&schedules, paris(2026, 10, 23, 21, 10), &Paris, false, false);
+        let Some(Action::AskMissed(slot)) = action else { panic!("{action:?}") };
+        planner.give_up(&slot);
+        assert!(planner.save_if_changed(&path).is_err());
+        // Échec déjà signalé : pas de nouvelle erreur, mais nouvel essai.
+        assert!(planner.save_if_changed(&path).is_ok());
+        fs::remove_dir(&path).unwrap();
+        planner.save_if_changed(&path).unwrap();
+        // Après un redémarrage, le créneau refusé n'est pas reproposé.
+        let (mut planner, warning) = Planner::load(&path);
+        assert_eq!(warning, None);
+        assert_eq!(planner.tick(&schedules, paris(2026, 10, 23, 21, 11), &Paris, false, false), None);
         fs::remove_dir_all(dir).unwrap();
     }
 
