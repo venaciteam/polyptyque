@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result};
 use polyptyque_core::browsers::{command_line_uses_profile, file_stem, launch_args, window_class, GECKO_USER_JS};
 use polyptyque_core::config::{BrowserFamily, Source, SourceKind};
-use polyptyque_core::platform::{Platform, WindowInfo};
+use polyptyque_core::platform::{Platform, WindowHandle, WindowInfo};
 use tr::tr;
 
 /// Retrouve la fenêtre d'une source parmi `windows` (ordre d'empilement).
@@ -22,13 +22,33 @@ use tr::tr;
 /// - Application : même exécutable, même classe et même titre ; à défaut
 ///   même classe ; à défaut la seule fenêtre de ce programme.
 pub fn find_window(platform: &dyn Platform, source: &Source, windows: &[WindowInfo]) -> Option<WindowInfo> {
+    find_window_excluding(platform, source, windows, &HashSet::new())
+}
+
+/// Comme [`find_window`], sans jamais retenir une fenêtre de `taken` (déjà
+/// enregistrée par une autre source de la session) : deux sources d'un même
+/// programme (deux VLC, deux applications Chrome) n'enregistrent jamais la
+/// même fenêtre.
+///
+/// Ordre de préférence pour une application, parmi les fenêtres libres de
+/// ce programme : même classe et même titre, puis même classe (la plus haute
+/// dans l'ordre d'empilement, c'est-à-dire la dernière utilisée), puis la
+/// seule fenêtre du programme si elle est libre. Une fois rattachée, une
+/// source garde sa fenêtre (par sa poignée) tant qu'elle existe : ce choix
+/// ne se refait qu'au démarrage ou après une perte.
+pub fn find_window_excluding(
+    platform: &dyn Platform,
+    source: &Source,
+    windows: &[WindowInfo],
+    taken: &HashSet<WindowHandle>,
+) -> Option<WindowInfo> {
     match &source.kind {
         SourceKind::Browser { profile_dir, browser, .. } => {
             let class = window_class(browser.family);
             let mut checked: HashMap<u32, bool> = HashMap::new();
             windows
                 .iter()
-                .filter(|w| w.class == class)
+                .filter(|w| w.class == class && !taken.contains(&w.handle))
                 .find(|w| {
                     *checked.entry(w.pid).or_insert_with(|| {
                         platform
@@ -45,12 +65,15 @@ pub fn find_window(platform: &dyn Platform, source: &Source, windows: &[WindowIn
                 // (Discord, par exemple) : on se rabat sur le nom du fichier.
                 same_program = windows.iter().filter(|w| same_file_name(&w.exe, exe_path)).collect();
             }
-            same_program
-                .iter()
+            let free: Vec<&WindowInfo> = same_program.iter().copied().filter(|w| !taken.contains(&w.handle)).collect();
+            free.iter()
                 .find(|w| &w.class == window_class && &w.title == window_title)
-                .or_else(|| same_program.iter().find(|w| &w.class == window_class))
-                .or_else(|| (same_program.len() == 1).then(|| &same_program[0]))
-                .map(|w| (*w).clone())
+                .or_else(|| free.iter().find(|w| &w.class == window_class))
+                .copied()
+                // La seule fenêtre du programme, pas la seule restée libre :
+                // une autre source peut suivre ses autres fenêtres.
+                .or_else(|| (same_program.len() == 1 && free.len() == 1).then(|| free[0]))
+                .cloned()
         }
     }
 }
@@ -510,6 +533,68 @@ mod tests {
             launch_args: vec![],
         });
         assert_eq!(find_window(&FakePlatform, &updated, &windows).map(|w| w.handle), Some(2));
+    }
+
+    #[test]
+    fn windows_of_other_sources_are_never_taken() {
+        let exe = r"C:\VLC\vlc.exe";
+        let windows = vec![
+            window(1, 5, "film1.mkv - VLC", "Qt5QWindowIcon", exe),
+            window(2, 6, "film2.mkv - VLC", "Qt5QWindowIcon", exe),
+        ];
+        let vlc = |title: &str| {
+            source(SourceKind::Application {
+                exe_path: exe.into(),
+                window_class: "Qt5QWindowIcon".into(),
+                window_title: title.into(),
+                launch_args: vec![],
+            })
+        };
+        // Titres changés : sans exclusion, les deux sources prendraient la 1.
+        let first = vlc("autre1 - VLC");
+        let second = vlc("autre2 - VLC");
+        let none = HashSet::new();
+        assert_eq!(find_window_excluding(&FakePlatform, &first, &windows, &none).map(|w| w.handle), Some(1));
+        let taken = HashSet::from([1]);
+        assert_eq!(find_window_excluding(&FakePlatform, &second, &windows, &taken).map(|w| w.handle), Some(2));
+        // Titre exact d'une fenêtre déjà prise : jamais retenue.
+        assert_eq!(
+            find_window_excluding(&FakePlatform, &vlc("film1.mkv - VLC"), &windows, &taken).map(|w| w.handle),
+            Some(2)
+        );
+        // Plus aucune fenêtre libre.
+        assert!(find_window_excluding(&FakePlatform, &second, &windows, &HashSet::from([1, 2])).is_none());
+
+        // Seule fenêtre du programme, d'une autre classe : retenue si libre,
+        // jamais si une autre source la suit.
+        let single = vec![window(3, 7, "Discord", "Autre", r"C:\Discord\Discord.exe")];
+        let discord = source(SourceKind::Application {
+            exe_path: r"C:\Discord\Discord.exe".into(),
+            window_class: "Chrome_WidgetWin_1".into(),
+            window_title: "Discord".into(),
+            launch_args: vec![],
+        });
+        assert_eq!(find_window(&FakePlatform, &discord, &single).map(|w| w.handle), Some(3));
+        assert!(find_window_excluding(&FakePlatform, &discord, &single, &HashSet::from([3])).is_none());
+    }
+
+    #[test]
+    fn browser_window_of_another_source_is_skipped() {
+        let windows = vec![
+            window(1, 11, "Page", "MozillaWindowClass", r"C:\ff\firefox.exe"),
+            window(2, 11, "Page", "MozillaWindowClass", r"C:\ff\firefox.exe"),
+        ];
+        let src = source(SourceKind::Browser {
+            profile_dir: PathBuf::from(r"C:\p\abc"),
+            start_url: None,
+            browser: BrowserRef {
+                name: "Firefox".into(),
+                exe_path: PathBuf::from(r"C:\ff\firefox.exe"),
+                family: BrowserFamily::Gecko,
+            },
+        });
+        let taken = HashSet::from([1]);
+        assert_eq!(find_window_excluding(&FakePlatform, &src, &windows, &taken).map(|w| w.handle), Some(2));
     }
 
     #[test]

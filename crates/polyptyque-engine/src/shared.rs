@@ -1,10 +1,11 @@
 //! État partagé entre les fils d'une source et l'interface.
 
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use polyptyque_core::platform::WindowInfo;
+use polyptyque_core::platform::{WindowHandle, WindowInfo};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SourceState {
@@ -242,6 +243,38 @@ impl Shared {
     }
 }
 
+/// Fenêtres suivies par les sources d'une session : une fenêtre n'est
+/// jamais enregistrée par deux sources à la fois.
+#[derive(Default)]
+pub(crate) struct WindowClaims {
+    /// Par exécution (rang de démarrage dans la session) : identifiant de
+    /// la source et fenêtre suivie.
+    claims: Mutex<HashMap<usize, (String, WindowHandle)>>,
+}
+
+impl WindowClaims {
+    /// Fenêtres suivies par les autres sources que `source_id`. Une
+    /// exécution précédente de la même source (relancée) ne compte pas.
+    pub fn taken_by_others(&self, source_id: &str) -> HashSet<WindowHandle> {
+        lock(&self.claims).values().filter(|(id, _)| id != source_id).map(|(_, handle)| *handle).collect()
+    }
+
+    /// Réserve `handle` pour l'exécution `run`. Faux si une autre source
+    /// vient de la prendre.
+    pub fn claim(&self, run: usize, source_id: &str, handle: WindowHandle) -> bool {
+        let mut claims = lock(&self.claims);
+        if claims.iter().any(|(r, (id, h))| *r != run && id != source_id && *h == handle) {
+            return false;
+        }
+        claims.insert(run, (source_id.to_string(), handle));
+        true
+    }
+
+    pub fn release(&self, run: usize) {
+        lock(&self.claims).remove(&run);
+    }
+}
+
 /// Relances d'un fil de capture après une erreur interne, au-delà
 /// desquelles la source passe en erreur.
 const MAX_TASK_RESTARTS: u32 = 3;
@@ -328,6 +361,20 @@ mod tests {
         });
         assert_eq!(runs, MAX_TASK_RESTARTS + 1);
         assert!(shared.has_failed());
+    }
+
+    #[test]
+    fn a_window_is_claimed_by_one_source_only() {
+        let claims = WindowClaims::default();
+        assert!(claims.claim(0, "a", 7));
+        assert!(!claims.claim(1, "b", 7));
+        assert_eq!(claims.taken_by_others("b"), HashSet::from([7]));
+        assert!(claims.taken_by_others("a").is_empty());
+        // La même source relancée (nouvelle exécution) peut la reprendre.
+        assert!(claims.claim(2, "a", 7));
+        claims.release(0);
+        claims.release(2);
+        assert!(claims.claim(1, "b", 7));
     }
 
     #[test]

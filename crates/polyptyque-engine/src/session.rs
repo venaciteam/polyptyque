@@ -20,7 +20,7 @@ use tr::tr;
 
 use crate::audio_task::{AudioInput, AudioTask};
 use crate::output::{clock, OutputPlan, OutputTask};
-use crate::shared::{Shared, SourceState};
+use crate::shared::{Shared, SourceState, WindowClaims};
 use crate::video_task::VideoTask;
 
 /// À l'arrêt, délai accordé aux fils de capture pour se terminer.
@@ -200,6 +200,8 @@ pub struct Session {
     microphone: Option<SourceRuntime>,
     started_count: usize,
     taken: HashSet<PathBuf>,
+    /// Fenêtres suivies par les sources : jamais deux sources sur la même.
+    claims: Arc<WindowClaims>,
     t0_hns: u64,
     started: Instant,
 }
@@ -227,6 +229,7 @@ impl Session {
             microphone: None,
             started_count: 0,
             taken: HashSet::new(),
+            claims: Arc::new(WindowClaims::default()),
             t0_hns,
             started: Instant::now(),
         };
@@ -404,6 +407,8 @@ impl Session {
                         width: video.width,
                         height: video.height,
                         fps: video.fps,
+                        claims: self.claims.clone(),
+                        run: order,
                     };
                     match thread::Builder::new().name(format!("{name}-video")).spawn(move || video_task.run()) {
                         Ok(handle) => runtime.capture_threads.push(handle),

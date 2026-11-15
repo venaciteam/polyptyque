@@ -13,7 +13,7 @@ use polyptyque_core::timeline::{frame_time_hns, frames_due, HNS_PER_SEC};
 use polyptyque_core::video::black_nv12;
 
 use crate::resolve;
-use crate::shared::{run_protected, Shared, SourceState};
+use crate::shared::{run_protected, Shared, SourceState, WindowClaims};
 
 /// Intervalle de recherche d'une fenêtre absente.
 const SEARCH_INTERVAL_HNS: u64 = HNS_PER_SEC;
@@ -28,6 +28,20 @@ pub(crate) struct VideoTask {
     pub width: u32,
     pub height: u32,
     pub fps: u32,
+    /// Fenêtres suivies par les sources de la session.
+    pub claims: Arc<WindowClaims>,
+    /// Rang de cette exécution dans la session (clé de sa réservation).
+    pub run: usize,
+}
+
+/// Libère la fenêtre réservée à la sortie du fil, même sur une erreur
+/// interne.
+struct ClaimGuard<'a>(&'a WindowClaims, usize);
+
+impl Drop for ClaimGuard<'_> {
+    fn drop(&mut self) {
+        self.0.release(self.1);
+    }
 }
 
 impl VideoTask {
@@ -42,6 +56,8 @@ impl VideoTask {
     fn capture(&self, sent: &mut u64) {
         let (platform, source, shared, queue) = (&self.platform, &self.source, &self.shared, &self.queue);
         let (t0_hns, width, height, fps) = (self.t0_hns, self.width, self.height, self.fps);
+        let (claims, run) = (self.claims.as_ref(), self.run);
+        let _claim = ClaimGuard(claims, run);
         let black: Nv12Frame = Arc::new(black_nv12(width, height));
         let mut latest = black.clone();
         let mut last_sent = black.clone();
@@ -61,7 +77,13 @@ impl VideoTask {
             if capture.is_none() && stop_at.is_none() && now >= next_search {
                 next_search = now + SEARCH_INTERVAL_HNS;
                 let windows = platform.list_windows();
-                if let Some(window) = resolve::find_window(platform.as_ref(), source, &windows) {
+                // Jamais la fenêtre d'une autre source de la session (deux
+                // sources d'un même programme).
+                let taken = claims.taken_by_others(&source.id);
+                let found = resolve::find_window_excluding(platform.as_ref(), source, &windows, &taken)
+                    // Prise entre-temps par une autre source : nouvel essai au tour suivant.
+                    .filter(|window| claims.claim(run, &source.id, window.handle));
+                if let Some(window) = found {
                     match platform.open_video_capture(window.handle, width, height, source.capture_cursor, source.crop) {
                         Ok(c) => {
                             log::info!(
@@ -78,6 +100,7 @@ impl VideoTask {
                             minimized = false;
                         }
                         Err(e) => {
+                            claims.release(run);
                             log::warn!("[{}] capture de la fenêtre impossible : {e:#}", source.name);
                             shared.note_error(tr::tr!("capture de la fenêtre impossible : {}", format!("{e:#}")));
                         }
@@ -119,6 +142,7 @@ impl VideoTask {
             if lost {
                 log::info!("[{}] fenêtre perdue, image noire jusqu'à son retour", source.name);
                 capture = None;
+                claims.release(run);
                 latest = black.clone();
                 shared.set_target(None);
                 shared.set_state(SourceState::Lost);
