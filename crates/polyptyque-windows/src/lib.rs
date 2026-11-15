@@ -36,6 +36,14 @@ pub fn keep_awake_for_schedules(on: bool) {
     system::keep_awake_for_schedules(on);
 }
 
+/// FFmpeg auxiliaire (conversion, réparation, lecture des pistes, essai
+/// d'encodeur) qui ne doit pas survivre à Polyptyque, plantage compris : à
+/// appeler juste après son lancement. Jamais pour un FFmpeg
+/// d'enregistrement, qui doit pouvoir terminer son fichier seul.
+pub fn end_helper_with_polyptyque(child: &std::process::Child) {
+    process::end_with_polyptyque(child);
+}
+
 /// Langue des messages propres à Windows (voir [`polyptyque_core::i18n`]).
 pub fn set_catalog(catalog: Option<std::sync::Arc<polyptyque_core::i18n::Catalog>>) {
     match catalog {
