@@ -67,6 +67,10 @@ const DISK_CHECK_STALE: Duration = Duration::from_secs(30);
 /// lancée avant le retour de l'un d'eux.
 const DISK_CHECK_MAX_THREADS: usize = 3;
 const BACKLOG_WARNING_SECONDS: f32 = 2.0;
+/// Attente maximale du test d'écriture du dossier d'enregistrement : un
+/// dossier réseau qui ne répond plus compte comme inaccessible, comme pour
+/// le moteur.
+const WRITE_CHECK_TIMEOUT: Duration = Duration::from_secs(5);
 /// Fenêtre perdue pendant l'enregistrement : délai avant de rouvrir le
 /// programme automatiquement (le temps qu'il redémarre seul, après une mise
 /// à jour par exemple), puis entre deux essais.
@@ -3926,11 +3930,11 @@ fn prepare(platform: &dyn Platform, config: &Config, sources: &[Source]) -> Resu
     // Dossier choisi inaccessible (disque débranché, autre PC) : dossier de
     // secours plutôt qu'un refus de démarrer.
     let chosen = &config.settings.output_dir;
-    let (output_dir, output_note) = if storage::dir_writable(chosen) {
+    let (output_dir, output_note) = if storage::dir_writable_within(chosen, WRITE_CHECK_TIMEOUT) {
         (chosen.clone(), None)
     } else {
         let fallback = paths::default_output_dir();
-        if !storage::dir_writable(&fallback) {
+        if !storage::dir_writable_within(&fallback, WRITE_CHECK_TIMEOUT) {
             return Err(anyhow!(tr!("impossible d'écrire dans {} ni dans {}", chosen.display(), fallback.display())));
         }
         log::warn!("dossier {} inaccessible : enregistrement dans {}", chosen.display(), fallback.display());
