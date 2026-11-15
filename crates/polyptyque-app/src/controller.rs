@@ -2469,9 +2469,16 @@ impl App {
     /// Supprime une scène (jamais la dernière), ses programmations et les
     /// sources qui ne sont dans aucune autre.
     fn delete_scene(&self, id: &str) {
+        let schedules: Vec<String> =
+            self.config.borrow().schedules.iter().filter(|s| s.scene_id == id).map(|s| s.id.clone()).collect();
         if !self.config.borrow_mut().delete_scene(id) {
             return;
         }
+        let now = chrono::Utc::now();
+        for schedule in &schedules {
+            self.schedule_was_changed(schedule, now);
+        }
+        self.save_planner();
         self.save();
         self.refresh_all();
         self.restart_previews();
