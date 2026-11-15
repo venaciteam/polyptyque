@@ -198,6 +198,9 @@ pub struct App {
     /// Scène visée par la fenêtre de saisie ouverte (renommer, dupliquer,
     /// ajouter une source) : celle en cours à son ouverture.
     sheet_scene: RefCell<String>,
+    /// Boîte de choix de fichier ou de dossier de Windows ouverte.
+    #[cfg_attr(not(windows), allow(dead_code))]
+    file_dialog_open: Cell<bool>,
     toast_timer: Timer,
     free_space: Cell<Option<u64>>,
     last_disk_check: Cell<Option<Instant>>,
@@ -387,6 +390,7 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
         windows: RefCell::new(Vec::new()),
         confirm: RefCell::new(None),
         sheet_scene: RefCell::new(String::new()),
+        file_dialog_open: Cell::new(false),
         toast_timer: Timer::default(),
         free_space: Cell::new(None),
         last_disk_check: Cell::new(None),
@@ -2145,7 +2149,56 @@ impl App {
 
     fn convert_files(&self) {
         let dir = self.config.borrow().settings.output_dir.clone();
-        let mut files = self.pick_mkv_files(&dir);
+        #[cfg(windows)]
+        {
+            let Some(ui) = self.ui.upgrade() else {
+                return;
+            };
+            let mut dialog = rfd::AsyncFileDialog::new()
+                .set_title(tr!("Fichiers à convertir en MP4"))
+                .add_filter(tr!("Enregistrements Polyptyque (MKV, MKA)"), &["mkv", "mka"])
+                .set_parent(&ui.window().window_handle());
+            if dir.exists() {
+                dialog = dialog.set_directory(&dir);
+            }
+            self.run_file_dialog(dialog.pick_files(), |app, files| {
+                app.convert_picked(files.unwrap_or_default().iter().map(|f| f.path().to_path_buf()).collect());
+            });
+        }
+        #[cfg(not(windows))]
+        self.convert_picked(self.pick_mkv_files(&dir));
+    }
+
+    /// Boîte de choix de Windows (fichiers, dossier) sans bloquer le fil de
+    /// l'interface : rfd l'ouvre sur un fil à part, modale pour la fenêtre
+    /// principale (sa propriétaire, désactivée tant qu'elle est ouverte). Les
+    /// minuteurs (fin de créneau, disque plein) et le pilotage continuent ;
+    /// `done` reçoit le choix sur le fil de l'interface.
+    #[cfg(windows)]
+    fn run_file_dialog<T: 'static>(
+        &self,
+        dialog: impl std::future::Future<Output = Option<T>> + 'static,
+        done: impl FnOnce(&Rc<App>, Option<T>) + 'static,
+    ) {
+        // Une seule à la fois (double clic avant qu'elle n'apparaisse).
+        if self.file_dialog_open.replace(true) {
+            return;
+        }
+        let spawned = slint::spawn_local(async move {
+            let choice = dialog.await;
+            with_app(|app| {
+                app.file_dialog_open.set(false);
+                done(app, choice);
+            });
+        });
+        if let Err(e) = spawned {
+            log::warn!("boîte de choix de fichier : {e}");
+            self.file_dialog_open.set(false);
+        }
+    }
+
+    /// Fichiers choisis pour la conversion MP4.
+    fn convert_picked(&self, mut files: Vec<PathBuf>) {
         // Un fichier encore en cours d'écriture donnerait une copie tronquée.
         let in_progress = self.session.borrow().as_ref().map(|s| s.files_in_progress()).unwrap_or_default();
         let before = files.len();
@@ -2172,21 +2225,6 @@ impl App {
                 2,
             ),
         }
-    }
-
-    #[cfg(windows)]
-    fn pick_mkv_files(&self, dir: &std::path::Path) -> Vec<PathBuf> {
-        let Some(ui) = self.ui.upgrade() else {
-            return Vec::new();
-        };
-        let mut dialog = rfd::FileDialog::new()
-            .set_title(tr!("Fichiers à convertir en MP4"))
-            .add_filter(tr!("Enregistrements Polyptyque (MKV, MKA)"), &["mkv", "mka"])
-            .set_parent(&ui.window().window_handle());
-        if dir.exists() {
-            dialog = dialog.set_directory(dir);
-        }
-        dialog.pick_files().unwrap_or_default()
     }
 
     /// Hors Windows (mode démonstration) : tous les MKV du dossier qui
@@ -3185,15 +3223,19 @@ impl App {
                 return;
             };
             let current = Some(ui.global::<Bridge>().get_output_dir().to_string());
-            let mut dialog = rfd::FileDialog::new()
+            let mut dialog = rfd::AsyncFileDialog::new()
                 .set_title(tr!("Dossier des enregistrements"))
                 .set_parent(&ui.window().window_handle());
             if let Some(dir) = current.filter(|d| std::path::Path::new(d).exists()) {
                 dialog = dialog.set_directory(dir);
             }
-            if let Some(folder) = dialog.pick_folder() {
-                self.with_bridge(|b| b.set_output_dir(folder.display().to_string().into()));
-            }
+            self.run_file_dialog(dialog.pick_folder(), |app, folder| {
+                // Les réglages ont pu se fermer entre-temps (démarrage
+                // programmé) : le choix n'a alors plus de destination.
+                if let Some(folder) = folder.filter(|_| app.with_bridge_value(|b| b.get_sheet() == "settings")) {
+                    app.with_bridge(|b| b.set_output_dir(folder.path().display().to_string().into()));
+                }
+            });
         }
     }
 

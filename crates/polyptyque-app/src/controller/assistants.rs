@@ -275,33 +275,42 @@ impl App {
                 Assistant::Hermes => vec!["yaml", "yml"],
                 _ => vec!["json", "json5"],
             };
-            let path = rfd::FileDialog::new()
+            let dialog = rfd::AsyncFileDialog::new()
                 .set_parent(&ui.window().window_handle())
                 .set_title(tr!("Configuration de {}", assistant.name()))
                 .add_filter(assistant.name(), &extensions)
                 .pick_file();
-            if let Some(path) = path {
-                let mut overrides = self.assistant_setup.borrow().overrides.clone();
-                overrides.insert(assistant, path);
-                let saved: HashMap<&str, &PathBuf> = overrides.iter().map(|(a, path)| (a.id(), path)).collect();
-                let result = serde_json::to_vec_pretty(&saved)
-                    .map_err(anyhow::Error::from)
-                    .and_then(|data| polyptyque_core::storage::write_atomic(&choices_path(), &data));
-                if let Err(e) = result {
-                    self.assistant_message(&tr!("Impossible de conserver le choix de configuration : {}", e), 3);
-                    return;
+            self.run_file_dialog(dialog, move |app, file| {
+                if let Some(file) = file {
+                    app.assistant_config_chosen(assistant, file.path().to_path_buf());
                 }
-                {
-                    let mut setup = self.assistant_setup.borrow_mut();
-                    setup.overrides = overrides;
-                    setup.revision += 1;
-                    setup.last_refresh = None;
-                }
-                self.refresh_assistants();
-            }
+            });
         }
         #[cfg(not(windows))]
         let _ = assistant;
+    }
+
+    /// Fichier de configuration choisi pour un assistant : retenu à la place
+    /// de celui trouvé d'office.
+    #[cfg(windows)]
+    fn assistant_config_chosen(&self, assistant: Assistant, path: PathBuf) {
+        let mut overrides = self.assistant_setup.borrow().overrides.clone();
+        overrides.insert(assistant, path);
+        let saved: HashMap<&str, &PathBuf> = overrides.iter().map(|(a, path)| (a.id(), path)).collect();
+        let result = serde_json::to_vec_pretty(&saved)
+            .map_err(anyhow::Error::from)
+            .and_then(|data| polyptyque_core::storage::write_atomic(&choices_path(), &data));
+        if let Err(e) = result {
+            self.assistant_message(&tr!("Impossible de conserver le choix de configuration : {}", e), 3);
+            return;
+        }
+        {
+            let mut setup = self.assistant_setup.borrow_mut();
+            setup.overrides = overrides;
+            setup.revision += 1;
+            setup.last_refresh = None;
+        }
+        self.refresh_assistants();
     }
 
     pub(super) fn copy_assistant_prompt(&self) {
