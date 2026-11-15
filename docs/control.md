@@ -111,7 +111,7 @@ For programs that talk to Polyptyque directly (the Stream Deck plugin, scripts).
 
 - **Windows:** named pipe `\\.\pipe\polyptyque-<SID>`, where `<SID>` is the account’s security identifier (`whoami /user`). Open it for reading and writing, preferably in overlapped mode.
 - **Elsewhere** (demo mode, future ports): Unix socket `polyptyque-<user>/control.sock` in `$XDG_RUNTIME_DIR`, or the temporary folder.
-- **Framing:** JSON-RPC 2.0, one UTF-8 JSON message per line (`\n`), 1 MiB at most. Parameters are named (an object). Several programs can be connected at the same time.
+- **Framing:** JSON-RPC 2.0, one UTF-8 JSON message per line (`\n`), 1 MiB at most. Parameters are named (an object). Batches (JSON arrays) aren’t supported: send one request per line. Several programs can be connected at the same time.
 - **Introduction:** send `hello` with `{"client": "<name>"}` first; the name appears in Polyptyque’s top bar. The answer gives the version, the protocol version (`1`) and the language.
 - **Live status:** after `subscribe`, Polyptyque sends `{"jsonrpc":"2.0","method":"state","params":<status>}` on every change (at most twice a second), and `{"method":"message","params":{"level":"info"|"warning"|"error","text":…}}` for every message it shows.
 - **Long commands** (`recording.start`, `recording.stop`, `scenes.open_windows`, `encoders.test`, and `settings.set` when it turns the mic on) answer once the operation is over.
@@ -124,7 +124,7 @@ For programs that talk to Polyptyque directly (the Stream Deck plugin, scripts).
 
 ## Errors and exit codes
 
-Errors are JSON-RPC errors whose `data.reason` is stable. The command line writes them as `{"error": {"reason": …, "message": …, …details}}` and exits with the matching code.
+Errors are JSON-RPC errors whose `data.reason` is stable. The command line writes them as `{"error": {"reason": …, "message": …, …details}}` and exits with the matching code. The JSON-RPC `code` follows the standard where it applies, all with the reason `invalid_request`: `-32700` unreadable message, `-32600` not a request (batches included), `-32601` unknown command, `-32602` invalid parameters; the other reasons use `-32001` to `-32011`, and `internal` uses `-32603`.
 
 | Exit code | Reason | Meaning |
 |---|---|---|
@@ -133,7 +133,7 @@ Errors are JSON-RPC errors whose `data.reason` is stable. The command line write
 | 2 | `invalid_request` | Unknown command, missing, unknown or mistyped parameter |
 | 3 | `not_running` | Polyptyque isn’t running (or the connection was lost) |
 | 4 | `control_disabled` | Control is turned off in Polyptyque’s Settings |
-| 5 | `locked`, `busy` | Not now: recording or operation in progress, window open in Polyptyque |
+| 5 | `locked`, `busy` | Not now: recording or operation in progress, window open in Polyptyque (while a form or a confirmation is open, scene and source changes and `recording.start` wait) |
 | 6 | `not_found`, `ambiguous` | Scene, source, scheduled recording, window or file not found, or a name that matches several |
 | 7 | `confirmation_required` | Ask the person `details.question`, then run again with `confirm` |
 | 8 | `refused`, `declined`, `timeout` | Invalid value or conflict, declined by the person, too late |
