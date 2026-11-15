@@ -1,4 +1,4 @@
-POLYPTYQUE 1.1.1
+POLYPTYQUE 1.1.2
 ================
 
 Polyptyque enregistre plusieurs fenêtres en même temps, chacune dans son

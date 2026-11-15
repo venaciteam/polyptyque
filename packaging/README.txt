@@ -1,4 +1,4 @@
-POLYPTYQUE 1.1.1
+POLYPTYQUE 1.1.2
 ================
 
 Polyptyque records several windows at once, each in its own file, with
