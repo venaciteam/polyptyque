@@ -380,8 +380,14 @@ fn resolve<Tz: TimeZone>(tz: &Tz, naive: NaiveDateTime) -> DateTime<Utc> {
     match tz.from_local_datetime(&naive) {
         LocalResult::Single(t) | LocalResult::Ambiguous(t, _) => t.with_timezone(&Utc),
         LocalResult::None => {
-            // Décalage en vigueur juste avant le saut.
-            let before = tz.offset_from_utc_datetime(&(naive - Duration::hours(3))).fix();
+            // Décalage en vigueur juste avant le saut : celui de l'heure
+            // locale trois heures plus tôt (lue comme une heure locale, et
+            // non universelle, pour valoir aussi loin de UTC).
+            let earlier = naive - Duration::hours(3);
+            let before = match tz.from_local_datetime(&earlier).earliest() {
+                Some(t) => t.offset().fix(),
+                None => tz.offset_from_utc_datetime(&earlier).fix(),
+            };
             Utc.from_utc_datetime(&(naive - Duration::seconds(i64::from(before.local_minus_utc()))))
         }
     }
@@ -774,6 +780,29 @@ mod tests {
         let s = weekly("02:15", "03:00", &ALL);
         assert_eq!(s.slot_on(date(2026, 3, 29), &Paris), None);
         assert!(s.slot_on(date(2026, 3, 30), &Paris).is_some());
+    }
+
+    #[test]
+    fn clock_changes_far_from_utc() {
+        use chrono_tz::Australia::Sydney;
+        use chrono_tz::Pacific::Auckland;
+        // Sydney, dimanche 04/10/2026 : à 02:00 (UTC+10), on passe à 03:00
+        // (UTC+11). 02:30 n'existe pas : 03:30.
+        let s = weekly("02:30", "05:00", &ALL);
+        let slot = s.slot_on(date(2026, 10, 4), &Sydney).unwrap();
+        assert_eq!(slot.start, Sydney.with_ymd_and_hms(2026, 10, 4, 3, 30, 0).single().unwrap());
+        assert_eq!(slot.start, utc(2026, 10, 3, 16, 30));
+        // Auckland, dimanche 27/09/2026 : à 02:00 (UTC+12), on passe à 03:00
+        // (UTC+13).
+        let slot = s.slot_on(date(2026, 9, 27), &Auckland).unwrap();
+        assert_eq!(slot.start, Auckland.with_ymd_and_hms(2026, 9, 27, 3, 30, 0).single().unwrap());
+        assert_eq!(slot.start, utc(2026, 9, 26, 14, 30));
+        // Retour à l'heure d'hiver (Sydney, dimanche 05/04/2026 : à 03:00,
+        // on revient à 02:00) : 02:30 existe deux fois, la première (UTC+11).
+        assert_eq!(s.slot_on(date(2026, 4, 5), &Sydney).unwrap().start, utc(2026, 4, 4, 15, 30));
+        // Auckland, dimanche 05/04/2026 : à 03:00, on revient à 02:00 (UTC+13
+        // puis UTC+12).
+        assert_eq!(s.slot_on(date(2026, 4, 5), &Auckland).unwrap().start, utc(2026, 4, 4, 13, 30));
     }
 
     #[test]
