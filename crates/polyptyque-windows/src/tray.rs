@@ -24,10 +24,11 @@ use windows::Win32::UI::Shell::{
     NOTIFYICON_VERSION_4,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    AppendMenuW, ChangeWindowMessageFilterEx, CreatePopupMenu, DestroyMenu, GetCursorPos, GetSystemMetrics, IsIconic, LoadIconW, LoadImageW,
-    PostMessageW, RegisterWindowMessageW, SetForegroundWindow, ShowWindow, TrackPopupMenu, HICON, IDI_APPLICATION,
-    IMAGE_ICON, LR_DEFAULTCOLOR, LR_SHARED, MF_SEPARATOR, MF_STRING, SM_CXSMICON, SM_CYSMICON, SW_RESTORE,
-    MSGFLT_ALLOW, TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON, WM_APP, WM_CONTEXTMENU, WM_NCDESTROY, WM_NULL,
+    AppendMenuW, ChangeWindowMessageFilterEx, CreatePopupMenu, DestroyMenu, GetCursorPos, GetSystemMetrics, IsIconic,
+    LoadIconW, LoadImageW, PostMessageW, RegisterWindowMessageW, SetForegroundWindow, ShowWindow, TrackPopupMenu,
+    HICON, IDI_APPLICATION, IMAGE_ICON, LR_DEFAULTCOLOR, LR_SHARED, MF_SEPARATOR, MF_STRING, MSGFLT_ALLOW, SM_CXSMICON,
+    SM_CYSMICON, SW_RESTORE, TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON, WM_APP, WM_CONTEXTMENU, WM_NCDESTROY,
+    WM_NULL,
 };
 
 use crate::windows_list::hwnd;

@@ -506,7 +506,6 @@ fn connect_to(path: &str, sid: &str) -> Result<PipeConnection, ConnectError> {
         match opened {
             Ok(pipe) => {
                 if !owned_by(pipe, sid) {
-
                     unsafe {
                         let _ = CloseHandle(pipe);
                     }
@@ -540,7 +539,8 @@ mod tests {
 
     fn accept(listener: &mut PipeListener) -> Box<dyn Connection> {
         for _ in 0..50 {
-            if let Some((connection, peer)) = listener.accept(Duration::from_millis(100)).expect("attente d'un client") {
+            if let Some((connection, peer)) = listener.accept(Duration::from_millis(100)).expect("attente d'un client")
+            {
                 assert_eq!(peer.pid, Some(std::process::id()));
                 return connection;
             }
