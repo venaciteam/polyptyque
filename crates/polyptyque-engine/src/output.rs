@@ -35,8 +35,13 @@ use crate::writer::{self, PartControl, WriterJob};
 /// vider sa file, aussi longue soit-elle : rien de ce qui a été capturé
 /// n'est perdu.
 const STALL_TIMEOUT: Duration = Duration::from_secs(30);
-/// Délai accordé à FFmpeg pour finaliser un fichier.
-const FINALIZE_TIMEOUT: Duration = Duration::from_secs(60);
+/// Ses entrées fermées, FFmpeg encode ce qui lui reste puis écrit l'index
+/// du fichier. Tant que le fichier ou son journal grossit, il avance : il
+/// n'est arrêté de force qu'après ce délai sans aucune avancée (un fichier
+/// tué en finalisation n'a pas d'index)…
+const FINALIZE_STALL: Duration = Duration::from_secs(60);
+/// …ou au-delà de ce plafond.
+const FINALIZE_MAX: Duration = Duration::from_secs(10 * 60);
 /// Une partie qui s'arrête avant ce délai compte comme un échec au
 /// démarrage.
 const QUICK_FAILURE: Duration = Duration::from_secs(20);
@@ -395,7 +400,7 @@ impl Part {
                     return PartEnd::Crashed(Crash::stopped(status, log));
                 }
                 // Flux fermés : FFmpeg termine le fichier.
-                return match wait_exit(&mut self.child, FINALIZE_TIMEOUT, shared) {
+                return match wait_exit(&mut self.child, shared, log) {
                     Some(status) if !status.success() && !stopping(shared) => {
                         PartEnd::Crashed(Crash::stopped(status, log))
                     }
@@ -513,8 +518,15 @@ pub(crate) fn clock(seconds: u64) -> String {
     format!("{:02}:{:02}:{:02}", seconds / 3600, seconds / 60 % 60, seconds % 60)
 }
 
-fn wait_exit(child: &mut Child, timeout: Duration, shared: &Shared) -> Option<std::process::ExitStatus> {
-    let deadline = Instant::now() + timeout;
+/// Attend que FFmpeg termine le fichier, ses entrées fermées. Il n'est
+/// arrêté de force que s'il n'avance plus (ni le fichier, relevé par le fil
+/// des tailles, ni son journal ne grossissent) pendant [`FINALIZE_STALL`],
+/// ou au-delà de [`FINALIZE_MAX`].
+fn wait_exit(child: &mut Child, shared: &Shared, log: &Path) -> Option<std::process::ExitStatus> {
+    let started = Instant::now();
+    let progress = || (shared.file_size.load(Ordering::Relaxed), std::fs::metadata(log).map(|m| m.len()).ok());
+    let mut last = progress();
+    let mut last_progress = Instant::now();
     loop {
         shared.encoding_beat();
         match child.try_wait() {
@@ -522,14 +534,31 @@ fn wait_exit(child: &mut Child, timeout: Duration, shared: &Shared) -> Option<st
                 log::info!("encodeur terminé : {status}");
                 return Some(status);
             }
-            Ok(None) if Instant::now() < deadline => thread::sleep(SUPERVISION_INTERVAL),
-            _ => {
-                log::warn!("l'encodeur ne se termine pas : arrêt forcé");
-                let _ = child.kill();
-                let _ = child.wait();
-                return None;
+            Ok(None) => {
+                let now = progress();
+                if now != last {
+                    last = now;
+                    last_progress = Instant::now();
+                }
+                let stalled = last_progress.elapsed() >= FINALIZE_STALL;
+                if !stalled && started.elapsed() < FINALIZE_MAX {
+                    thread::sleep(SUPERVISION_INTERVAL);
+                    continue;
+                }
+                if stalled {
+                    log::warn!(
+                        "l'encodeur n'avance plus depuis {} s en finalisant le fichier : arrêt forcé",
+                        FINALIZE_STALL.as_secs()
+                    );
+                } else {
+                    log::warn!("l'encodeur finalise depuis plus de {} min : arrêt forcé", FINALIZE_MAX.as_secs() / 60);
+                }
             }
+            Err(e) => log::warn!("état de l'encodeur illisible ({e}) : arrêt forcé"),
         }
+        let _ = child.kill();
+        let _ = child.wait();
+        return None;
     }
 }
 
