@@ -43,6 +43,10 @@ const QUICK_FAILURE: Duration = Duration::from_secs(20);
 /// Échecs au démarrage tolérés d'affilée avant d'abandonner la source.
 const MAX_QUICK_FAILURES: u32 = 3;
 const SUPERVISION_INTERVAL: Duration = Duration::from_millis(100);
+/// Délai accordé à un accès au dossier d'enregistrement (test d'écriture,
+/// taille d'un fichier) : un disque qui ne répond plus ne bloque pas
+/// l'encodage des autres parties.
+const DISK_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub(crate) struct OutputPlan {
     /// Image et son, ou son seul (micro).
@@ -157,13 +161,16 @@ impl OutputTask {
                     PartEnd::Crashed(Crash::plain(tr!("démarrage de l'encodeur impossible : {}", format!("{e:#}"))))
                 }
             };
-            let nothing_written = match std::fs::metadata(&output) {
+            let checked = output.clone();
+            let nothing_written = storage::within(DISK_TIMEOUT, move || match std::fs::metadata(&checked) {
                 Ok(meta) => meta.len() == 0,
                 // Fichier absent d'un dossier accessible : jamais créé. Un
                 // dossier devenu inaccessible (disque débranché) garde au
                 // contraire son fichier dans la liste.
-                Err(_) => output.parent().is_some_and(Path::is_dir),
-            };
+                Err(_) => checked.parent().is_some_and(Path::is_dir),
+            })
+            // Disque qui ne répond pas : le fichier reste dans la liste.
+            .unwrap_or(false);
             if nothing_written {
                 // Rien d'écrit : on ne garde pas de fichier vide.
                 let _ = std::fs::remove_file(&output);
@@ -215,6 +222,7 @@ impl OutputTask {
                 if stopping(&shared) {
                     return;
                 }
+                shared.encoding_beat();
                 thread::sleep(SUPERVISION_INTERVAL);
             }
         }
@@ -387,7 +395,7 @@ impl Part {
                     return PartEnd::Crashed(Crash::stopped(status, log));
                 }
                 // Flux fermés : FFmpeg termine le fichier.
-                return match wait_exit(&mut self.child, FINALIZE_TIMEOUT) {
+                return match wait_exit(&mut self.child, FINALIZE_TIMEOUT, shared) {
                     Some(status) if !status.success() && !stopping(shared) => {
                         PartEnd::Crashed(Crash::stopped(status, log))
                     }
@@ -425,6 +433,7 @@ impl Part {
                 stalled = true;
                 let _ = self.child.kill();
             }
+            shared.encoding_beat();
             thread::sleep(SUPERVISION_INTERVAL);
         }
     }
@@ -463,7 +472,8 @@ impl Part {
 /// de secours si ce dossier n'est plus accessible.
 fn next_part_path(plan: &OutputPlan, shared: &Shared, part: u32) -> PathBuf {
     let dir = plan.first_output.parent().unwrap_or(Path::new("."));
-    if storage::dir_writable(dir) || !storage::dir_writable(&plan.fallback_dir) {
+    let writable = |dir: &Path| storage::dir_writable_within(dir, DISK_TIMEOUT);
+    if writable(dir) || !writable(&plan.fallback_dir) {
         return part_path(&plan.first_output, dir, part);
     }
     let message =
@@ -503,9 +513,10 @@ pub(crate) fn clock(seconds: u64) -> String {
     format!("{:02}:{:02}:{:02}", seconds / 3600, seconds / 60 % 60, seconds % 60)
 }
 
-fn wait_exit(child: &mut Child, timeout: Duration) -> Option<std::process::ExitStatus> {
+fn wait_exit(child: &mut Child, timeout: Duration, shared: &Shared) -> Option<std::process::ExitStatus> {
     let deadline = Instant::now() + timeout;
     loop {
+        shared.encoding_beat();
         match child.try_wait() {
             Ok(Some(status)) => {
                 log::info!("encodeur terminé : {status}");

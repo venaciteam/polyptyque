@@ -25,6 +25,14 @@ use crate::video_task::VideoTask;
 
 /// À l'arrêt, délai accordé aux fils de capture pour se terminer.
 const CAPTURE_JOIN_TIMEOUT: Duration = Duration::from_secs(10);
+/// À l'arrêt, le fil d'encodage vide sa file aussi longtemps qu'il donne
+/// signe de vie ; resté muet ce délai (bloqué sur un disque qui ne répond
+/// plus), il est abandonné pour ne pas suspendre l'arrêt.
+const ENCODING_SILENCE_TIMEOUT: Duration = Duration::from_secs(120);
+/// Intervalle de relevé de la taille des fichiers.
+const SIZE_INTERVAL: Duration = Duration::from_secs(1);
+/// À l'arrêt, attente du dernier relevé de taille.
+const SIZE_SETTLE_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub struct SessionPlan {
     pub scene_name: String,
@@ -136,7 +144,26 @@ impl SourceRuntime {
                 }
             }
             if let Some(output) = output {
-                let _ = output.join();
+                while !output.is_finished() && shared.encoding_silence() < ENCODING_SILENCE_TIMEOUT {
+                    thread::sleep(Duration::from_millis(50));
+                }
+                if output.is_finished() {
+                    let _ = output.join();
+                } else {
+                    log::error!(
+                        "[{name}] l'encodage ne répond plus depuis {} s à l'arrêt (disque ?) : abandonné",
+                        ENCODING_SILENCE_TIMEOUT.as_secs()
+                    );
+                    shared.note_error(tr!(
+                        "L'encodage ne répondait plus à l'arrêt : le fichier est peut-être incomplet (détail dans le \
+                         journal)"
+                    ));
+                }
+            }
+            // Dernier relevé de la taille, une fois les fichiers fermés.
+            let deadline = Instant::now() + SIZE_SETTLE_TIMEOUT;
+            while !shared.sizes_settled() && Instant::now() < deadline {
+                thread::sleep(Duration::from_millis(20));
             }
             shared.mark_done();
             log::info!("[{name}] fichier(s) finalisé(s) ; {}", summary_line(&shared));
@@ -163,7 +190,7 @@ impl SourceRuntime {
             backlog_seconds: shared.video_backlog.load(Ordering::Relaxed) as f32 / fps,
             part: shared.part.load(Ordering::Relaxed),
             output: outputs.last().cloned().unwrap_or_default(),
-            file_size: total_size(&outputs),
+            file_size: shared.file_size.load(Ordering::Relaxed),
             error: shared.error(),
         }
     }
@@ -173,7 +200,7 @@ impl SourceRuntime {
         SourceSummary {
             id: self.id.clone(),
             name: self.name.clone(),
-            file_size: total_size(&outputs),
+            file_size: self.shared.file_size.load(Ordering::Relaxed),
             outputs,
             frames_total: self.shared.frames_total.load(Ordering::Relaxed),
             frames_dropped: self.shared.frames_dropped.load(Ordering::Relaxed),
@@ -390,10 +417,18 @@ impl Session {
             if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| output_task.run())).is_err() {
                 output_shared.fail(format!("[{output_name}] erreur interne de l'encodage (voir le journal)"));
             }
+            output_shared.mark_encoding_finished();
         };
         match thread::Builder::new().name(format!("{name}-encodage")).spawn(encode) {
             Ok(handle) => runtime.output_thread = Some(handle),
-            Err(e) => shared.fail(tr!("fil d'encodage : {}", e)),
+            Err(e) => {
+                shared.mark_encoding_finished();
+                shared.fail(tr!("fil d'encodage : {}", e));
+            }
+        }
+        let watched = shared.clone();
+        if let Err(e) = thread::Builder::new().name(format!("{name}-taille")).spawn(move || watch_sizes(&watched)) {
+            log::warn!("[{name}] relevé de la taille des fichiers impossible : {e}");
         }
         if !shared.has_failed() {
             let input = match capture {
@@ -507,7 +542,7 @@ fn summary_line(shared: &Shared) -> String {
     let outputs = shared.outputs();
     let bytes_per_second = CHANNELS as u64 * 4 * SAMPLE_RATE as u64;
     let seconds = shared.audio_position.load(Ordering::SeqCst) / bytes_per_second;
-    let bytes = total_size(&outputs) as f64;
+    let bytes = shared.file_size.load(Ordering::Relaxed) as f64;
     let size = if bytes >= 1e9 { format!("{:.1} Go", bytes / 1e9) } else { format!("{:.0} Mo", bytes / 1e6) };
     let size = size.replace('.', ",");
     let mut line = format!("bilan : {} enregistrées, {} fichier(s), {size}", clock(seconds), outputs.len());
@@ -523,6 +558,24 @@ fn summary_line(shared: &Shared) -> String {
         line.push_str(&format!(" ; dernier message : {error}"));
     }
     line
+}
+
+/// Relève la taille des fichiers de la source jusqu'à la fin de l'encodage,
+/// puis une dernière fois. Seul ce fil touche au disque pour cela : un
+/// dossier qui ne répond plus ne fige jamais l'interface.
+fn watch_sizes(shared: &Shared) {
+    loop {
+        let finished = shared.encoding_finished();
+        shared.file_size.store(total_size(&shared.outputs()), Ordering::Relaxed);
+        if finished || shared.is_done() {
+            shared.mark_sizes_settled();
+            return;
+        }
+        let next = Instant::now() + SIZE_INTERVAL;
+        while Instant::now() < next && !shared.encoding_finished() {
+            thread::sleep(Duration::from_millis(50));
+        }
+    }
 }
 
 fn total_size(outputs: &[PathBuf]) -> u64 {

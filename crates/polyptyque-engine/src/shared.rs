@@ -91,6 +91,17 @@ pub(crate) struct Shared {
     stop_at_hns: AtomicU64,
     /// Fils de capture bloqués à l'arrêt : l'écriture se termine sans eux.
     abandoned: AtomicBool,
+    /// Taille de toutes les parties, relevée par un fil à part : l'interface
+    /// ne touche jamais au disque (dossier réseau, disque qui ne répond plus).
+    pub file_size: AtomicU64,
+    /// Le fil d'encodage est terminé (fichiers fermés ou abandonnés).
+    encoding_finished: AtomicBool,
+    /// Taille relevée une dernière fois après la fin de l'encodage.
+    sizes_settled: AtomicBool,
+    /// Signe de vie du fil d'encodage, en millisecondes depuis `created` :
+    /// un fil bloqué sur le disque n'empêche pas l'arrêt de la session.
+    created: std::time::Instant,
+    encoding_heartbeat_ms: AtomicU64,
 }
 
 impl Shared {
@@ -116,7 +127,39 @@ impl Shared {
             error: Mutex::new(None),
             stop_at_hns: AtomicU64::new(0),
             abandoned: AtomicBool::new(false),
+            file_size: AtomicU64::new(0),
+            encoding_finished: AtomicBool::new(false),
+            sizes_settled: AtomicBool::new(false),
+            created: std::time::Instant::now(),
+            encoding_heartbeat_ms: AtomicU64::new(0),
         }
+    }
+
+    pub fn mark_encoding_finished(&self) {
+        self.encoding_finished.store(true, Ordering::SeqCst);
+    }
+
+    pub fn encoding_finished(&self) -> bool {
+        self.encoding_finished.load(Ordering::SeqCst)
+    }
+
+    pub fn mark_sizes_settled(&self) {
+        self.sizes_settled.store(true, Ordering::SeqCst);
+    }
+
+    pub fn sizes_settled(&self) -> bool {
+        self.sizes_settled.load(Ordering::SeqCst)
+    }
+
+    /// Le fil d'encodage est en vie (appelé à chaque tour de ses attentes).
+    pub fn encoding_beat(&self) {
+        self.encoding_heartbeat_ms.store(self.created.elapsed().as_millis() as u64, Ordering::Relaxed);
+    }
+
+    /// Temps écoulé depuis le dernier signe de vie du fil d'encodage.
+    pub fn encoding_silence(&self) -> std::time::Duration {
+        let last = std::time::Duration::from_millis(self.encoding_heartbeat_ms.load(Ordering::Relaxed));
+        self.created.elapsed().saturating_sub(last)
     }
 
     /// État affiché : un échec prime, puis l'arrêt en cours ou terminé.
