@@ -156,8 +156,8 @@ impl SourceRuntime {
                         ENCODING_SILENCE_TIMEOUT.as_secs()
                     );
                     shared.note_error(tr!(
-                        "L'encodage ne répondait plus à l'arrêt : le fichier est peut-être incomplet (détail dans le \
-                         journal)"
+                        "L'encodage ne répondait plus à l'arrêt : le fichier est peut-être incomplet (détail \
+                         dans le journal)"
                     ));
                 }
             }
@@ -463,6 +463,7 @@ impl Session {
                 shared: shared.clone(),
                 queue: audio_tx,
                 t0_hns: origin_hns,
+                fps: has_video.then_some(video.fps),
             };
             match thread::Builder::new().name(format!("{name}-audio")).spawn(move || audio_task.run()) {
                 Ok(handle) => runtime.capture_threads.push(handle),

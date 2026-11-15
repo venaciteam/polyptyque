@@ -9,11 +9,13 @@ use std::time::Duration;
 use crossbeam_channel::Sender;
 use polyptyque_core::config::Source;
 use polyptyque_core::platform::{Nv12Frame, Platform, VideoCapture, WindowHandle};
-use polyptyque_core::timeline::{frame_time_hns, frames_due, HNS_PER_SEC};
+use polyptyque_core::config::SAMPLE_RATE;
+use polyptyque_core::timeline::{cut_resume_point, frame_time_hns, frames_due, CLOCK_JUMP_HNS, HNS_PER_SEC};
 use polyptyque_core::video::black_nv12;
 
 use crate::resolve;
 use crate::shared::{run_protected, Shared, SourceState, WindowClaims};
+use crate::writer::video_cut_marker;
 
 /// Intervalle de recherche d'une fenêtre absente.
 const SEARCH_INTERVAL_HNS: u64 = HNS_PER_SEC;
@@ -69,10 +71,34 @@ impl VideoTask {
         // Au-delà d'une seconde d'avance, l'encodeur ne suit plus : on
         // répète l'image précédente plutôt que d'accumuler de la mémoire.
         let max_backlog = fps as usize;
+        let mut last_now: Option<u64> = None;
+        // Une relance après une erreur interne ne refait pas une coupure
+        // déjà traitée.
+        let mut seen_cut = shared.cut_generation();
 
         loop {
             let now = platform.now_hns();
             let stop_at = shared.stop_at();
+
+            // Saut de l'horloge (veille non signalée, programme figé) : pas
+            // de rattrapage en images figées, la suite part dans une
+            // nouvelle partie.
+            let jumped = last_now.filter(|&prev| stop_at.is_none() && now.saturating_sub(prev) > CLOCK_JUMP_HNS);
+            if let Some(prev) = jumped {
+                let seconds = (now - prev) / HNS_PER_SEC;
+                log::warn!("[{}] horloge en avance de {seconds} s d'un coup : coupure", source.name);
+                shared.request_cut(prev, now, t0_hns);
+            }
+            last_now = Some(now);
+            if let Some(cut) = shared.pending_cut(seen_cut) {
+                seen_cut = cut.generation;
+                if queue.send(video_cut_marker()).is_err() {
+                    return;
+                }
+                // Image et son repartent ensemble de la même image.
+                next_index = cut_resume_point(t0_hns, cut.to_hns, Some(fps), SAMPLE_RATE).0;
+                *sent = next_index;
+            }
 
             if capture.is_none() && stop_at.is_none() && now >= next_search {
                 next_search = now + SEARCH_INTERVAL_HNS;
@@ -166,8 +192,8 @@ impl VideoTask {
                 last_sent = frame;
                 next_index += 1;
                 *sent = next_index;
+                shared.frames_total.fetch_add(1, Ordering::Relaxed);
             }
-            shared.frames_total.store(next_index, Ordering::Relaxed);
             shared.video_backlog.store(queue.len() as u64, Ordering::Relaxed);
             shared.check_backlog(&source.name, queue.len() as f32 / fps.max(1) as f32);
 

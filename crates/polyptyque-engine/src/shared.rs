@@ -104,6 +104,9 @@ pub(crate) struct Shared {
     sizes_settled: AtomicBool,
     /// Signe de vie du fil d'encodage, en millisecondes depuis `created` :
     /// un fil bloqué sur le disque n'empêche pas l'arrêt de la session.
+    /// Dernière coupure demandée (saut de l'horloge) : chaque fil de capture
+    /// la traite une fois.
+    cut: Mutex<Option<Cut>>,
     created: std::time::Instant,
     encoding_heartbeat_ms: AtomicU64,
 }
@@ -135,9 +138,36 @@ impl Shared {
             file_size: AtomicU64::new(0),
             encoding_finished: AtomicBool::new(false),
             sizes_settled: AtomicBool::new(false),
+            cut: Mutex::new(None),
             created: std::time::Instant::now(),
             encoding_heartbeat_ms: AtomicU64::new(0),
         }
+    }
+
+    /// Demande une coupure : l'horloge a sauté de `from_hns` à `to_hns`
+    /// (veille non signalée, programme figé). Ignorée si c'est la même
+    /// interruption, déjà signalée par l'autre fil de capture.
+    pub fn request_cut(&self, from_hns: u64, to_hns: u64, t0_hns: u64) {
+        let mut cut = lock(&self.cut);
+        if cut.is_some_and(|last| last.to_hns >= from_hns) {
+            return;
+        }
+        let generation = cut.map_or(1, |last| last.generation + 1);
+        *cut = Some(Cut { generation, from_hns, to_hns, resume_offset_hns: to_hns.saturating_sub(t0_hns) });
+    }
+
+    /// Rang de la dernière coupure (0 : aucune).
+    pub fn cut_generation(&self) -> u64 {
+        lock(&self.cut).map_or(0, |cut| cut.generation)
+    }
+
+    /// Coupure plus récente que `seen`, à traiter.
+    pub fn pending_cut(&self, seen: u64) -> Option<Cut> {
+        lock(&self.cut).filter(|cut| cut.generation > seen)
+    }
+
+    pub fn last_cut(&self) -> Option<Cut> {
+        *lock(&self.cut)
     }
 
     pub fn mark_encoding_finished(&self) {
@@ -348,6 +378,21 @@ impl WindowClaims {
     }
 }
 
+/// Coupure d'une source après un saut de l'horloge : les fils de capture
+/// placent une marque de coupure dans leur file à la fin de ce qui précède,
+/// puis reprennent à `to_hns` sans combler l'interruption ; l'encodage
+/// ferme la partie à la marque et continue dans la suivante.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Cut {
+    pub generation: u64,
+    /// Dernier instant vu avant l'interruption.
+    pub from_hns: u64,
+    /// Instant de la reprise.
+    pub to_hns: u64,
+    /// Reprise depuis le départ de la source.
+    pub resume_offset_hns: u64,
+}
+
 /// Retard d'encodage (image ou son) au-delà duquel la source s'arrête.
 pub(crate) const MAX_BACKLOG_SECONDS: u64 = 300;
 
@@ -455,6 +500,22 @@ mod tests {
         assert!(shared.check_backlog("essai", shared.audio_backlog_seconds()));
         assert!(shared.has_failed());
         assert!(shared.error().is_some_and(|e| e.contains("ne suit plus")));
+    }
+
+    #[test]
+    fn one_interruption_gives_one_cut() {
+        let shared = Shared::new();
+        assert_eq!(shared.cut_generation(), 0);
+        assert!(shared.pending_cut(0).is_none());
+        // Vue par le fil vidéo, puis par le fil audio : une seule coupure.
+        shared.request_cut(100, 5_000, 40);
+        shared.request_cut(120, 5_010, 40);
+        let cut = shared.pending_cut(0).unwrap();
+        assert_eq!((cut.generation, cut.from_hns, cut.to_hns, cut.resume_offset_hns), (1, 100, 5_000, 4_960));
+        assert!(shared.pending_cut(1).is_none());
+        // Une interruption plus tard : nouvelle coupure.
+        shared.request_cut(9_000, 20_000, 40);
+        assert_eq!(shared.pending_cut(1).map(|c| c.generation), Some(2));
     }
 
     #[test]

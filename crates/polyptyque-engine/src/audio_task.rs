@@ -11,7 +11,9 @@ use crossbeam_channel::Sender;
 use polyptyque_core::config::{CHANNELS, SAMPLE_RATE};
 use polyptyque_core::level::{peak_of, SOUND_THRESHOLD};
 use polyptyque_core::platform::{AudioCapture, AudioPacket, Platform};
-use polyptyque_core::timeline::{approximate_times, AudioTimeline, PacketTime, HNS_PER_SEC};
+use polyptyque_core::timeline::{
+    approximate_times, cut_resume_point, AudioTimeline, PacketTime, CLOCK_JUMP_HNS, HNS_PER_SEC,
+};
 
 use crate::shared::{run_protected, Shared, SourceState};
 
@@ -36,6 +38,9 @@ pub(crate) struct AudioTask {
     pub shared: Arc<Shared>,
     pub queue: Sender<Vec<u8>>,
     pub t0_hns: u64,
+    /// Cadence de l'image de la source : après une coupure, le son reprend
+    /// calé sur l'image de reprise (`None` pour le micro).
+    pub fps: Option<u32>,
 }
 
 impl AudioTask {
@@ -50,6 +55,15 @@ impl AudioTask {
         run_protected(&self.shared, &self.name, &what, || self.capture(&mut sent));
     }
 
+    /// Met `out` en file (s'il n'est pas vide). Faux si l'écriture a cessé.
+    fn send(&self, out: &mut Vec<u8>) -> bool {
+        if out.is_empty() {
+            return true;
+        }
+        self.shared.audio_queued.fetch_add(out.len() as u64, Ordering::Relaxed);
+        self.queue.send(std::mem::take(out)).is_ok()
+    }
+
     fn capture(&self, sent: &mut u64) {
         let (platform, name, input, shared, queue) =
             (&self.platform, &self.name, &self.input, &self.shared, &self.queue);
@@ -62,6 +76,10 @@ impl AudioTask {
         let mut warned_skew = false;
         let mut packets: Vec<AudioPacket> = Vec::new();
         let mut out: Vec<u8> = Vec::new();
+        let mut last_arrival: Option<u64> = None;
+        // Une relance après une erreur interne ne refait pas une coupure
+        // déjà traitée.
+        let mut seen_cut = shared.cut_generation();
 
         loop {
             // Encodeur arrêté : inutile d'accumuler du son qui ne sera jamais lu.
@@ -71,11 +89,13 @@ impl AudioTask {
             let now = platform.now_hns();
             if let Some(stop) = shared.stop_at() {
                 if now >= stop {
-                    timeline.finish(stop, &mut out);
-                    if !out.is_empty() {
+                    // Fin exacte à l'instant d'arrêt, par blocs bornés.
+                    loop {
+                        let more = timeline.finish(stop, &mut out);
                         *sent = timeline.written_frames();
-                        shared.audio_queued.fetch_add(out.len() as u64, Ordering::Relaxed);
-                        let _ = queue.send(std::mem::take(&mut out));
+                        if !self.send(&mut out) || !more {
+                            break;
+                        }
                     }
                     break;
                 }
@@ -143,6 +163,38 @@ impl AudioTask {
             }
 
             let arrival = platform.now_hns();
+            // Saut de l'horloge (veille non signalée, programme figé), le plus
+            // souvent pendant la lecture : vu avant de placer les paquets.
+            // L'interruption n'est pas comblée de silence, la suite part dans
+            // une nouvelle partie.
+            let jumped = last_arrival
+                .filter(|&prev| shared.stop_at().is_none() && arrival.saturating_sub(prev) > CLOCK_JUMP_HNS);
+            if let Some(prev) = jumped {
+                log::warn!("[{name}] horloge en avance de {} s d'un coup : coupure", (arrival - prev) / HNS_PER_SEC);
+                shared.request_cut(prev, arrival, self.t0_hns);
+            }
+            last_arrival = Some(arrival);
+            if let Some(cut) = shared.pending_cut(seen_cut) {
+                seen_cut = cut.generation;
+                // Son dû jusqu'au début de l'interruption, puis la marque de
+                // coupure, puis reprise calée sur l'image de reprise.
+                loop {
+                    let more = timeline.finish(cut.from_hns, &mut out);
+                    *sent = timeline.written_frames();
+                    if !self.send(&mut out) {
+                        return;
+                    }
+                    if !more {
+                        break;
+                    }
+                }
+                if queue.send(Vec::new()).is_err() {
+                    return;
+                }
+                let (_, sample) = cut_resume_point(self.t0_hns, cut.to_hns, self.fps, SAMPLE_RATE);
+                timeline.jump_to(sample);
+                *sent = sample;
+            }
             if !packets.is_empty() {
                 let frame_bytes = timeline.frame_bytes();
                 let counts: Vec<usize> = packets.iter().map(|p| p.data.len() / frame_bytes).collect();
@@ -176,8 +228,7 @@ impl AudioTask {
 
             if !out.is_empty() {
                 *sent = timeline.written_frames();
-                shared.audio_queued.fetch_add(out.len() as u64, Ordering::Relaxed);
-                if queue.send(std::mem::take(&mut out)).is_err() {
+                if !self.send(&mut out) {
                     return;
                 }
                 shared.check_backlog(name, shared.audio_backlog_seconds());

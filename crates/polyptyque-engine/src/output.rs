@@ -25,6 +25,7 @@ use polyptyque_core::encoder::{
 use polyptyque_core::naming;
 use polyptyque_core::platform::{Nv12Frame, Platform};
 use polyptyque_core::storage;
+use polyptyque_core::timeline::HNS_PER_SEC;
 use tr::tr;
 
 use crate::shared::Shared;
@@ -52,6 +53,8 @@ const SUPERVISION_INTERVAL: Duration = Duration::from_millis(100);
 /// taille d'un fichier) : un disque qui ne répond plus ne bloque pas
 /// l'encodage des autres parties.
 const DISK_TIMEOUT: Duration = Duration::from_secs(5);
+/// À une coupure, délai accordé au second flux pour atteindre sa marque.
+const CUT_GRACE: Duration = Duration::from_secs(5);
 
 pub(crate) struct OutputPlan {
     /// Image et son, ou son seul (micro).
@@ -90,6 +93,9 @@ enum PartEnd {
     Closed,
     /// L'encodeur s'est arrêté ou figé pendant l'enregistrement.
     Crashed(Crash),
+    /// Fichier fermé à une coupure (saut de l'horloge) : la suite part dans
+    /// une nouvelle partie.
+    Cut,
 }
 
 /// Arrêt de l'encodeur : ce qui est affiché, et le détail pour le journal
@@ -121,26 +127,34 @@ impl OutputTask {
         let OutputTask { platform, mut plan, shared, video, audio } = self;
         let mut part = 1u32;
         let mut quick_failures = 0u32;
+        // Positions des flux (images, octets de son) et instant (secondes
+        // depuis le départ de la source) de la dernière reprise après une
+        // coupure : image et son y repartent ensemble, les relances
+        // suivantes se recalent à partir de là.
+        let mut base = (0u64, 0u64, 0u64);
+        let mut after_cut = false;
         loop {
             let output = if part == 1 { plan.first_output.clone() } else { next_part_path(&plan, &shared, part) };
-            let (video_start, audio_start) = if part == 1 {
-                (0, 0)
+            let positions =
+                (shared.video_position.load(Ordering::SeqCst), shared.audio_position.load(Ordering::SeqCst));
+            let (video_start, audio_start) = if part == 1 || after_cut {
+                positions
             } else if plan.video {
-                resume_positions(
-                    shared.video_position.load(Ordering::SeqCst),
-                    shared.audio_position.load(Ordering::SeqCst),
-                    plan.fps,
-                )
+                let (video, audio) =
+                    resume_positions(positions.0.saturating_sub(base.0), positions.1.saturating_sub(base.1), plan.fps);
+                (video + base.0, audio + base.1)
             } else {
                 // Son seul : il reprend là où il en est.
                 let frame_bytes = CHANNELS as u64 * 4;
-                (0, shared.audio_position.load(Ordering::SeqCst).div_ceil(frame_bytes) * frame_bytes)
+                (0, positions.1.div_ceil(frame_bytes) * frame_bytes)
             };
-            let resume_seconds = if plan.video {
-                video_start / plan.fps.max(1) as u64
-            } else {
-                audio_start / (CHANNELS as u64 * 4) / SAMPLE_RATE as u64
-            };
+            after_cut = false;
+            let resume_seconds = base.2
+                + if plan.video {
+                    video_start.saturating_sub(base.0) / plan.fps.max(1) as u64
+                } else {
+                    audio_start.saturating_sub(base.1) / (CHANNELS as u64 * 4) / SAMPLE_RATE as u64
+                };
             shared.part.store(part, Ordering::Relaxed);
             shared.push_output(output.clone());
             if part > 1 {
@@ -183,6 +197,33 @@ impl OutputTask {
             }
             let (shown, reason) = match end {
                 PartEnd::Closed => return,
+                PartEnd::Cut => {
+                    let queued = video.as_ref().is_some_and(|q| !q.is_empty()) || !audio.is_empty();
+                    if stopping(&shared) && !queued {
+                        return;
+                    }
+                    let cut = shared.last_cut();
+                    let gap = cut.map_or(0, |c| c.to_hns.saturating_sub(c.from_hns) / HNS_PER_SEC);
+                    base = (
+                        shared.video_position.load(Ordering::SeqCst),
+                        shared.audio_position.load(Ordering::SeqCst),
+                        cut.map_or(0, |c| c.resume_offset_hns / HNS_PER_SEC),
+                    );
+                    after_cut = true;
+                    part += 1;
+                    log::warn!(
+                        "[{}] interruption de {} (veille non signalée, ordinateur ou programme figé) : suite dans \
+                         la partie {part}, sans combler l'interruption",
+                        plan.title,
+                        clock(gap)
+                    );
+                    shared.note_error(tr!(
+                        "Interruption de {} (mise en veille ou ordinateur figé) : la suite est dans la partie {}",
+                        clock(gap),
+                        part
+                    ));
+                    continue;
+                }
                 PartEnd::Crashed(crash) => (crash.shown, crash.detail),
             };
             if stopping(&shared) {
@@ -391,6 +432,7 @@ impl Part {
     /// l'arrêt de l'encodeur.
     fn supervise(mut self, shared: &Shared, log: &Path) -> PartEnd {
         let mut stalled = false;
+        let mut cut_seen: Option<Instant> = None;
         loop {
             let writers_done = self.writers.iter().all(|w| w.handle.is_finished());
             if writers_done {
@@ -400,6 +442,14 @@ impl Part {
                     let _ = self.child.kill();
                     let status = self.child.wait().map(|s| s.to_string()).unwrap_or_default();
                     return PartEnd::Crashed(Crash::stopped(status, log));
+                }
+                if self.control.cuts.load(Ordering::SeqCst) > 0 {
+                    // Coupure : FFmpeg termine ce fichier, la suite part dans
+                    // le suivant quoi qu'il arrive.
+                    if let Some(status) = wait_exit(&mut self.child, shared, log).filter(|s| !s.success()) {
+                        log::warn!("encodeur terminé en erreur à la coupure ({status}) : {}", log_tail(log));
+                    }
+                    return PartEnd::Cut;
                 }
                 // Flux fermés : FFmpeg termine le fichier.
                 return match wait_exit(&mut self.child, shared, log) {
@@ -419,6 +469,14 @@ impl Part {
                     Crash::stopped(status, log)
                 };
                 return if stopping(shared) && !stalled { PartEnd::Closed } else { PartEnd::Crashed(crash) };
+            }
+            if self.control.cuts.load(Ordering::SeqCst) > 0 && !self.control.cancel.load(Ordering::SeqCst) {
+                // Un flux a atteint sa marque de coupure : l'autre doit la
+                // recevoir sous peu. Sinon, la partie est fermée quand même.
+                if cut_seen.get_or_insert_with(Instant::now).elapsed() >= CUT_GRACE {
+                    log::warn!("coupure : un flux n'a pas reçu sa marque, partie fermée quand même");
+                    self.control.cancel.store(true, Ordering::SeqCst);
+                }
             }
             if self.control.broken.load(Ordering::SeqCst) && !stalled {
                 // Un tube ne passe plus alors que FFmpeg tourne encore.
@@ -553,7 +611,8 @@ fn wait_exit(child: &mut Child, shared: &Shared, log: &Path) -> Option<std::proc
                         FINALIZE_STALL.as_secs()
                     );
                 } else {
-                    log::warn!("l'encodeur finalise depuis plus de {} min : arrêt forcé", FINALIZE_MAX.as_secs() / 60);
+                    let minutes = FINALIZE_MAX.as_secs() / 60;
+                    log::warn!("l'encodeur finalise depuis plus de {minutes} min : arrêt forcé");
                 }
             }
             Err(e) => log::warn!("état de l'encodeur illisible ({e}) : arrêt forcé"),
