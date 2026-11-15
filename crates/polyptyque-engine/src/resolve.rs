@@ -64,9 +64,27 @@ fn exact_match(source: &Source, window: &WindowInfo) -> bool {
     let SourceKind::Application { exe_path, window_class, window_title, .. } = &source.kind else {
         return false;
     };
-    (same_path(&window.exe, exe_path) || same_file_name(&window.exe, exe_path))
+    (same_path(&window.exe, exe_path) || same_file_name(&window.exe, exe_path) || store_frame_of(exe_path, window))
         && &window.class == window_class
         && &window.title == window_title
+}
+
+/// Cadre des applications du Microsoft Store (UWP), et programme commun qui
+/// le possède. Depuis le 2026-11-15, la plateforme attribue chaque cadre au
+/// vrai processus de son application (`CalculatorApp.exe`, par exemple).
+const STORE_FRAME_CLASS: &str = "ApplicationFrameWindow";
+const STORE_FRAME_HOST: &str = "applicationframehost";
+
+fn is_store_frame_host(exe: &Path) -> bool {
+    file_stem(exe).as_deref() == Some(STORE_FRAME_HOST)
+}
+
+/// Source du Store enregistrée avant cette attribution : son programme est
+/// `ApplicationFrameHost.exe`, et tout cadre du Store lui appartient, quel
+/// que soit le programme auquel il est désormais attribué (comportement
+/// d'avant).
+fn store_frame_of(exe_path: &Path, window: &WindowInfo) -> bool {
+    window.class == STORE_FRAME_CLASS && is_store_frame_host(exe_path)
 }
 
 /// Comme [`find_window`], sans jamais retenir une fenêtre déjà enregistrée
@@ -111,6 +129,14 @@ pub fn find_window_excluding(
                 // (Discord, par exemple) : on se rabat sur le nom du fichier.
                 same_program = windows.iter().filter(|w| same_file_name(&w.exe, exe_path)).collect();
             }
+            if is_store_frame_host(exe_path) {
+                // Source du Store d'avant le 2026-11-15 : ses cadres portent
+                // maintenant le programme de leur application.
+                same_program = windows
+                    .iter()
+                    .filter(|w| store_frame_of(exe_path, w) || same_file_name(&w.exe, exe_path))
+                    .collect();
+            }
             let free: Vec<&WindowInfo> = same_program.iter().copied().filter(|w| !taken.contains(&w.handle)).collect();
             let unreserved = |w: &&&WindowInfo| !exclusions.reserved.contains(&w.handle);
             free.iter()
@@ -122,6 +148,21 @@ pub fn find_window_excluding(
                 .or_else(|| {
                     (same_program.len() == 1 && free.len() == 1 && !exclusions.reserved.contains(&free[0].handle))
                         .then(|| free[0])
+                })
+                // Cadre du Store dont l'application n'a pas pu être reconnue
+                // (réduit, en pause) : resté à ApplicationFrameHost.exe. Pris
+                // seulement à son titre exact, en dernier recours.
+                .or_else(|| {
+                    (window_class == STORE_FRAME_CLASS)
+                        .then(|| {
+                            windows.iter().find(|w| {
+                                w.class == STORE_FRAME_CLASS
+                                    && is_store_frame_host(&w.exe)
+                                    && &w.title == window_title
+                                    && !taken.contains(&w.handle)
+                            })
+                        })
+                        .flatten()
                 })
                 .cloned()
         }
@@ -320,6 +361,13 @@ pub fn launch(source: &Source) -> Result<()> {
             let first_launch = prepare_profile(profile_dir, browser.family)?;
             let url = if first_launch { start_url.as_deref() } else { None };
             spawn_detached(&browser.exe_path, &launch_args(browser.family, profile_dir, url))
+        }
+        SourceKind::Application { window_class, .. } if window_class == STORE_FRAME_CLASS => {
+            // Une application du Store ne s'ouvre que par Windows (son
+            // identifiant d'application, inconnu ici) : lancer directement
+            // son programme (`…\WindowsApps\…`, ou ApplicationFrameHost.exe
+            // pour une source ancienne) n'ouvre aucune fenêtre.
+            anyhow::bail!(tr!("application du Microsoft Store, à ouvrir depuis le menu Démarrer"))
         }
         SourceKind::Application { exe_path, launch_args, .. } => {
             let args: Vec<OsString> = launch_args.iter().map(OsString::from).collect();
@@ -717,6 +765,49 @@ mod tests {
         });
         let taken = Exclusions { taken: HashSet::from([1]), ..Default::default() };
         assert_eq!(find_window_excluding(&FakePlatform, &src, &windows, &taken).map(|w| w.handle), Some(2));
+    }
+
+    #[test]
+    fn store_sources_match_frames_of_either_attribution() {
+        let host = r"C:\Windows\System32\ApplicationFrameHost.exe";
+        let calc = r"C:\Program Files\WindowsApps\Microsoft.WindowsCalculator_1_x64__8wekyb3d8bbwe\CalculatorApp.exe";
+        let photos = r"C:\Program Files\WindowsApps\Microsoft.Windows.Photos_1_x64__8wekyb3d8bbwe\Photos.exe";
+        let frame = "ApplicationFrameWindow";
+        let store = |exe: &str, title: &str| {
+            source(SourceKind::Application {
+                exe_path: exe.into(),
+                window_class: frame.into(),
+                window_title: title.into(),
+                launch_args: vec![],
+            })
+        };
+        let windows = vec![window(1, 5, "Photos", frame, photos), window(2, 6, "Calculatrice", frame, calc)];
+        // Source enregistrée avant l'attribution au vrai processus.
+        let old = store(host, "Calculatrice");
+        assert_eq!(find_window(&FakePlatform, &old, &windows).map(|w| w.handle), Some(2));
+        // Titre changé : à défaut, même classe (comme avant).
+        assert_eq!(find_window(&FakePlatform, &store(host, "Autre"), &windows).map(|w| w.handle), Some(1));
+        // Sa fenêtre exacte reste réservée face à une autre source ancienne.
+        let mut exclusions = Exclusions::default();
+        exclusions.reserve_for(&[&old], &windows);
+        assert_eq!(exclusions.reserved, HashSet::from([2]));
+        assert_eq!(
+            find_window_excluding(&FakePlatform, &store(host, "Autre"), &windows, &exclusions).map(|w| w.handle),
+            Some(1)
+        );
+        // Cadre encore attribué à ApplicationFrameHost.exe (réduit).
+        let unresolved = vec![window(3, 7, "Calculatrice", frame, host)];
+        assert_eq!(find_window(&FakePlatform, &old, &unresolved).map(|w| w.handle), Some(3));
+        // Source récente : ce cadre seulement à son titre exact.
+        assert_eq!(find_window(&FakePlatform, &store(calc, "Calculatrice"), &unresolved).map(|w| w.handle), Some(3));
+        assert!(find_window(&FakePlatform, &store(calc, "Autre"), &unresolved).is_none());
+        let taken = Exclusions { taken: HashSet::from([3]), ..Default::default() };
+        assert!(find_window_excluding(&FakePlatform, &store(calc, "Calculatrice"), &unresolved, &taken).is_none());
+        // Une source récente ne prend jamais le cadre d'une autre application.
+        assert!(find_window(&FakePlatform, &store(calc, "Calculatrice"), &windows[..1]).is_none());
+        // Jamais de lancement direct d'une application du Store.
+        assert!(launch(&old).is_err());
+        assert!(launch(&store(calc, "Calculatrice")).is_err());
     }
 
     #[test]

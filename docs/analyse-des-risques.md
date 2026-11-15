@@ -107,7 +107,7 @@ Chaque scénario porte un identifiant (A1, B3…) repris dans le plan d'action.
 | C4 | Navigateur désinstallé ou déplacé | faible | moyenne | Message d'échec de lancement au démarrage de l'enregistrement | Proposer de choisir le nouvel emplacement | P3 |
 | C5 | Jeu en plein écran exclusif, contenu protégé | moyenne | moyenne | Image noire (limite connue, documentée) | Rien à ajouter | — |
 | C6 | Deux sources d'un même programme (deux VLC, deux applications Chrome), dont l'une a changé de titre | moyenne | forte | Les deux sources peuvent enregistrer la même fenêtre, et leurs aperçus la montrer | Une fenêtre par source, fenêtre exacte d'une autre jamais prise à défaut ; mêmes règles pour la préparation, les aperçus, les niveaux sonores, la réouverture et « Rétablir la fenêtre » (réalisé le 2026-11-15) | — |
-| C7 | Application du Microsoft Store | moyenne | moyenne | Fenêtre attribuée à `ApplicationFrameHost.exe` : son non capturé, source mal reconnue | Processus de la fenêtre `CoreWindow` de l'application (réalisé le 2026-11-15) | — |
+| C7 | Application du Microsoft Store | moyenne | moyenne | Fenêtre attribuée à `ApplicationFrameHost.exe` : son non capturé, source mal reconnue | Processus de la fenêtre `CoreWindow` de l'application (réalisé le 2026-11-15) ; sources ajoutées avant toujours reconnues ; jamais de relance directe (impossible), message à la place | — |
 
 ## D - Encodage et disque
 

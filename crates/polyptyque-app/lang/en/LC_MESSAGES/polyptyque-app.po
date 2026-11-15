@@ -806,7 +806,7 @@ msgstr "the left edge"
 msgid "le cadre entier"
 msgstr "the whole frame"
 
-#: polyptyque-app/ui/sheets.slint:1604 polyptyque-app/src/controller/crop.rs:63 polyptyque-app/src/controller/crop.rs:148 polyptyque-app/src/controller.rs:841 polyptyque-app/src/controller.rs:1196
+#: polyptyque-app/ui/sheets.slint:1604 polyptyque-app/src/controller/crop.rs:64 polyptyque-app/src/controller/crop.rs:149 polyptyque-app/src/controller.rs:841 polyptyque-app/src/controller.rs:1196
 msgid "Recherche de la fenêtre…"
 msgstr "Looking for the window…"
 
@@ -1322,31 +1322,31 @@ msgstr "An unidentified program"
 msgid "Pilotage · {}"
 msgstr "Remote control · {}"
 
-#: polyptyque-app/src/controller/crop.rs:34 polyptyque-app/src/controller/crop.rs:243
+#: polyptyque-app/src/controller/crop.rs:34 polyptyque-app/src/controller/crop.rs:244
 msgid "Le rognage ne se change pas pendant un enregistrement."
 msgstr "Cropping can’t be changed while recording."
 
-#: polyptyque-app/src/controller/crop.rs:150
+#: polyptyque-app/src/controller/crop.rs:151
 msgid "Fenêtre réduite : la rétablir pour la rogner."
 msgstr "Window minimized: restore it to crop it."
 
-#: polyptyque-app/src/controller/crop.rs:151
+#: polyptyque-app/src/controller/crop.rs:152
 msgid "Fenêtre introuvable : l'ouvrir pour la rogner."
 msgstr "Window not found: open it to crop it."
 
-#: polyptyque-app/src/controller/crop.rs:152
+#: polyptyque-app/src/controller/crop.rs:153
 msgid "Aperçu impossible : {}"
 msgstr "Preview unavailable: {}"
 
-#: polyptyque-app/src/controller/crop.rs:254
+#: polyptyque-app/src/controller/crop.rs:255
 msgid "Cette source a été supprimée entre-temps."
 msgstr "This source was deleted in the meantime."
 
-#: polyptyque-app/src/controller/crop.rs:269
+#: polyptyque-app/src/controller/crop.rs:270
 msgid "« {} » n'est plus rognée."
 msgstr "“{}” is no longer cropped."
 
-#: polyptyque-app/src/controller/crop.rs:271
+#: polyptyque-app/src/controller/crop.rs:272
 msgid "Rognage de « {} » enregistré."
 msgstr "Cropping of “{}” saved."
 
@@ -3336,7 +3336,7 @@ msgstr "on {} at {}"
 msgid "création du dossier {}"
 msgstr "creating folder {}"
 
-#: polyptyque-core/src/storage.rs:19 polyptyque-core/src/storage.rs:20 polyptyque-engine/src/resolve.rs:359
+#: polyptyque-core/src/storage.rs:19 polyptyque-core/src/storage.rs:20 polyptyque-engine/src/resolve.rs:407
 msgid "écriture de {}"
 msgstr "writing {}"
 
@@ -3408,7 +3408,7 @@ msgstr "{} · part {} (resumed at {})"
 msgid "ouverture de {}"
 msgstr "opening {}"
 
-#: polyptyque-engine/src/output.rs:407 polyptyque-engine/src/remux.rs:59 polyptyque-engine/src/remux.rs:61 polyptyque-engine/src/remux.rs:349 polyptyque-engine/src/resolve.rs:371
+#: polyptyque-engine/src/output.rs:407 polyptyque-engine/src/remux.rs:59 polyptyque-engine/src/remux.rs:61 polyptyque-engine/src/remux.rs:349 polyptyque-engine/src/resolve.rs:419
 msgid "lancement de {}"
 msgstr "launching {}"
 
@@ -3480,7 +3480,11 @@ msgstr "different duration after conversion ({} s instead of {} s)"
 msgid "durée illisible après conversion"
 msgstr "unreadable duration after conversion"
 
-#: polyptyque-engine/src/resolve.rs:355
+#: polyptyque-engine/src/resolve.rs:370
+msgid "application du Microsoft Store, à ouvrir depuis le menu Démarrer"
+msgstr "Microsoft Store app, open it from the Start menu"
+
+#: polyptyque-engine/src/resolve.rs:403
 msgid "création du profil {}"
 msgstr "creating profile {}"
 
