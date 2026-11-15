@@ -31,8 +31,15 @@ use crate::windows_list::hwnd;
 
 /// Identifiant de notre traitement des messages de la fenêtre.
 const SUBCLASS_ID: usize = 0x5059_5054; // « PYPT »
-/// Arrêt critique (batterie épuisée…) : il ne peut pas être bloqué.
+/// Arrêt critique (batterie épuisée, fermeture forcée…) : il ne peut pas
+/// être bloqué.
 const ENDSESSION_CRITICAL: u32 = 0x4000_0000;
+/// Demande du Gestionnaire de redémarrage (installateur qui doit remplacer
+/// un fichier ouvert, maintenance du système) : Polyptyque est prié de se
+/// fermer, mais la session Windows continue.
+const ENDSESSION_CLOSEAPP: u32 = 0x0000_0001;
+/// Déconnexion de l'utilisateur.
+const ENDSESSION_LOGOFF: u32 = 0x8000_0000;
 /// Plus haut niveau réservé aux applications : prévenu avant les processus
 /// de niveau ordinaire (0x280), dont les FFmpeg lancés par Polyptyque.
 const SHUTDOWN_LEVEL_FIRST: u32 = 0x3FF;
@@ -117,6 +124,30 @@ fn notify(event: SessionEnd) -> bool {
     .unwrap_or(false)
 }
 
+/// Origine d'une demande de fermeture, d'après le `lParam` (un masque de
+/// bits) de `WM_QUERYENDSESSION` et `WM_ENDSESSION`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Request {
+    /// Arrêt, redémarrage ou déconnexion : la session Windows se ferme.
+    Session,
+    /// Gestionnaire de redémarrage : seul Polyptyque est prié de se fermer,
+    /// Windows continue.
+    CloseApp,
+}
+
+fn request(lparam: LPARAM) -> Request {
+    let flags = lparam.0 as u32;
+    if flags & ENDSESSION_CLOSEAPP != 0 && flags & ENDSESSION_LOGOFF == 0 {
+        Request::CloseApp
+    } else {
+        Request::Session
+    }
+}
+
+fn critical(lparam: LPARAM) -> bool {
+    lparam.0 as u32 & ENDSESSION_CRITICAL != 0
+}
+
 unsafe extern "system" fn window_proc(
     window: HWND,
     message: u32,
@@ -126,14 +157,41 @@ unsafe extern "system" fn window_proc(
     _: usize,
 ) -> LRESULT {
     match message {
+        // Gestionnaire de redémarrage pendant un enregistrement : refus,
+        // comme pour un arrêt. Selon Microsoft, l'installateur renonce alors
+        // (ou demande de fermer Polyptyque, ou de redémarrer plus tard),
+        // sauf fermeture forcée : Polyptyque est alors arrêté quoi qu'il
+        // réponde, et les FFmpeg de l'enregistrement, processus à part,
+        // terminent leurs fichiers seuls. Une demande marquée critique n'est
+        // jamais bloquée.
         WM_QUERYENDSESSION => {
-            let critical = lparam.0 as u32 & ENDSESSION_CRITICAL != 0;
-            if notify(SessionEnd::Query) && !critical {
-                log::warn!("fermeture de session demandée pendant un enregistrement : blocage");
+            if notify(SessionEnd::Query) && !critical(lparam) {
+                match request(lparam) {
+                    Request::Session => {
+                        log::warn!("fermeture de session demandée pendant un enregistrement : blocage")
+                    }
+                    Request::CloseApp => log::warn!(
+                        "fermeture de Polyptyque demandée par le Gestionnaire de redémarrage (installateur) pendant un enregistrement : refus"
+                    ),
+                }
                 return LRESULT(0);
             }
         }
         WM_ENDSESSION if wparam.0 != 0 => {
+            // Gestionnaire de redémarrage non forcé : Windows continue, et
+            // Polyptyque aussi. Le traiter comme une fin de session
+            // arrêterait l'enregistrement et marquerait la fin du programme
+            // comme normale alors qu'il reste ouvert (plus aucun bilan après
+            // un plantage). La demande n'a été acceptée que hors
+            // enregistrement ; la suite passe par la fermeture ordinaire
+            // (WM_CLOSE envoyé ensuite par le Gestionnaire), avec ses
+            // confirmations. Marquée critique (fermeture imposée) : comme
+            // une fin de session, les fichiers sont finalisés d'abord.
+
+            if request(lparam) == Request::CloseApp && !critical(lparam) {
+                log::info!("fermeture demandée par le Gestionnaire de redémarrage : la session Windows continue");
+                return LRESULT(0);
+            }
             log::warn!("fermeture de session : finalisation des fichiers");
             notify(SessionEnd::Ending);
             return LRESULT(0);
@@ -153,4 +211,24 @@ unsafe extern "system" fn window_proc(
         _ => {}
     }
     unsafe { DefSubclassProc(window, message, wparam, lparam) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn origine_de_la_demande() {
+        // Arrêt ou redémarrage : lParam nul.
+        assert_eq!(request(LPARAM(0)), Request::Session);
+        assert_eq!(request(LPARAM(0x8000_0000_u32 as isize)), Request::Session);
+        assert_eq!(request(LPARAM(0x4000_0000)), Request::Session);
+        // Gestionnaire de redémarrage, forcé ou non.
+        assert_eq!(request(LPARAM(0x1)), Request::CloseApp);
+        assert_eq!(request(LPARAM(0x4000_0001)), Request::CloseApp);
+        assert!(critical(LPARAM(0x4000_0001)));
+        assert!(!critical(LPARAM(0x1)));
+        // Déconnexion signalée en même temps : la session se ferme bien.
+        assert_eq!(request(LPARAM(0x8000_0001_u32 as isize)), Request::Session);
+    }
 }

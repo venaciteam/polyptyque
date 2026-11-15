@@ -9,6 +9,10 @@
 //! - Polyptyque crée la première instance du tube, ou renonce : un autre
 //!   programme qui l'aurait créée avant lui ne reçoit rien. Côté client, le
 //!   propriétaire du tube est vérifié avant tout envoi.
+//! - Le nom du tube n'existe que tant qu'une instance au moins est ouverte :
+//!   la suivante est toujours créée avant de fermer la précédente, et le
+//!   propriétaire de chaque nouvelle instance est vérifié (un autre compte
+//!   qui aurait pris le nom entre-temps est écarté).
 //!
 //! Entrées-sorties asynchrones (OVERLAPPED) : une connexion lit et écrit
 //! depuis le même fil, sans que l'écriture attende la fin de la lecture en
@@ -191,6 +195,8 @@ impl Drop for Waiting {
 /// Côté Polyptyque : le tube et l'instance qui attend le client suivant.
 pub struct PipeListener {
     path: HSTRING,
+    /// Compte de Polyptyque, propriétaire attendu de chaque instance.
+    sid: String,
     security: SecurityDescriptor,
     waiting: Option<Waiting>,
 }
@@ -202,9 +208,12 @@ impl PipeListener {
     /// Crée le tube. Échoue si un autre programme l'a déjà créé.
     pub fn bind() -> io::Result<Self> {
         let sid = user_sid()?;
-        let path = HSTRING::from(format!(r"\\.\pipe\polyptyque-{sid}"));
+        Self::bind_at(format!(r"\\.\pipe\polyptyque-{sid}"), sid)
+    }
+
+    fn bind_at(path: String, sid: String) -> io::Result<Self> {
         let security = SecurityDescriptor::for_user(&sid)?;
-        let mut listener = Self { path, security, waiting: None };
+        let mut listener = Self { path: HSTRING::from(path), sid, security, waiting: None };
         listener.waiting = Some(listener.listen(true)?);
         Ok(listener)
     }
@@ -231,6 +240,15 @@ impl PipeListener {
         };
         if pipe.is_invalid() {
             return Err(io::Error::last_os_error());
+        }
+        // Instance suivante : si toutes les précédentes avaient été fermées,
+        // le nom a pu être repris par un autre compte, qui aurait alors fixé
+        // les autorisations et le propriétaire du tube.
+        if !first && !owned_by(pipe, &self.sid) {
+            unsafe {
+                let _ = CloseHandle(pipe);
+            }
+            return Err(io::Error::new(io::ErrorKind::PermissionDenied, "tube nommé tenu par un autre compte"));
         }
         let event = match unsafe { CreateEventW(None, true, false, PCWSTR::null()) } {
             Ok(event) => Owned(event),
@@ -275,9 +293,17 @@ impl Listener for PipeListener {
             let result = unsafe { GetOverlappedResult(pipe, &*waiting.overlapped, &mut transferred, false) };
             waiting.connected = true;
             if let Err(e) = result {
-                // Client reparti aussitôt : l'instance est remplacée.
+                // Client reparti aussitôt : l'instance est remplacée. La
+                // nouvelle d'abord, pour que le nom du tube ne disparaisse
+                // jamais (l'ancienne est fermée en étant remplacée).
                 log::warn!("pilotage : connexion avortée : {e}");
-                self.waiting = None;
+                match self.listen(false) {
+                    Ok(next) => self.waiting = Some(next),
+                    Err(e) => {
+                        log::warn!("pilotage : nouvelle instance du tube impossible : {e}");
+                        self.waiting = None;
+                    }
+                }
                 return Ok(None);
             }
         }
@@ -460,7 +486,11 @@ fn owned_by(pipe: HANDLE, sid: &str) -> bool {
 /// Connexion d'un client au Polyptyque ouvert par ce compte.
 pub fn connect() -> Result<PipeConnection, ConnectError> {
     let sid = user_sid().map_err(ConnectError::Io)?;
-    let path = HSTRING::from(format!(r"\\.\pipe\polyptyque-{sid}"));
+    connect_to(&format!(r"\\.\pipe\polyptyque-{sid}"), &sid)
+}
+
+fn connect_to(path: &str, sid: &str) -> Result<PipeConnection, ConnectError> {
+    let path = HSTRING::from(path);
     for _ in 0..5 {
         let opened = unsafe {
             CreateFileW(
@@ -475,7 +505,7 @@ pub fn connect() -> Result<PipeConnection, ConnectError> {
         };
         match opened {
             Ok(pipe) => {
-                if !owned_by(pipe, &sid) {
+                if !owned_by(pipe, sid) {
                     unsafe {
                         let _ = CloseHandle(pipe);
                     }
@@ -492,4 +522,98 @@ pub fn connect() -> Result<PipeConnection, ConnectError> {
         }
     }
     Err(ConnectError::Io(io::ErrorKind::TimedOut.into()))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::thread;
+
+    use super::*;
+
+    /// Tube propre à un test : jamais celui d'un Polyptyque ouvert.
+    fn test_path() -> String {
+        static NEXT: AtomicU32 = AtomicU32::new(0);
+        format!(r"\\.\pipe\polyptyque-test-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed))
+    }
+
+    fn accept(listener: &mut PipeListener) -> Box<dyn Connection> {
+        for _ in 0..50 {
+            if let Some((connection, peer)) = listener.accept(Duration::from_millis(100)).expect("attente d'un client")
+            {
+                assert_eq!(peer.pid, Some(std::process::id()));
+                return connection;
+            }
+        }
+        panic!("aucun client");
+    }
+
+    fn exchange(server: &mut dyn Connection, client: &mut dyn Connection) {
+        client.write_all(b"ping\n").expect("envoi du client");
+        let mut buf = [0u8; 16];
+        let n = server.read(&mut buf, Duration::from_secs(5)).expect("lecture").expect("rien reçu");
+        assert_eq!(&buf[..n], b"ping\n");
+    }
+
+    #[test]
+    fn nom_deja_pris() {
+        let sid = user_sid().unwrap();
+        let path = test_path();
+        let _first = PipeListener::bind_at(path.clone(), sid.clone()).unwrap();
+        assert!(PipeListener::bind_at(path, sid).is_err());
+    }
+
+    /// Plusieurs clients à la suite : chaque instance suivante passe la
+    /// vérification du propriétaire.
+    #[test]
+    fn clients_successifs() {
+        let sid = user_sid().unwrap();
+        let path = test_path();
+        let mut listener = PipeListener::bind_at(path.clone(), sid.clone()).unwrap();
+        let mut connections = Vec::new();
+        for _ in 0..3 {
+            let (p, s) = (path.clone(), sid.clone());
+            let client = thread::spawn(move || connect_to(&p, &s).map_err(|e| format!("{e:?}")));
+            let mut server = accept(&mut listener);
+            let mut client = client.join().unwrap().expect("connexion du client");
+            exchange(server.as_mut(), &mut client);
+            connections.push((server, client));
+        }
+        // Toutes les connexions fermées : l'instance en attente garde le
+        // nom, un nouveau client passe.
+        connections.clear();
+        let (p, s) = (path.clone(), sid.clone());
+        let client = thread::spawn(move || connect_to(&p, &s).map_err(|e| format!("{e:?}")));
+        let mut server = accept(&mut listener);
+        let mut client = client.join().unwrap().expect("connexion du client");
+        exchange(server.as_mut(), &mut client);
+    }
+
+    /// Connexion avortée (attente annulée) sans autre instance ouverte :
+    /// l'instance de remplacement est créée et le tube reste joignable.
+    #[test]
+    fn connexion_avortee() {
+        let sid = user_sid().unwrap();
+        let path = test_path();
+        let mut listener = PipeListener::bind_at(path.clone(), sid.clone()).unwrap();
+        {
+            let waiting = listener.waiting.as_ref().unwrap();
+            unsafe {
+                CancelIoEx(waiting.pipe.unwrap(), Some(&*waiting.overlapped)).unwrap();
+            }
+        }
+        assert!(listener.accept(Duration::from_secs(1)).unwrap().is_none());
+        assert!(listener.waiting.is_some(), "instance de remplacement");
+        let (p, s) = (path.clone(), sid.clone());
+        let client = thread::spawn(move || connect_to(&p, &s).map_err(|e| format!("{e:?}")));
+        let mut server = accept(&mut listener);
+        let mut client = client.join().unwrap().expect("connexion du client");
+        exchange(server.as_mut(), &mut client);
+    }
+
+    #[test]
+    fn client_sans_tube() {
+        let sid = user_sid().unwrap();
+        assert!(matches!(connect_to(&test_path(), &sid), Err(ConnectError::NotListening)));
+    }
 }

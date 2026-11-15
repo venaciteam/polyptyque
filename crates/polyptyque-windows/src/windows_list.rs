@@ -1,26 +1,34 @@
 //! Énumération des fenêtres principales.
 
+use std::collections::HashMap;
 use std::ffi::c_void;
+use std::sync::Mutex;
 
 use anyhow::{bail, Result};
 use polyptyque_core::platform::{WindowDiagnostic, WindowHandle, WindowInfo};
-use windows::core::BOOL;
+use windows::core::{w, BOOL, HSTRING, PCWSTR};
 use windows::Win32::Foundation::{HWND, LPARAM, POINT, RECT, TRUE, WPARAM};
 use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED};
 use windows::Win32::Graphics::Gdi::{
     GetMonitorInfoW, MonitorFromPoint, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONULL, MONITOR_DEFAULTTOPRIMARY,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, GetClassNameW, GetWindow, GetWindowLongW, GetWindowPlacement, GetWindowRect, GetWindowTextW,
-    GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, PostMessageW, SetWindowPos, ShowWindow,
-    GWL_EXSTYLE, GW_OWNER, SWP_NOACTIVATE, SWP_NOZORDER, SW_SHOWMAXIMIZED, SW_SHOWNOACTIVATE, WINDOWPLACEMENT,
-    WM_CLOSE, WPF_RESTORETOMAXIMIZED, WS_EX_TOOLWINDOW,
+    EnumWindows, FindWindowExW, GetClassNameW, GetWindow, GetWindowLongW, GetWindowPlacement, GetWindowRect,
+    GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, PostMessageW, SetWindowPos,
+    ShowWindow, GWL_EXSTYLE, GW_OWNER, SWP_NOACTIVATE, SWP_NOZORDER, SW_SHOWMAXIMIZED, SW_SHOWNOACTIVATE,
+    WINDOWPLACEMENT, WM_CLOSE, WPF_RESTORETOMAXIMIZED, WS_EX_TOOLWINDOW,
 };
 
 use crate::process;
 
 /// Fenêtres du bureau et de la barre des tâches, jamais utiles à capturer.
 const IGNORED_CLASSES: &[&str] = &["Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd"];
+/// Cadre des applications du Microsoft Store (UWP) : il appartient à
+/// ApplicationFrameHost.exe, commun à toutes, et contient la fenêtre de
+/// l'application elle-même ([`CORE_WINDOW_CLASS`]), qui appartient à son
+/// vrai processus.
+const STORE_FRAME_CLASS: &str = "ApplicationFrameWindow";
+const CORE_WINDOW_CLASS: PCWSTR = w!("Windows.UI.Core.CoreWindow");
 
 pub fn hwnd(handle: WindowHandle) -> HWND {
     HWND(handle as *mut c_void)
@@ -104,8 +112,76 @@ fn describe(window: HWND, include_hidden: bool) -> Option<WindowInfo> {
         }
         let mut pid = 0u32;
         GetWindowThreadProcessId(window, Some(&mut pid));
+        if class == STORE_FRAME_CLASS {
+            if let Some(app) = store_app_pid(window, pid, &title) {
+                pid = app;
+            }
+        }
         let exe = process::image_path(pid).unwrap_or_default();
         Some(WindowInfo { handle: window.0 as WindowHandle, pid, title, class, exe })
+    }
+}
+
+fn window_pid(window: HWND) -> u32 {
+    let mut pid = 0u32;
+    unsafe { GetWindowThreadProcessId(window, Some(&mut pid)) };
+    pid
+}
+
+/// Processus d'application du Store vu en dernier dans chaque cadre.
+static STORE_APPS: Mutex<Option<HashMap<isize, u32>>> = Mutex::new(None);
+
+/// Vrai processus de l'application du Store affichée dans le cadre `frame`
+/// (qui appartient à `host_pid`, ApplicationFrameHost.exe) : c'est lui qui
+/// identifie la source et dont le son est capturé, celui du cadre étant
+/// commun à toutes les applications du Store, et muet.
+///
+/// Fenêtre réduite (ou application en pause) : Windows détache la fenêtre
+/// de l'application du cadre, qui devient une fenêtre de premier niveau.
+/// Par prudence, seul un processus sûr est retenu, dans l'ordre : celui vu
+/// dans ce cadre auparavant s'il a toujours sa fenêtre d'application, puis
+/// la seule fenêtre d'application détachée de même titre. Sinon `None` : le
+/// cadre reste attribué à ApplicationFrameHost.exe (comportement d'avant,
+/// son muet), plutôt qu'à une application qui ne serait pas la bonne.
+fn store_app_pid(frame: HWND, host_pid: u32, title: &str) -> Option<u32> {
+    let mut known = STORE_APPS.lock().unwrap_or_else(|e| e.into_inner());
+    let known = known.get_or_insert_with(HashMap::new);
+    let key = frame.0 as isize;
+    // Fenêtre de l'application dans le cadre.
+    let mut child: Option<HWND> = None;
+    while let Ok(next) = unsafe { FindWindowExW(Some(frame), child, CORE_WINDOW_CLASS, PCWSTR::null()) } {
+        let pid = window_pid(next);
+        if pid != 0 && pid != host_pid {
+            // Cadres disparus : oubliés (une poignée peut resservir).
+            known.retain(|&handle, _| unsafe { IsWindow(Some(HWND(handle as *mut c_void))).as_bool() });
+            known.insert(key, pid);
+            return Some(pid);
+        }
+        child = Some(next);
+    }
+    // Fenêtre d'application détachée (cadre réduit).
+    let detached = |name: PCWSTR| -> Vec<u32> {
+        let mut pids = Vec::new();
+        let mut after: Option<HWND> = None;
+        while let Ok(next) = unsafe { FindWindowExW(None, after, CORE_WINDOW_CLASS, name) } {
+            let pid = window_pid(next);
+            if pid != 0 && pid != host_pid && !pids.contains(&pid) {
+                pids.push(pid);
+            }
+            after = Some(next);
+        }
+        pids
+    };
+    if let Some(&pid) = known.get(&key) {
+        if detached(PCWSTR::null()).contains(&pid) {
+            return Some(pid);
+        }
+        known.remove(&key);
+    }
+    let title = HSTRING::from(title);
+    match detached(PCWSTR(title.as_ptr()))[..] {
+        [pid] => Some(pid),
+        _ => None,
     }
 }
 
