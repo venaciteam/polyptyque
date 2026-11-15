@@ -95,9 +95,17 @@ pub fn sanitize(name: &str) -> String {
     out
 }
 
+/// Fichiers de travail d'une conversion ou d'une réparation interrompue,
+/// à côté du fichier qu'ils concernent (voir `remux` dans le moteur) : tant
+/// qu'il en reste un, le nom est pris. Leur remise en ordre peut recréer le
+/// fichier (original remis en place) : un nouvel enregistrement qui aurait
+/// choisi ce nom serait écrasé, ou l'écraserait.
+const WORK_SUFFIXES: &[&str] = &[".avant-reparation", ".reparation", ".partiel", ".reparation.partiel"];
+
 /// Chemin libre dans `dir` : `nom.ext`, sinon `nom (2).ext`, `nom (3).ext`…
 /// `taken` contient les chemins déjà réservés pendant la session (les
-/// fichiers ne sont créés qu'au démarrage de l'encodeur).
+/// fichiers ne sont créés qu'au démarrage de l'encodeur). Un nom qui a
+/// encore des fichiers de travail ([`WORK_SUFFIXES`]) est pris.
 pub fn unique_path(dir: &Path, stem: &str, ext: &str, taken: &HashSet<PathBuf>) -> PathBuf {
     let candidate = |n: u32| {
         let name = if n <= 1 { format!("{stem}.{ext}") } else { format!("{stem} ({n}).{ext}") };
@@ -106,7 +114,8 @@ pub fn unique_path(dir: &Path, stem: &str, ext: &str, taken: &HashSet<PathBuf>) 
     let mut n = 1;
     loop {
         let path = candidate(n);
-        if !path.exists() && !taken.contains(&path) {
+        let leftover = || WORK_SUFFIXES.iter().any(|suffix| crate::storage::sibling(&path, suffix).exists());
+        if !path.exists() && !taken.contains(&path) && !leftover() {
             return path;
         }
         n += 1;
@@ -149,5 +158,20 @@ mod tests {
         taken.insert(first);
         let second = unique_path(&dir, &stem, "mkv", &taken);
         assert!(second.ends_with(format!("{stem} (2).mkv")));
+    }
+
+    #[test]
+    fn unique_path_skips_names_with_leftovers() {
+        let dir = std::env::temp_dir().join(format!("polyptyque-restes-{}", crate::config::new_id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        // Original d'une réparation interrompue, pas encore remis en place.
+        std::fs::write(dir.join("a.mkv.avant-reparation"), "original").unwrap();
+        std::fs::write(dir.join("a (2).mkv.reparation"), "réparé").unwrap();
+        std::fs::write(dir.join("b.mp4.partiel"), "").unwrap();
+        let none = HashSet::new();
+        assert_eq!(unique_path(&dir, "a", "mkv", &none), dir.join("a (3).mkv"));
+        assert_eq!(unique_path(&dir, "b", "mp4", &none), dir.join("b (2).mp4"));
+        assert_eq!(unique_path(&dir, "b", "mkv", &none), dir.join("b.mkv"));
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

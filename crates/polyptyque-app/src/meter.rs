@@ -8,6 +8,9 @@
 //! - Micro : écouté seulement pendant que les réglages sont ouverts, pour
 //!   vérifier le micro choisi.
 //!
+//! Une fenêtre n'est écoutée que pour une source, avec les mêmes règles que
+//! l'enregistrement (voir [`crate::claims`]).
+//!
 //! Même capture que l'enregistrement : si le niveau bouge ici, il bougera
 //! pendant l'enregistrement. Rien n'est écrit ni encodé, seule la crête est
 //! gardée.
@@ -20,7 +23,8 @@ use std::time::{Duration, Instant};
 use polyptyque_core::config::{Source, CHANNELS, SAMPLE_RATE};
 use polyptyque_core::level::{peak_of, RECENT_SOUND_HNS, SOUND_THRESHOLD};
 use polyptyque_core::platform::{AudioCapture, AudioPacket, Platform, WindowHandle};
-use polyptyque_engine::resolve;
+
+use crate::claims::{self, Release, TrackedWindows, WindowClaims};
 
 /// Attente maximale d'une lecture : le fil vérifie au moins aussi souvent
 /// s'il doit s'arrêter.
@@ -102,18 +106,24 @@ pub struct SourceMeters {
 impl SourceMeters {
     /// Une écoute par source ; celles que `engine_listens` désigne démarrent
     /// suspendues.
-    pub fn start(platform: &Arc<dyn Platform>, sources: &[Source], engine_listens: impl Fn(&str) -> bool) -> Self {
+    pub fn start(
+        platform: &Arc<dyn Platform>,
+        sources: &[Source],
+        tracked: &TrackedWindows,
+        engine_listens: impl Fn(&str) -> bool,
+    ) -> Self {
+        let claims = WindowClaims::new(sources, tracked.clone());
         let meters = sources
             .iter()
             .filter_map(|source| {
                 let level = Arc::new(Level::default());
                 let paused = Arc::new(AtomicBool::new(engine_listens(&source.id)));
                 let stop = Arc::new(AtomicBool::new(false));
-                let (platform, source_clone, level_clone, paused_clone, stop_clone) =
-                    (platform.clone(), source.clone(), level.clone(), paused.clone(), stop.clone());
+                let (platform, source_clone, level_clone, paused_clone, stop_clone, claims) =
+                    (platform.clone(), source.clone(), level.clone(), paused.clone(), stop.clone(), claims.clone());
                 thread::Builder::new()
                     .name(format!("{}-niveau", source.name))
-                    .spawn(move || run_source(platform, source_clone, level_clone, paused_clone, stop_clone))
+                    .spawn(move || run_source(platform, source_clone, level_clone, paused_clone, stop_clone, claims))
                     .map_err(|e| log::warn!("niveau sonore de {} indisponible : {e}", source.name))
                     .ok()
                     .map(|_| SourceMeter { source_id: source.id.clone(), level, paused, stop })
@@ -143,7 +153,10 @@ fn run_source(
     level: Arc<Level>,
     paused: Arc<AtomicBool>,
     stop: Arc<AtomicBool>,
+    claims: Arc<WindowClaims>,
 ) {
+    let run_id = claims::next_run();
+    let _release = Release(claims.clone(), run_id);
     // Capture en cours, avec la fenêtre et le processus écoutés.
     let mut capture: Option<(Box<dyn AudioCapture>, WindowHandle, u32)> = None;
     let mut next_check = Instant::now();
@@ -152,7 +165,9 @@ fn run_source(
 
     while !stop.load(Ordering::Relaxed) {
         if paused.load(Ordering::Relaxed) {
-            capture = None;
+            if capture.take().is_some() {
+                claims.release(run_id);
+            }
             next_check = Instant::now();
             thread::sleep(IDLE);
             continue;
@@ -160,17 +175,22 @@ fn run_source(
         let now = Instant::now();
         if now >= next_check {
             next_check = now + RETRY;
-            // Fenêtre fermée : son programme peut continuer sans elle, ou
-            // revenir dans un autre processus. On cherche de nouveau.
-            if capture.as_ref().is_some_and(|(_, handle, _)| !platform.is_window_alive(*handle)) {
+            // Fenêtre fermée (son programme peut continuer sans elle, ou
+            // revenir dans un autre processus), ou que l'enregistrement suit
+            // pour une autre source : on cherche de nouveau.
+            if capture.as_ref().is_some_and(|(_, handle, _)| {
+                !platform.is_window_alive(*handle) || claims.should_switch(&source.id, *handle)
+            }) {
                 capture = None;
+                claims.release(run_id);
             }
             if capture.is_none() {
                 let windows = platform.list_windows();
-                if let Some(window) = resolve::find_window(platform.as_ref(), &source, &windows) {
+                if let Some(window) = claims.find(platform.as_ref(), run_id, &source, &windows) {
                     match platform.open_audio_capture(window.pid, SAMPLE_RATE, CHANNELS) {
                         Ok(c) => capture = Some((c, window.handle, window.pid)),
                         Err(e) => {
+                            claims.release(run_id);
                             if warned_pid != Some(window.pid) {
                                 log::warn!(
                                     "[{}] niveau sonore du processus {} indisponible : {e:#}",
@@ -199,6 +219,7 @@ fn run_source(
             Err(e) => {
                 log::debug!("[{}] écoute du processus {pid} interrompue : {e:#}", source.name);
                 capture = None;
+                claims.release(run_id);
                 next_check = Instant::now() + RETRY;
             }
         }

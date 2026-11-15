@@ -13,7 +13,9 @@ use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 use std::thread;
+use std::time::{Duration, SystemTime};
 
 use anyhow::{bail, Context, Result};
 use polyptyque_core::naming;
@@ -54,7 +56,9 @@ pub fn inspect(platform: &dyn Platform, ffmpeg: &Path, path: &Path) -> Result<Me
     platform.prepare_encoder_process(&mut command);
     // Sans fichier de sortie, FFmpeg décrit l'entrée puis s'arrête en erreur :
     // c'est attendu.
-    let output = command.output().with_context(|| tr!("lancement de {}", ffmpeg.display()))?;
+    let child = command.spawn().with_context(|| tr!("lancement de {}", ffmpeg.display()))?;
+    platform.end_helper_with_polyptyque(&child);
+    let output = child.wait_with_output().with_context(|| tr!("lancement de {}", ffmpeg.display()))?;
     let text = String::from_utf8_lossy(&output.stderr);
     let info = parse_media_info(&text);
     if info.video_streams == 0 && info.audio_streams == 0 {
@@ -84,6 +88,7 @@ pub fn convert(
     if !is_convertible(input) {
         bail!(tr!("seuls les fichiers .mkv et .mka peuvent être convertis"));
     }
+    recover_leftovers(input.parent().unwrap_or(Path::new(".")));
     let output = converted_path(input);
     log::info!("conversion : {} -> {}", input.display(), output.display());
     remux_file(platform, ffmpeg, input, &output, Container::Mp4, on_progress, cancel)
@@ -113,7 +118,10 @@ pub fn repair(
         bail!(tr!("seuls les fichiers .mkv et .mka peuvent être réparés"));
     }
     log::info!("réparation : {}", input.display());
-    let repaired = storage::sibling(input, ".reparation");
+    // Restes d'une réparation interrompue (original à remettre en place).
+    recover_leftovers(input.parent().unwrap_or(Path::new(".")));
+    let _working = InProgress::mark(input);
+    let repaired = storage::sibling(input, REPAIRED_SUFFIX);
     let result = remux_file(platform, ffmpeg, input, &repaired, Container::Matroska, on_progress, cancel)
         .and_then(|()| check_repaired_size(input, &repaired))
         .and_then(|()| replace_with(input, &repaired));
@@ -123,7 +131,13 @@ pub fn repair(
             Ok(input.to_path_buf())
         }
         Err(e) => {
-            let _ = fs::remove_file(&repaired);
+            if input.exists() {
+                let _ = fs::remove_file(&repaired);
+            } else {
+                // L'original n'a pas pu être remis à sa place : la copie
+                // réparée (vérifiée) est gardée elle aussi.
+                log::error!("réparation de {} : copie réparée gardée sous {}", input.display(), repaired.display());
+            }
             log::warn!("réparation de {} : {e:#}", input.display());
             Err(e)
         }
@@ -147,16 +161,168 @@ fn check_repaired_size(original: &Path, repaired: &Path) -> Result<()> {
 const MIN_REPAIRED_PERCENT: u64 = 95;
 
 /// Remplace `original` par `replacement`, en remettant l'original en place
-/// si le second renommage échoue.
+/// si le second renommage échoue. Si même cela échoue, l'original reste
+/// sous `….avant-reparation` (remis en place par [`recover_leftovers`]) et
+/// la copie réparée est gardée : rien n'est perdu.
 fn replace_with(original: &Path, replacement: &Path) -> Result<()> {
-    let backup = storage::sibling(original, ".avant-reparation");
-    fs::rename(original, &backup).context(tr!("le fichier d'origine est utilisé par un autre programme"))?;
-    if let Err(e) = fs::rename(replacement, original) {
-        let _ = fs::rename(&backup, original);
+    let backup = storage::sibling(original, BACKUP_SUFFIX);
+    rename_retrying(original, &backup).context(tr!("le fichier d'origine est utilisé par un autre programme"))?;
+    if let Err(e) = rename_retrying(replacement, original) {
+        if let Err(restore) = rename_retrying(&backup, original) {
+            log::error!("original de {} resté sous {} : {restore}", original.display(), backup.display());
+            return Err(e).context(tr!(
+                "remplacement du fichier d'origine : l'original est conservé sous {}",
+                backup.display()
+            ));
+        }
         return Err(e).context(tr!("remplacement du fichier d'origine"));
     }
     let _ = fs::remove_file(&backup);
     Ok(())
+}
+
+/// Suffixes des fichiers de travail : copie inachevée, copie réparée
+/// vérifiée, original mis de côté pendant son remplacement. Les mêmes
+/// rendent un nom pris pour `naming::unique_path`.
+const PARTIAL_SUFFIX: &str = ".partiel";
+const REPAIRED_SUFFIX: &str = ".reparation";
+const BACKUP_SUFFIX: &str = ".avant-reparation";
+
+/// Renommages tentés avant d'abandonner : un antivirus ou l'indexation de
+/// Windows ouvrent souvent un fichier tout juste écrit, quelques instants.
+const RENAME_ATTEMPTS: u32 = 5;
+
+fn rename_retrying(from: &Path, to: &Path) -> std::io::Result<()> {
+    let mut attempt = 1;
+    loop {
+        match fs::rename(from, to) {
+            Ok(()) => return Ok(()),
+            Err(_) if attempt < RENAME_ATTEMPTS && from.exists() => {
+                thread::sleep(Duration::from_millis(200 * attempt as u64));
+                attempt += 1;
+            }
+            Err(e) => return Err(e),
+        }
+    }
+}
+
+/// Noms (en minuscules) des fichiers en cours de conversion, de
+/// réparation ou d'enregistrement dans ce processus : [`recover_leftovers`]
+/// n'y touche jamais.
+static IN_PROGRESS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// Inscrit un fichier parmi ceux en cours, jusqu'à la fin de la portée.
+pub(crate) struct InProgress(String);
+
+impl InProgress {
+    pub(crate) fn mark(path: &Path) -> Self {
+        let name = lowercase_name(path);
+        IN_PROGRESS.lock().unwrap_or_else(|e| e.into_inner()).push(name.clone());
+        Self(name)
+    }
+
+    fn contains(name: &str) -> bool {
+        IN_PROGRESS.lock().unwrap_or_else(|e| e.into_inner()).iter().any(|n| n == name)
+    }
+}
+
+impl Drop for InProgress {
+    fn drop(&mut self) {
+        let mut names = IN_PROGRESS.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(index) = names.iter().position(|n| *n == self.0) {
+            names.remove(index);
+        }
+    }
+}
+
+fn lowercase_name(path: &Path) -> String {
+    path.file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default()
+}
+
+/// Une copie inachevée modifiée depuis moins longtemps peut appartenir à
+/// une conversion encore en cours : elle est laissée.
+const PARTIAL_MIN_AGE: Duration = Duration::from_secs(120);
+
+/// Remet en ordre, dans `dir`, les restes d'une conversion ou d'une
+/// réparation interrompue (Polyptyque fermé ou planté, renommage refusé) :
+/// - `X.mkv.avant-reparation` (l'original) sans `X.mkv` : remis en place ;
+/// - `X.mkv.reparation` (copie réparée, déjà vérifiée) : remise en place
+///   si ni `X.mkv` ni son original n'existent, effacée si `X.mkv` est là
+///   sans original de côté ;
+/// - `X.mp4.partiel`, `X.m4a.partiel`, `X.mkv.reparation.partiel` (copie
+///   inachevée) : effacé.
+///
+/// Rien d'autre n'est touché : ni un enregistrement (`.mkv`, `.mka`), ni un
+/// fichier en cours de conversion ou de réparation. Renvoie le nombre de
+/// fichiers remis en place ou effacés.
+pub fn recover_leftovers(dir: &Path) -> usize {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return 0;
+    };
+    let names: Vec<String> =
+        entries.filter_map(|e| e.ok()).map(|e| e.file_name().to_string_lossy().into_owned()).collect();
+    let mut done = 0;
+    // Un fichier de travail rattaché à un enregistrement `.mkv` ou `.mka`
+    // qui n'est pas en cours de traitement.
+    let work_file = |name: &str, suffix: &str| -> Option<PathBuf> {
+        let base = name.strip_suffix(suffix)?;
+        let path = dir.join(base);
+        (is_convertible(&path) && !InProgress::contains(&base.to_lowercase())).then_some(path)
+    };
+    for name in &names {
+        let Some(original) = work_file(name, BACKUP_SUFFIX) else {
+            continue;
+        };
+        if !original.exists() {
+            match rename_retrying(&dir.join(name), &original) {
+                Ok(()) => {
+                    log::warn!("réparation interrompue : original remis en place ({})", original.display());
+                    done += 1;
+                }
+                Err(e) => log::error!("original de {} non remis en place : {e}", original.display()),
+            }
+        }
+    }
+    for name in &names {
+        let Some(original) = work_file(name, REPAIRED_SUFFIX) else {
+            continue;
+        };
+        let repaired = dir.join(name);
+        if storage::sibling(&original, BACKUP_SUFFIX).exists() {
+            // Original mis de côté et non remis en place : rien n'est effacé.
+            continue;
+        }
+        let result = if original.exists() {
+            fs::remove_file(&repaired)
+        } else {
+            rename_retrying(&repaired, &original)
+        };
+        match result {
+            Ok(()) => {
+                log::info!("reste d'une réparation interrompue traité : {}", repaired.display());
+                done += 1;
+            }
+            Err(e) => log::warn!("reste d'une réparation interrompue ({}) : {e}", repaired.display()),
+        }
+    }
+    for name in &names {
+        let Some(base) = name.strip_suffix(PARTIAL_SUFFIX) else {
+            continue;
+        };
+        let lower = base.to_lowercase();
+        let ours = [".mp4", ".m4a", ".mkv.reparation", ".mka.reparation"].iter().any(|ext| lower.ends_with(ext));
+        let path = dir.join(name);
+        let old = fs::metadata(&path)
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|modified| SystemTime::now().duration_since(modified).ok())
+            .is_some_and(|age| age >= PARTIAL_MIN_AGE);
+        if ours && old && !InProgress::contains(&name.to_lowercase()) && fs::remove_file(&path).is_ok() {
+            log::info!("copie inachevée effacée : {}", path.display());
+            done += 1;
+        }
+    }
+    done
 }
 
 /// Recopie `input` dans `output` sans réencodage, sous un nom temporaire
@@ -173,7 +339,8 @@ fn remux_file(
 ) -> Result<()> {
     let source = inspect(platform, ffmpeg, input)?;
     let input_size = fs::metadata(input).map(|m| m.len()).unwrap_or(0);
-    let partial = storage::sibling(output, ".partiel");
+    let partial = storage::sibling(output, PARTIAL_SUFFIX);
+    let _working = InProgress::mark(&partial);
     // Reste d'une conversion interrompue : FFmpeg refuserait de l'écraser.
     let _ = fs::remove_file(&partial);
     let args = remux_args(input, &partial, container, source.video_codec.as_deref() == Some("hevc"));
@@ -182,6 +349,7 @@ fn remux_file(
     command.args(&args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     platform.prepare_encoder_process(&mut command);
     let mut child = command.spawn().with_context(|| tr!("lancement de {}", ffmpeg.display()))?;
+    platform.end_helper_with_polyptyque(&child);
 
     // Les erreurs sont lues à part pour que FFmpeg ne bloque jamais dessus.
     let stderr = child.stderr.take().map(|mut pipe| {
@@ -225,7 +393,7 @@ fn remux_file(
     } else {
         inspect(platform, ffmpeg, &partial)
             .and_then(|copy| verify(&source, &copy))
-            .and_then(|()| fs::rename(&partial, output).context(tr!("renommage du fichier terminé")))
+            .and_then(|()| rename_retrying(&partial, output).context(tr!("renommage du fichier terminé")))
     };
     if result.is_err() {
         let _ = fs::remove_file(&partial);
@@ -399,6 +567,85 @@ At least one output file must be specified";
         assert!(check_repaired_size(&original, &repaired).is_ok());
         fs::write(&repaired, vec![0u8; 5_000]).unwrap();
         assert!(check_repaired_size(&original, &repaired).is_err());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn interrupted_repairs_are_put_back_in_place() {
+        let dir = std::env::temp_dir().join(format!("polyptyque-restes-{}", polyptyque_core::config::new_id()));
+        fs::create_dir_all(&dir).unwrap();
+        let write = |name: &str, content: &str| fs::write(dir.join(name), content).unwrap();
+        let read = |name: &str| fs::read_to_string(dir.join(name)).ok();
+        let old = |name: &str| {
+            let file = fs::File::options().write(true).open(dir.join(name)).unwrap();
+            file.set_modified(SystemTime::now() - Duration::from_secs(3_600)).unwrap();
+        };
+        // Original resté de côté, seul : remis en place.
+        write("a.mkv.avant-reparation", "original a");
+        // Original de côté et copie réparée, sans fichier : l'original revient,
+        // la copie est effacée.
+        write("b.mkv.avant-reparation", "original b");
+        write("b.mkv.reparation", "réparé b");
+        // Copie réparée seule : elle prend la place.
+        write("c.mka.reparation", "réparé c");
+        // Copie réparée d'un original intact : effacée.
+        write("d.mkv", "original d");
+        write("d.mkv.reparation", "réparé d");
+        // Un fichier présent n'est jamais remplacé par ce qui était de côté.
+        write("e.mkv", "nouvel enregistrement e");
+        write("e.mkv.avant-reparation", "original e");
+        // Copies inachevées : effacées si anciennes, gardées si récentes.
+        write("f.mp4.partiel", "");
+        old("f.mp4.partiel");
+        write("g.mkv.reparation.partiel", "");
+        old("g.mkv.reparation.partiel");
+        write("h.m4a.partiel", "");
+        // Ni enregistrement ni fichier étranger.
+        write("i.mkv", "enregistrement i");
+        write("j.mov.partiel", "");
+        old("j.mov.partiel");
+        write("k.txt.avant-reparation", "autre");
+
+        assert_eq!(recover_leftovers(&dir), 7);
+        assert_eq!(read("a.mkv").as_deref(), Some("original a"));
+        assert_eq!(read("b.mkv").as_deref(), Some("original b"));
+        assert_eq!(read("b.mkv.reparation"), None);
+        assert_eq!(read("c.mka").as_deref(), Some("réparé c"));
+        assert_eq!(read("d.mkv").as_deref(), Some("original d"));
+        assert_eq!(read("d.mkv.reparation"), None);
+        assert_eq!(read("e.mkv").as_deref(), Some("nouvel enregistrement e"));
+        assert_eq!(read("e.mkv.avant-reparation").as_deref(), Some("original e"));
+        assert_eq!(read("f.mp4.partiel"), None);
+        assert_eq!(read("g.mkv.reparation.partiel"), None);
+        assert!(read("h.m4a.partiel").is_some());
+        assert!(read("i.mkv").is_some());
+        assert!(read("j.mov.partiel").is_some());
+        assert!(read("k.txt.avant-reparation").is_some());
+
+        // Un fichier en cours de réparation n'est pas touché.
+        fs::rename(dir.join("a.mkv"), dir.join("a.mkv.avant-reparation")).unwrap();
+        {
+            let _working = InProgress::mark(&dir.join("a.mkv"));
+            assert_eq!(recover_leftovers(&dir), 0);
+        }
+        assert_eq!(recover_leftovers(&dir), 1);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn failed_replacement_keeps_the_original() {
+        let dir = std::env::temp_dir().join(format!("polyptyque-remplacement-{}", polyptyque_core::config::new_id()));
+        fs::create_dir_all(&dir).unwrap();
+        let original = dir.join("a.mkv");
+        fs::write(&original, "original").unwrap();
+        // Copie réparée introuvable : le second renommage échoue, l'original revient.
+        assert!(replace_with(&original, &dir.join("a.mkv.reparation")).is_err());
+        assert_eq!(fs::read_to_string(&original).unwrap(), "original");
+        assert!(!dir.join("a.mkv.avant-reparation").exists());
+        fs::write(dir.join("a.mkv.reparation"), "réparé").unwrap();
+        replace_with(&original, &dir.join("a.mkv.reparation")).unwrap();
+        assert_eq!(fs::read_to_string(&original).unwrap(), "réparé");
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
         fs::remove_dir_all(dir).unwrap();
     }
 

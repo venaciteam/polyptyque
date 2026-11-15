@@ -10,6 +10,9 @@
 //! Les cartes montrent la partie gardée de chaque fenêtre (rognage) ;
 //! l'éditeur de rognage a son propre aperçu de la fenêtre entière
 //! ([`start_whole`]).
+//!
+//! Comme pendant l'enregistrement, une fenêtre n'est montrée que par une
+//! source (voir [`crate::claims`]).
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -22,6 +25,8 @@ use polyptyque_core::platform::{Platform, VideoCapture, WindowHandle};
 use polyptyque_core::video::{fit_rect, nv12_to_rgba};
 use polyptyque_engine::resolve;
 use slint::{Rgba8Pixel, SharedPixelBuffer};
+
+use crate::claims::{self, Release, TrackedWindows, WindowClaims};
 
 /// Définitions possibles des aperçus (16:9), de la plus légère à la plus fine.
 const PREVIEW_SIZES: [(u32, u32); 3] = [(640, 360), (960, 540), (1280, 720)];
@@ -78,11 +83,19 @@ impl PreviewWorker {
 
 /// Aperçu de la fenêtre entière, sans rognage, pour l'éditeur de rognage :
 /// l'image a les proportions de la fenêtre (sans bandes noires).
-pub fn start_whole(platform: &Arc<dyn Platform>, source: &Source) -> Option<PreviewWorker> {
-    spawn(platform, source, Arc::new(AtomicU64::new(pack(WHOLE_SIZE))), true)
+/// `claims` : celles des aperçus des cartes, pour montrer la même fenêtre
+/// que la carte de la source.
+pub fn start_whole(platform: &Arc<dyn Platform>, source: &Source, claims: Arc<WindowClaims>) -> Option<PreviewWorker> {
+    spawn(platform, source, Arc::new(AtomicU64::new(pack(WHOLE_SIZE))), true, claims)
 }
 
-fn spawn(platform: &Arc<dyn Platform>, source: &Source, size: Arc<AtomicU64>, whole: bool) -> Option<PreviewWorker> {
+fn spawn(
+    platform: &Arc<dyn Platform>,
+    source: &Source,
+    size: Arc<AtomicU64>,
+    whole: bool,
+    claims: Arc<WindowClaims>,
+) -> Option<PreviewWorker> {
     let slot =
         Arc::new(Mutex::new(Slot { frame: None, state: PreviewState::Searching, state_changed: true, content: None }));
     let stop = Arc::new(AtomicBool::new(false));
@@ -90,7 +103,7 @@ fn spawn(platform: &Arc<dyn Platform>, source: &Source, size: Arc<AtomicU64>, wh
         (platform.clone(), source.clone(), slot.clone(), stop.clone());
     thread::Builder::new()
         .name(format!("{}-apercu", source.name))
-        .spawn(move || run(platform, source_clone, slot_clone, stop_clone, size, whole))
+        .spawn(move || run(platform, source_clone, slot_clone, stop_clone, size, whole, claims))
         .map_err(|e| log::warn!("aperçu de {} indisponible : {e}", source.name))
         .ok()
         .map(|_| PreviewWorker { source_id: source.id.clone(), slot, stop })
@@ -131,17 +144,28 @@ pub struct PreviewManager {
     workers: Vec<PreviewWorker>,
     /// Définition demandée, commune à tous les aperçus.
     size: Arc<AtomicU64>,
+    /// Fenêtres montrées par les aperçus (`None` : aperçus jamais lancés).
+    claims: Option<Arc<WindowClaims>>,
 }
 
 impl PreviewManager {
-    pub fn start(platform: &Arc<dyn Platform>, sources: &[Source], size: (u32, u32)) -> Self {
+    pub fn start(platform: &Arc<dyn Platform>, sources: &[Source], size: (u32, u32), tracked: &TrackedWindows) -> Self {
         let wanted = Arc::new(AtomicU64::new(pack(size)));
-        let workers = sources.iter().filter_map(|source| spawn(platform, source, wanted.clone(), false)).collect();
-        Self { workers, size: wanted }
+        let claims = WindowClaims::new(sources, tracked.clone());
+        let workers = sources
+            .iter()
+            .filter_map(|source| spawn(platform, source, wanted.clone(), false, claims.clone()))
+            .collect();
+        Self { workers, size: wanted, claims: Some(claims) }
     }
 
     pub fn workers(&self) -> &[PreviewWorker] {
         &self.workers
+    }
+
+    /// Fenêtres montrées par les aperçus, s'ils ont été lancés.
+    pub fn claims(&self) -> Option<Arc<WindowClaims>> {
+        self.claims.clone()
     }
 
     /// Change la définition : chaque aperçu se recrée à la nouvelle taille
@@ -157,7 +181,10 @@ impl PreviewManager {
         let Some(index) = self.workers.iter().position(|w| w.source_id == source.id) else {
             return false;
         };
-        match spawn(platform, source, self.size.clone(), false) {
+        let Some(claims) = self.claims.clone() else {
+            return false;
+        };
+        match spawn(platform, source, self.size.clone(), false, claims) {
             Some(worker) => {
                 self.workers[index] = worker;
                 true
@@ -178,7 +205,10 @@ fn run(
     stop: Arc<AtomicBool>,
     size: Arc<AtomicU64>,
     whole: bool,
+    claims: Arc<WindowClaims>,
 ) {
+    let run_id = claims::next_run();
+    let _release = Release(claims.clone(), run_id);
     // Vrai si l'état a changé.
     let set_state = |state: PreviewState| {
         let mut slot = lock(&slot);
@@ -213,7 +243,7 @@ fn run(
         if capture.is_none() && now >= next_search {
             next_search = now + SEARCH_INTERVAL;
             let windows = platform.list_windows();
-            match resolve::find_window(platform.as_ref(), &source, &windows) {
+            match claims.find(platform.as_ref(), run_id, &source, &windows) {
                 Some(window) => {
                     if missing_since.take().is_some() && explained {
                         log::info!("[{name}] aperçu : fenêtre retrouvée");
@@ -237,6 +267,7 @@ fn run(
                             }
                         }
                         Err(e) => {
+                            claims.release(run_id);
                             let message = format!("{e:#}");
                             if set_state(PreviewState::Failed(message.clone())) {
                                 log::warn!("[{name}] aperçu impossible : {message}");
@@ -260,10 +291,14 @@ fn run(
             }
         }
 
-        let (mut lost, mut interrupted) = (false, false);
+        let (mut lost, mut interrupted, mut switch) = (false, false, false);
         if let Some((c, handle)) = capture.as_mut() {
             if !platform.is_window_alive(*handle) {
                 lost = true;
+            } else if now >= next_minimized_check && claims.should_switch(&source.id, *handle) {
+                // L'enregistrement suit une autre fenêtre pour cette source,
+                // ou suit celle-ci pour une autre : la bonne est cherchée.
+                switch = true;
             } else {
                 if now >= next_minimized_check && !failing {
                     next_minimized_check = now + Duration::from_millis(500);
@@ -317,9 +352,16 @@ fn run(
             capture = None;
             next_search = now + SEARCH_INTERVAL;
         }
+        if switch {
+            capture = None;
+            claims.release(run_id);
+            set_state(PreviewState::Searching);
+            next_search = now;
+        }
         if lost {
             // Fenêtre fermée.
             capture = None;
+            claims.release(run_id);
             set_state(PreviewState::Missing);
             next_search = now + SEARCH_INTERVAL;
         }

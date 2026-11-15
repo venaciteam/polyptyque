@@ -126,6 +126,14 @@ pub trait Platform: Send + Sync {
     /// Horloge commune, en centaines de nanosecondes.
     fn now_hns(&self) -> u64;
 
+    /// Temps passé en veille depuis le démarrage de l'ordinateur, en
+    /// centaines de nanosecondes, si le système sait le mesurer : un saut de
+    /// l'horloge commune n'est une mise en veille que si ce temps a avancé
+    /// d'autant. `None` : tout saut est tenu pour une veille.
+    fn suspended_hns(&self) -> Option<u64> {
+        None
+    }
+
     /// Capture de la partie `crop` de la fenêtre, mise à l'échelle dans
     /// `width` × `height` (proportions conservées, bandes noires). À appeler
     /// sur le fil qui utilisera la capture.
@@ -159,6 +167,13 @@ pub trait Platform: Send + Sync {
     /// Réglages propres au système pour les processus FFmpeg (pas de
     /// fenêtre, pas de propagation du Ctrl+C…).
     fn prepare_encoder_process(&self, command: &mut Command);
+
+    /// Rattache un FFmpeg auxiliaire (conversion, réparation, lecture des
+    /// pistes, essai d'encodeur) à Polyptyque : il est arrêté avec lui,
+    /// plantage compris, au lieu de lui survivre s'il reste figé. À appeler
+    /// juste après son lancement. Jamais pour un FFmpeg d'enregistrement,
+    /// qui doit pouvoir terminer son fichier seul.
+    fn end_helper_with_polyptyque(&self, _child: &std::process::Child) {}
 
     /// Empêche la mise en veille et affine la précision des minuteries
     /// pendant un enregistrement. À appeler depuis le fil principal.

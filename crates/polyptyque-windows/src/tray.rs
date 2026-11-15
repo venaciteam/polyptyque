@@ -24,10 +24,11 @@ use windows::Win32::UI::Shell::{
     NOTIFYICON_VERSION_4,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    AppendMenuW, CreatePopupMenu, DestroyMenu, GetCursorPos, GetSystemMetrics, IsIconic, LoadIconW, LoadImageW,
-    PostMessageW, RegisterWindowMessageW, SetForegroundWindow, ShowWindow, TrackPopupMenu, HICON, IDI_APPLICATION,
-    IMAGE_ICON, LR_DEFAULTCOLOR, LR_SHARED, MF_SEPARATOR, MF_STRING, SM_CXSMICON, SM_CYSMICON, SW_RESTORE,
-    TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON, WM_APP, WM_CONTEXTMENU, WM_NCDESTROY, WM_NULL,
+    AppendMenuW, ChangeWindowMessageFilterEx, CreatePopupMenu, DestroyMenu, GetCursorPos, GetSystemMetrics, IsIconic,
+    LoadIconW, LoadImageW, PostMessageW, RegisterWindowMessageW, SetForegroundWindow, ShowWindow, TrackPopupMenu,
+    HICON, IDI_APPLICATION, IMAGE_ICON, LR_DEFAULTCOLOR, LR_SHARED, MF_SEPARATOR, MF_STRING, MSGFLT_ALLOW, SM_CXSMICON,
+    SM_CYSMICON, SW_RESTORE, TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON, WM_APP, WM_CONTEXTMENU, WM_NCDESTROY,
+    WM_NULL,
 };
 
 use crate::windows_list::hwnd;
@@ -89,6 +90,12 @@ fn taskbar_created_message() -> u32 {
 /// message de Windows : il doit seulement planifier la suite.
 pub fn watch(window: isize, handler: impl Fn(TrayEvent) + 'static) -> Result<()> {
     HANDLER.with(|h| *h.borrow_mut() = Some(Box::new(handler)));
+    // Polyptyque lancé en administrateur : Windows écarte les messages des
+    // programmes aux droits ordinaires, dont la demande d'affichage d'une
+    // seconde copie lancée normalement. Celle-ci seule est acceptée.
+    if let Err(e) = unsafe { ChangeWindowMessageFilterEx(hwnd(window), show_request_message(), MSGFLT_ALLOW, None) } {
+        log::warn!("demande d'affichage par une autre copie non autorisée : {e}");
+    }
     unsafe { SetWindowSubclass(hwnd(window), Some(window_proc), SUBCLASS_ID, 0) }
         .ok()
         .context("icône de la zone de notification")

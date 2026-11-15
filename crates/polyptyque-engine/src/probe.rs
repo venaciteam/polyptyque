@@ -48,6 +48,7 @@ pub fn probe(platform: &dyn Platform, ffmpeg: &Path, choice: EncoderChoice) -> b
     let Ok(mut child) = command.spawn() else {
         return false;
     };
+    platform.end_helper_with_polyptyque(&child);
     let deadline = Instant::now() + PROBE_TIMEOUT;
     loop {
         match child.try_wait() {

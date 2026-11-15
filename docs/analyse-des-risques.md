@@ -21,6 +21,9 @@ type: projet
 > [!success] Mise à jour du 2026-10-23
 > Programmation des enregistrements ajoutée (voir le [[cahier-des-charges#Programmation des enregistrements|cahier des charges]]) : nouveaux scénarios B10, B11 et E11. Le redémarrage par Windows Update (B2) est aussi couvert par l'option « Lancer Polyptyque au démarrage de Windows ».
 
+> [!success] Mise à jour du 2026-11-15
+> Revue de fiabilité du code : B3, D2, A4, A5, A6, D1 et D4 complétés (voir le [[#Plan d'action proposé|plan d'action]]) ; nouveaux scénarios A10, A11, C6, C7, D8 et D9, déjà couverts.
+
 ## Table des matières
 
 1. [[#Principes]]
@@ -74,6 +77,8 @@ Chaque scénario porte un identifiant (A1, B3…) repris dans le plan d'action.
 | A6 | Conversion MP4 interrompue (plantage, coupure) | faible | moyenne | Le MP4 partiel garde son nom définitif et semble valide alors qu'il est tronqué | Écriture sous un nom temporaire, renommé seulement après vérification ; restes supprimés au démarrage | P2 |
 | A7 | Journaux qui s'accumulent | forte | faible | Un journal par lancement et un dossier par session, jamais supprimés | Suppression automatique après 30 jours | P3 |
 | A8 | Mise à jour interrompue ou bloquée | faible | moyenne | Velopack 1.2.161 remplace le dossier du programme en deux temps : l'ancien est mis de côté, puis le nouveau prend sa place. Si le premier temps échoue (fichier verrouillé), l'ancienne version est relancée. Si le second échoue (par exemple un antivirus qui analyse les nouveaux fichiers), la copie mise de côté est effacée : Polyptyque ne démarre plus et doit être réinstallé ; réglages, scènes et profils, rangés ailleurs, sont conservés. Vérifié dans le code de Velopack, qui a corrigé ce défaut le 2026-10-10, pour l'instant seulement dans une préversion | Passer à la première version stable de Velopack qui contient ce correctif (pas de préversion) | P2 |
+| A10 | FFmpeg de conversion, de réparation ou d'essai figé, qui survit à Polyptyque fermé ou planté | faible | faible | Le processus reste en mémoire et garde le fichier ouvert | Objet tâche de Windows fermé avec Polyptyque : ces FFmpeg s'arrêtent avec lui, plantage compris. Jamais ceux d'un enregistrement, qui doivent finir leurs fichiers seuls (réalisé le 2026-11-15) | — |
+| A11 | Installateur ou maintenance qui demande la fermeture de Polyptyque (Gestionnaire de redémarrage) pendant un enregistrement | faible | forte | Traité comme une fin de session : enregistrement arrêté, fin du programme marquée normale alors qu'il reste ouvert | Refus pendant un enregistrement, qui continue ; fermeture ordinaire sinon (réalisé le 2026-11-15) | — |
 | A9 | Mémoire qui grimpe sur 12 h | faible | forte | Mesuré pendant le test d'endurance du 2026-10-21 (14 h 15, trois sources) : environ 415 Mo pour Polyptyque et 195 Mo par FFmpeg, sans croissance constatée | Rien à ajouter | — |
 
 ## B - Windows et le matériel
@@ -101,17 +106,21 @@ Chaque scénario porte un identifiant (A1, B3…) repris dans le plan d'action.
 | C3 | Profil de navigateur supprimé à la main | faible | moyenne | Recréé vide **sans avertissement** : connexions à refaire | Message « Profil introuvable : il faudra te reconnecter » | P3 |
 | C4 | Navigateur désinstallé ou déplacé | faible | moyenne | Message d'échec de lancement au démarrage de l'enregistrement | Proposer de choisir le nouvel emplacement | P3 |
 | C5 | Jeu en plein écran exclusif, contenu protégé | moyenne | moyenne | Image noire (limite connue, documentée) | Rien à ajouter | — |
+| C6 | Deux sources d'un même programme (deux VLC, deux applications Chrome), dont l'une a changé de titre | moyenne | forte | Les deux sources peuvent enregistrer la même fenêtre, et leurs aperçus la montrer | Une fenêtre par source, fenêtre exacte d'une autre jamais prise à défaut ; mêmes règles pour la préparation, les aperçus, les niveaux sonores, la réouverture et « Rétablir la fenêtre » (réalisé le 2026-11-15) | — |
+| C7 | Application du Microsoft Store | moyenne | moyenne | Fenêtre attribuée à `ApplicationFrameHost.exe` : son non capturé, source mal reconnue | Processus de la fenêtre `CoreWindow` de l'application (réalisé le 2026-11-15) ; sources ajoutées avant toujours reconnues ; jamais de relance directe (impossible), message à la place | — |
 
 ## D - Encodage et disque
 
 | N° | Scénario | Prob. | Grav. | Aujourd'hui | Proposition | Prio. |
 |---|---|---|---|---|---|---|
-| D1 | Encodeur planté ou figé | faible | forte | Relance automatique dans `…_partie2.mkv`, environ une seconde perdue (testé en simulation) | Rien à ajouter | — |
+| D1 | Encodeur planté ou figé | faible | forte | Relance automatique dans `…_partie2.mkv`, environ une seconde perdue (testé en simulation) | Rien à ajouter. *2026-11-15 : à l'arrêt, FFmpeg n'est plus tué au bout de 60 s fixes, seulement après 60 s sans progrès (10 min au plus). Encodeur perdu pendant qu'il vide sa file à l'arrêt (ou après une mise en erreur de la source) : une partie de plus vide la file, dans la limite des échecs rapides (testé en simulation)* | — |
 | D2 | Trop d'encodages simultanés pour une carte GeForce | faible | forte | NVIDIA limite le nombre d'encodages simultanés **pour tout l'ordinateur**, tous logiciels confondus (OBS, Discord, enregistrement NVIDIA en arrière-plan…) : 12 aujourd'hui selon NVIDIA, au moins 8 avec le pilote 570 exigé par Polyptyque. Au-delà, FFmpeg refuse avec un message trompeur (`OpenEncodeSessionEx failed: out of memory (10)`). L'encodeur refusé échoue trois fois, puis la source passe en erreur avec ce message. La limite réelle sera sans doute plutôt la puissance de la puce (à mesurer, voir le cahier des charges) | Reconnaître ce refus : bascule automatique de la source sur l'encodage par le processeur, avec un message clair (« limite de la carte NVIDIA atteinte, autres logiciels compris ») | P2 |
 | D3 | Disque plein | moyenne | forte | Estimation avant le départ, alerte, arrêt propre sous 1 Go libre | Rien à ajouter | — |
 | D4 | Disque externe débranché, dossier devenu inaccessible | faible | forte | L'encodeur échoue en boucle, puis chaque source passe en erreur avec un message technique | Bascule automatique vers un dossier de secours (`Vidéos\Polyptyque`) et message clair | P1 |
 | D5 | Dossier sur une clé ou un disque en FAT32 | moyenne | moyenne | Fichiers limités à 4 Go par ce format : l'encodeur échoue à 4 Go et repart dans une nouvelle partie (environ une seconde perdue à chaque fois) | Détection à l'enregistrement des réglages et au démarrage : avertissement, et découpage propre avant 4 Go | P2 |
 | D6 | Dossier sur un disque lent ou en réseau | moyenne | moyenne | Retard de l'encodeur et images perdues affichés | Avertissement au choix du dossier si le lecteur est amovible ou réseau | P3 |
+| D8 | Encodeur qui ne suit plus (machine trop chargée) | moyenne | forte | Les images s'accumulent sans limite (jusqu'à 3 Go dans FFmpeg en 1080p), et la finalisation peut durer très longtemps | File de FFmpeg bornée (environ 128 Mo, 8 à 64 images) ; au-delà de 5 min de retard, source en erreur, fichier fermé proprement (réalisé le 2026-11-15) | — |
+| D9 | Dossier protégé par l'« Accès contrôlé aux dossiers » de Windows (Vidéos) | faible | forte | FFmpeg ne peut pas écrire : message technique, bascule inutile sur le processeur | Refus reconnu, message qui en donne la cause (réalisé le 2026-11-15) | — |
 | D7 | FFmpeg supprimé ou bloqué par l'antivirus | faible | forte | Au démarrage : message clair. En cours d'enregistrement : la relance échoue et la source passe en erreur | Message dédié (« FFmpeg a disparu : vérifier l'antivirus ») | P3 |
 
 ## E - Erreurs de manipulation
@@ -157,20 +166,20 @@ Chaque scénario porte un identifiant (A1, B3…) repris dans le plan d'action.
 > 	- **réparation sans réencodage** des fichiers interrompus (index reconstruit, durée correcte), l'original étant gardé jusqu'à la réussite ;
 > 	- bouton **« Reprendre l'enregistrement »** (nouveaux fichiers, nommés d'après leur heure de départ comme d'habitude : le suffixe `_reprise` prévu n'a pas été ajouté, le nom suffit à les distinguer).
 > - [x] **Fils protégés** (A2) : une erreur interne dans une source est affichée et sa capture relancée.
-> - [x] **Instance unique** (A4) : un second lancement ramène la fenêtre existante.
-> - [x] **Réglages sauvegardés** (A5) : écriture forcée sur le disque, cinq sauvegardes tournantes, restauration automatique.
+> - [x] **Instance unique** (A4) : un second lancement ramène la fenêtre existante. *2026-11-15 : aussi face à une copie lancée en administrateur.*
+> - [x] **Réglages sauvegardés** (A5) : écriture forcée sur le disque, cinq sauvegardes tournantes, restauration automatique. *2026-11-15 : fichier verrouillé relu cinq fois et jamais écrasé, fichier illisible copié en `.invalide`, fichier d'une version plus récente copié en `config.toml.vN` avec un avertissement.*
 > - [x] **Rouvrir et rétablir** (C1, C2, B4) : boutons « Rouvrir » (fenêtre perdue) et « Rétablir la fenêtre » (fenêtre réduite) pendant l'enregistrement ; relance automatique des sources qui l'autorisent.
-> - [x] **Dossier de secours** (D4) : si le dossier d'enregistrement devient inaccessible, la suite est écrite dans `Vidéos\Polyptyque`, avec message.
+> - [x] **Dossier de secours** (D4) : si le dossier d'enregistrement devient inaccessible, la suite est écrite dans `Vidéos\Polyptyque`, avec message. *2026-11-15 : un dossier qui ne répond pas en 5 s compte comme inaccessible ; espace libre et tailles lus avec délai, hors du fil de l'interface ; une partie fermée n'est mesurée qu'une fois, celle restée sur le dossier perdu ne fige pas la mesure de la suite.*
 
 ### Lot 2 - Situations prévisibles
 
 > [!todo] Priorité 2
-> - [x] **Mise en veille** (B3) : *réalisé : arrêt propre et reprise proposée au réveil (choix provisoire).* Polyptyque s'inscrit pour être prévenu par Windows quelques secondes avant la veille, et ferme alors les fichiers proprement. Au réveil, il propose la reprise ou reprend seul dans une nouvelle partie, selon la réponse aux [[#Questions ouvertes]]. La durée de la veille n'est plus comblée d'images figées.
+> - [x] **Mise en veille** (B3) : *réalisé : arrêt propre et reprise proposée au réveil (choix provisoire).* Polyptyque s'inscrit pour être prévenu par Windows quelques secondes avant la veille, et ferme alors les fichiers proprement. Au réveil, il propose la reprise ou reprend seul dans une nouvelle partie, selon la réponse aux [[#Questions ouvertes]]. La durée de la veille n'est plus comblée d'images figées. *2026-11-15 : une veille dont Windows n'a pas prévenu laisse un saut d'horloge ; au-delà de 5 s passées en veille (mesurées par Windows), la partie est fermée et la suite part dans une nouvelle, sans images figées ni silence. Un fil bloqué sans veille ne coupe pas.*
 > - [x] **Après un redémarrage de Windows Update** (B2) : *réalisé : conseil dans le README et le LISEZMOI (pas encore dans l'interface), relance demandée à Windows, bilan « Windows s'est éteint… » avec reprise.* conseil sur les heures d'activité (README et interface) ; bilan et reprise au lancement suivant (lot 1) ; relance automatique de Polyptyque par Windows quand l'utilisateur l'a autorisée (à tester).
 > - [ ] **Mises à jour de Polyptyque** (A8) : passer à la première version stable de Velopack qui corrige l'échec du remplacement.
-> - [x] **Limite d'encodages de la carte NVIDIA** (D2) : bascule automatique sur le processeur pour la source refusée.
+> - [x] **Limite d'encodages de la carte NVIDIA** (D2) : bascule automatique sur le processeur pour la source refusée. *2026-11-15 : refus reconnu dans tout le journal de la partie (FFmpeg 7 et 8 écrivent d'autres erreurs après lui), donc dès le premier échec au lieu du troisième.*
 > - [ ] **FAT32** (D5) : avertissement et découpage propre avant 4 Go.
-> - [x] **Conversion MP4** (A6) : nom temporaire jusqu'à la vérification.
+> - [x] **Conversion MP4** (A6) : nom temporaire jusqu'à la vérification. *2026-11-15 : restes d'une conversion ou d'une réparation interrompue remis en ordre au lancement (dossier des enregistrements et de secours) et avant chaque conversion, renommages réessayés ; FFmpeg auxiliaires arrêtés avec Polyptyque (A10).*
 > - [x] **Programmation** (B10, E11) : anti-veille, lancement au démarrage de Windows, question du démarrage manqué, confirmations (réalisé le 2026-10-23, à tester sur la machine de référence).
 
 ### Lot 3 - Confort et prévention

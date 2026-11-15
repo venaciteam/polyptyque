@@ -13,12 +13,16 @@ use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, bail, Result};
 use polyptyque_core::platform::Platform;
+use polyptyque_core::storage;
 use polyptyque_engine::{probe, remux};
 use tr::tr;
 
 /// Marge d'espace disque gardée libre en plus de la taille du fichier.
 const DISK_MARGIN: u64 = 1_000_000_000;
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
+/// Délai accordé à la remise en ordre des restes d'un dossier : un dossier
+/// qui ne répond pas (partage réseau injoignable) ne retient pas la file.
+const LEFTOVERS_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Ce qu'il faut faire d'un fichier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,8 +43,9 @@ pub enum ConversionEvent {
         input: PathBuf,
         result: Result<PathBuf, String>,
     },
-    /// File vide, y compris après une annulation.
-    Idle,
+    /// File vide, y compris après une annulation, une fois traité le fichier
+    /// numéro `last_job` : périmé si d'autres ont été demandés depuis.
+    Idle { last_job: u64 },
 }
 
 pub struct Converter {
@@ -79,16 +84,32 @@ impl CancelControl {
 }
 
 impl Converter {
-    pub fn start(platform: Arc<dyn Platform>, on_event: impl Fn(ConversionEvent) + Send + 'static) -> Self {
+    /// `leftover_dirs` : dossiers où remettre en ordre les restes d'une
+    /// conversion ou d'une réparation interrompue, avant le premier fichier
+    /// de la file (voir [`remux::recover_leftovers`]).
+    pub fn start(
+        platform: Arc<dyn Platform>,
+        leftover_dirs: Vec<PathBuf>,
+        on_event: impl Fn(ConversionEvent) + Send + 'static,
+    ) -> Self {
         let (jobs, queue) = mpsc::channel();
         let control = Arc::new(CancelControl::default());
         let worker_control = control.clone();
         let worker = thread::Builder::new()
             .name("conversion-mp4".into())
-            .spawn(move || run(platform, queue, worker_control, on_event))
+            .spawn(move || {
+                if recover_leftovers(leftover_dirs, &worker_control) {
+                    run(platform, queue, worker_control, on_event);
+                }
+            })
             .map_err(|e| log::error!("conversion MP4 indisponible : {e}"))
             .ok();
         Self { jobs: Some(jobs), last_job: Cell::new(0), control, worker }
+    }
+
+    /// Numéro du dernier fichier demandé.
+    pub fn last_job(&self) -> u64 {
+        self.last_job.get()
     }
 
     pub fn enqueue(&self, file: PathBuf, kind: JobKind) {
@@ -117,15 +138,62 @@ impl Drop for Converter {
     }
 }
 
+/// Remet en ordre les restes des conversions et réparations interrompues,
+/// sur un fil à part, avant que la file ne commence : rien ne court avec une
+/// conversion demandée dès l'ouverture. Faux si Polyptyque se ferme entre-
+/// temps : un dossier qui ne répond pas (lecteur réseau) ne retient pas sa
+/// fermeture, le fil de remise en ordre est alors abandonné. Chaque dossier
+/// a [`LEFTOVERS_TIMEOUT`] : passé ce délai, la file commence quand même
+/// (sa remise en ordre finit seule, plus tard).
+fn recover_leftovers(dirs: Vec<PathBuf>, control: &CancelControl) -> bool {
+    let mut dirs = dirs;
+    dirs.dedup();
+    if dirs.is_empty() {
+        return true;
+    }
+    let (done, finished) = mpsc::channel::<()>();
+    let started = thread::Builder::new().name("restes-conversion".into()).spawn(move || {
+        for dir in dirs {
+            let shown = dir.display().to_string();
+            match storage::within(LEFTOVERS_TIMEOUT, move || remux::recover_leftovers(&dir)) {
+                Some(0) => {}
+                Some(count) => {
+                    log::info!("{count} reste(s) de conversion ou de réparation remis en ordre dans {shown}")
+                }
+                None => log::warn!(
+                    "restes des conversions interrompues : {shown} ne répond pas en {} s, file démarrée sans attendre",
+                    LEFTOVERS_TIMEOUT.as_secs()
+                ),
+            }
+        }
+        let _ = done.send(());
+    });
+    if let Err(e) = started {
+        log::warn!("restes des conversions interrompues non traités : {e}");
+        return true;
+    }
+    loop {
+        match finished.recv_timeout(Duration::from_millis(100)) {
+            Ok(()) => return true,
+            // Fil arrêté (panique) : la file peut commencer.
+            Err(mpsc::RecvTimeoutError::Disconnected) => return true,
+            Err(mpsc::RecvTimeoutError::Timeout) if *lock(&control.up_to) == u64::MAX => return false,
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+        }
+    }
+}
+
 fn run(
     platform: Arc<dyn Platform>,
     queue: Receiver<(u64, PathBuf, JobKind)>,
     control: Arc<CancelControl>,
     on_event: impl Fn(ConversionEvent),
 ) {
+    let mut last_job = 0;
     while let Ok(first) = queue.recv() {
         let mut next = Some(first);
         while let Some((job, input, kind)) = next {
+            last_job = job;
             if control.begin(job) {
                 on_event(ConversionEvent::Started { input: input.clone(), kind });
                 let result = convert_one(platform.as_ref(), &input, kind, &control.current, &on_event)
@@ -134,7 +202,7 @@ fn run(
             }
             next = queue.try_recv().ok();
         }
-        on_event(ConversionEvent::Idle);
+        on_event(ConversionEvent::Idle { last_job });
     }
 }
 

@@ -18,6 +18,7 @@ use polyptyque_core::control::protocol::{CommandError, Reason, PROTOCOL_VERSION}
 use polyptyque_core::encoder::{bytes_per_hour, EncoderChoice, EncoderKind};
 use polyptyque_core::hotkeys;
 use polyptyque_core::paths;
+use polyptyque_core::platform::WindowInfo;
 use polyptyque_core::schedule::{self, Repeat, Schedule, Slot, TimeOfDay};
 use polyptyque_engine::{probe, remux, SourceState};
 use serde_json::{json, Value};
@@ -129,6 +130,14 @@ fn family_name(family: BrowserFamily) -> &'static str {
 
 fn file_name(path: &Path) -> String {
     path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+}
+
+/// Une autre fenêtre ouverte appartient au même programme : son titre est
+/// alors nécessaire pour les distinguer. Un exécutable illisible (chemin
+/// vide) ne fait jamais « le même programme ».
+fn shares_program(windows: &[WindowInfo], window: &WindowInfo) -> bool {
+    !window.exe.as_os_str().is_empty()
+        && windows.iter().any(|other| other.handle != window.handle && other.exe == window.exe)
 }
 
 impl App {
@@ -287,6 +296,34 @@ impl App {
         self.with_bridge_value(|b| b.get_sheet().to_string())
     }
 
+    /// Refuse quand une fenêtre de saisie ou de confirmation est ouverte :
+    /// ce qu'elle s'apprête à faire porte sur une scène, ses sources ou une
+    /// programmation, qu'une commande ne doit pas changer sous elle. Avec
+    /// `settings` : aussi les réglages, les assistants et le signalement
+    /// (un démarrage les fermerait sans enregistrer la saisie).
+    fn check_no_input_sheet(&self, settings: bool) -> Result<(), CommandError> {
+        let sheet = self.sheet();
+        let open = matches!(
+            sheet.as_str(),
+            "confirm"
+                | "scene-new"
+                | "scene-rename"
+                | "scene-duplicate"
+                | "browser"
+                | "application"
+                | "crop"
+                | "schedule-new"
+                | "schedule-edit"
+        ) || (settings && matches!(sheet.as_str(), "settings" | "assistants" | "report"));
+        if open {
+            return Err(CommandError::new(
+                Reason::Busy,
+                tr!("Une fenêtre de saisie ou de confirmation est ouverte dans Polyptyque : y répondre ou la fermer d'abord."),
+            ));
+        }
+        Ok(())
+    }
+
     // ----- Généralités ------------------------------------------------------------
 
     fn cmd_hello(&self, client: u64, params: &Value) -> Outcome {
@@ -428,6 +465,7 @@ impl App {
 
     fn cmd_scene_create(&self, params: &Value) -> Outcome {
         self.check_unlocked()?;
+        self.check_no_input_sheet(false)?;
         let name = Self::scene_name_param(params)?;
         let activate = flag(params, "activate").unwrap_or(true);
         let id = self.create_scene(&name, activate);
@@ -437,6 +475,7 @@ impl App {
 
     fn cmd_scene_rename(&self, params: &Value) -> Outcome {
         self.check_unlocked()?;
+        self.check_no_input_sheet(false)?;
         let scene = self.find_scene(required(params, "scene")?)?;
         let name = Self::scene_name_param(params)?;
         self.rename_scene(&scene.id, &name);
@@ -446,6 +485,7 @@ impl App {
 
     fn cmd_scene_duplicate(&self, params: &Value) -> Outcome {
         self.check_unlocked()?;
+        self.check_no_input_sheet(false)?;
         let scene = self.scene_param(params)?;
         let name = match text(params, "name").map(str::trim) {
             Some("") => return Err(CommandError::invalid(tr!("Nom de scène manquant."))),
@@ -461,6 +501,7 @@ impl App {
 
     fn cmd_scene_delete(&self, params: &Value) -> Outcome {
         self.check_unlocked()?;
+        self.check_no_input_sheet(false)?;
         let scene = self.find_scene(required(params, "scene")?)?;
         if self.config.borrow().scenes.len() <= 1 {
             return Err(refused(tr!("La dernière scène ne peut pas être supprimée.")));
@@ -476,6 +517,7 @@ impl App {
         let scene = self.find_scene(required(params, "scene")?)?;
         if self.config.borrow().active_scene != scene.id {
             self.check_unlocked()?;
+            self.check_no_input_sheet(false)?;
             self.select_scene(&scene.id);
         }
         Ok(Reply::ok(json!({ "scene": self.scene_json(&scene) })))
@@ -567,14 +609,13 @@ impl App {
         let items: Vec<Value> = windows
             .iter()
             .map(|w| {
-                let same_program = windows.iter().filter(|o| o.exe == w.exe).count();
                 let mut item = json!({
                     "id": w.handle.to_string(),
                     "program": program_name(&w.exe).map(|n| format::capitalize(&n)).unwrap_or_default(),
                     "executable": file_name(&w.exe),
                     "browser": classify_executable(&w.exe).is_some(),
                 });
-                if same_program > 1 {
+                if shares_program(&windows, w) {
                     item["title"] = json!(w.title);
                 }
                 item
@@ -585,6 +626,7 @@ impl App {
 
     fn cmd_add_browser(&self, params: &Value) -> Outcome {
         self.check_unlocked()?;
+        self.check_no_input_sheet(false)?;
         let scene = self.scene_param(params)?;
         let wanted = required(params, "browser")?.trim();
         let installed = self.platform.detect_browsers();
@@ -616,6 +658,7 @@ impl App {
 
     fn cmd_add_application(&self, params: &Value) -> Outcome {
         self.check_unlocked()?;
+        self.check_no_input_sheet(false)?;
         let scene = self.scene_param(params)?;
         let window_id = required(params, "window")?;
         let window = window_id
@@ -627,7 +670,11 @@ impl App {
         let name = match text(params, "name").map(str::trim) {
             Some("") => return Err(CommandError::invalid(tr!("Nom de source manquant."))),
             Some(name) => name.to_string(),
-            None => program_name(&window.exe).map(|n| format::capitalize(&n)).unwrap_or_else(|| window.title.clone()),
+            // Programme illisible : un nom neutre, jamais le titre (il serait
+            // renvoyé au programme et écrit au journal).
+            None => program_name(&window.exe)
+                .map(|n| format::capitalize(&n))
+                .unwrap_or_else(|| tr!("Application {}", scene.source_ids.len() + 1)),
         };
         let id = self.add_application_source(
             &name,
@@ -642,6 +689,7 @@ impl App {
 
     fn cmd_add_to_scene(&self, params: &Value) -> Outcome {
         self.check_unlocked()?;
+        self.check_no_input_sheet(false)?;
         let source = self.find_source(required(params, "source")?, None)?;
         let scene = self.find_scene(required(params, "scene")?)?;
         let result = self.config.borrow_mut().link_source(&scene.id, &source.id);
@@ -665,6 +713,7 @@ impl App {
 
     fn cmd_remove_source(&self, params: &Value) -> Outcome {
         self.check_unlocked()?;
+        self.check_no_input_sheet(false)?;
         let scene = self.scene_param(params)?;
         let source = self.find_source(required(params, "source")?, Some(&scene))?;
         if !confirmed(params) {
@@ -678,6 +727,7 @@ impl App {
 
     fn cmd_move_source(&self, params: &Value) -> Outcome {
         self.check_unlocked()?;
+        self.check_no_input_sheet(false)?;
         let scene = self.scene_param(params)?;
         let source = self.find_source(required(params, "source")?, Some(&scene))?;
         let count = scene.source_ids.len() as i64;
@@ -781,13 +831,21 @@ impl App {
                 tr!("FFmpeg introuvable : ffmpeg.exe doit se trouver à côté de polyptyque.exe"),
             ));
         }
-        if scene.id != active.id {
-            self.select_scene(&scene.id);
-        }
+        // Le démarrage fermerait sans l'enregistrer une saisie en cours
+        // (réglages, programmation, rognage…).
+        self.check_no_input_sheet(true)?;
+        // Tout est vérifié avant de changer de scène : une commande refusée
+        // ne change rien.
         let only = match text(params, "source") {
             Some(reference) => Some(self.find_source(reference, Some(&scene))?.id),
             None => None,
         };
+        if scene.source_ids.is_empty() {
+            return Err(refused(tr!("Ajouter d'abord au moins une source à cette scène.")));
+        }
+        if scene.id != active.id {
+            self.select_scene(&scene.id);
+        }
         self.control.borrow_mut().start_request = Some(request);
         self.start_recording(only.as_deref());
         Ok(Reply::Wait {
@@ -1127,7 +1185,7 @@ impl App {
                 tr!("La fenêtre des réglages est ouverte dans Polyptyque : la fermer d'abord (elle remplacerait ces réglages)."),
             ));
         }
-        let (mut settings, enable_microphone) = self.settings_from(params)?;
+        let (settings, enable_microphone) = self.settings_from(params)?;
         if !enable_microphone {
             self.apply_settings(settings);
             return Ok(Reply::ok(json!({ "settings": self.settings_json() })));
@@ -1139,28 +1197,37 @@ impl App {
                 tr!("Une fenêtre est ouverte dans Polyptyque : la fermer d'abord, pour que la question du micro puisse s'afficher."),
             ));
         }
-        settings.microphone.enabled = true;
         self.control.borrow_mut().mic_answer = None;
+        let client_id = client;
         let client = self.control_client_name(client);
         self.bring_window_forward();
         self.ask(
-            Confirm::EnableMicrophone,
+            Confirm::EnableMicrophone(client_id),
             &tr!("Activer le micro"),
             &tr!(
-                "« {} » demande d'activer le micro. Ce qu'il capte sera alors enregistré dans un fichier séparé, pendant chaque enregistrement. Windows doit autoriser l'accès au micro pour les applications de bureau.",
-                client
+                "{} demande d'activer le micro. Ce qu'il capte sera alors enregistré dans un fichier séparé, pendant chaque enregistrement. Windows doit autoriser l'accès au micro pour les applications de bureau.",
+                self.control_client_identity(client_id)
             ),
             &tr!("Activer le micro"),
         );
         log::info!("pilotage : activation du micro demandée par {client}, question posée");
         let deadline = Instant::now() + MIC_ANSWER_LIMIT;
+        let params = params.clone();
         Ok(Reply::Wait {
             check: Box::new(move |app| {
                 let answer = app.control.borrow_mut().mic_answer.take();
                 match answer {
                     Some(true) if app.recording() || app.busy.get() => Some(Err(locked())),
                     Some(true) => {
-                        app.apply_settings(settings.clone());
+                        // Réglages relus au moment de l'accord : ceux changés
+                        // pendant la question restent, seuls les champs de la
+                        // commande s'y appliquent.
+                        let mut settings = match app.settings_from(&params) {
+                            Ok((settings, _)) => settings,
+                            Err(error) => return Some(Err(error)),
+                        };
+                        settings.microphone.enabled = true;
+                        app.apply_settings(settings);
                         Some(Ok(json!({ "settings": app.settings_json() })))
                     }
                     Some(false) => Some(Err(CommandError::new(
@@ -1168,7 +1235,7 @@ impl App {
                         tr!("Activation du micro non acceptée (question refusée, ou fermée par une autre action) : aucun réglage n'a changé."),
                     ))),
                     None if Instant::now() >= deadline => {
-                        if matches!(*app.confirm.borrow(), Some(Confirm::EnableMicrophone)) {
+                        if matches!(*app.confirm.borrow(), Some(Confirm::EnableMicrophone(c)) if c == client_id) {
                             app.close_sheet();
                             app.control.borrow_mut().mic_answer = None;
                         }
@@ -1604,5 +1671,28 @@ impl App {
                 .flatten(),
             "control_clients": control.client_count(),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn window(handle: isize, exe: &str) -> WindowInfo {
+        WindowInfo { handle, pid: 1, title: format!("titre {handle}"), class: String::new(), exe: PathBuf::from(exe) }
+    }
+
+    #[test]
+    fn titres_seulement_entre_fenetres_d_un_meme_programme() {
+        let windows = vec![
+            window(1, r"C:\Programmes\Discord\Discord.exe"),
+            window(2, r"C:\Programmes\Discord\Discord.exe"),
+            window(3, r"C:\Programmes\OBS\obs64.exe"),
+            // Exécutables illisibles : jamais regroupés.
+            window(4, ""),
+            window(5, ""),
+        ];
+        let shared: Vec<bool> = windows.iter().map(|w| shares_program(&windows, w)).collect();
+        assert_eq!(shared, [true, true, false, false, false]);
     }
 }

@@ -6,7 +6,7 @@
 //! sont.
 
 use std::io;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -25,6 +25,13 @@ pub(crate) trait Chunk: Send + 'static {
     fn units(&self) -> u64;
     /// Données à écrire une fois les `skip` premières unités sautées.
     fn tail(&self, skip: u64) -> &[u8];
+    /// Marque de coupure (vide) : fin de ce flux pour cette partie.
+    fn is_cut(&self) -> bool;
+}
+
+/// Marque de coupure d'une file d'images : une image vide.
+pub(crate) fn video_cut_marker() -> Arc<Vec<u8>> {
+    Arc::new(Vec::new())
 }
 
 /// Bloc de son : la position se compte en octets.
@@ -35,6 +42,10 @@ impl Chunk for Vec<u8> {
 
     fn tail(&self, skip: u64) -> &[u8] {
         &self[(skip as usize).min(self.len())..]
+    }
+
+    fn is_cut(&self) -> bool {
+        self.is_empty()
     }
 }
 
@@ -51,6 +62,10 @@ impl Chunk for Arc<Vec<u8>> {
             self.as_slice()
         }
     }
+
+    fn is_cut(&self) -> bool {
+        self.is_empty()
+    }
 }
 
 /// Commande partagée par les fils d'écriture d'une même partie.
@@ -60,6 +75,8 @@ pub(crate) struct PartControl {
     pub cancel: AtomicBool,
     /// Une écriture a échoué : l'encodeur ne lit plus ce tube.
     pub broken: AtomicBool,
+    /// Flux arrivés à une marque de coupure : la partie se termine là.
+    pub cuts: AtomicU32,
 }
 
 pub(crate) struct WriterJob<T> {
@@ -94,6 +111,12 @@ pub(crate) fn spawn<T: Chunk>(
         };
         while !control.cancel.load(Ordering::SeqCst) {
             match queue.recv_timeout(POLL) {
+                Ok(item) if item.is_cut() => {
+                    // Coupure (saut de l'horloge) : ce flux est complet pour
+                    // cette partie, la suite ira dans la suivante.
+                    control.cuts.fetch_add(1, Ordering::SeqCst);
+                    break;
+                }
                 Ok(item) => {
                     let units = item.units();
                     let at = position.fetch_add(units, Ordering::SeqCst);
@@ -142,5 +165,13 @@ mod tests {
         assert_eq!(frame.units(), 1);
         assert_eq!(frame.tail(0).len(), 12);
         assert!(frame.tail(1).is_empty());
+    }
+
+    #[test]
+    fn cut_markers_are_recognised() {
+        assert!(video_cut_marker().is_cut());
+        assert!(!Arc::new(vec![1u8; 12]).is_cut());
+        assert!(Vec::<u8>::new().is_cut());
+        assert!(!vec![0u8; 8].is_cut());
     }
 }

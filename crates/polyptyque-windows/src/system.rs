@@ -1,14 +1,16 @@
 //! Horloge, mise en veille, minuteries et espace disque.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Mutex, OnceLock};
 use std::thread;
+use std::time::Duration;
 
 use windows::core::HSTRING;
 use windows::Win32::Media::{timeBeginPeriod, timeEndPeriod};
 use windows::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;
 use windows::Win32::System::Performance::{QueryPerformanceCounter, QueryPerformanceFrequency};
 use windows::Win32::System::Power::{SetThreadExecutionState, ES_CONTINUOUS, ES_DISPLAY_REQUIRED, ES_SYSTEM_REQUIRED};
+use windows::Win32::System::WindowsProgramming::{QueryInterruptTime, QueryUnbiasedInterruptTime};
 
 /// Horloge haute précision (QPC) en centaines de nanosecondes : c'est la
 /// même base de temps que les horodatages audio de WASAPI.
@@ -26,6 +28,19 @@ pub fn now_hns() -> u64 {
         let _ = QueryPerformanceCounter(&mut counter);
     }
     (counter as u128 * 10_000_000 / frequency as u128) as u64
+}
+
+/// Temps passé en veille ou en veille prolongée depuis le démarrage, en
+/// centaines de nanosecondes : le temps d'interruption compte la veille,
+/// sa version « sans biais » non. Un fil simplement bloqué ne le fait pas
+/// avancer.
+pub fn suspended_hns() -> u64 {
+    let mut unbiased = 0u64;
+    unsafe {
+        let interrupt = QueryInterruptTime();
+        let _ = QueryUnbiasedInterruptTime(&mut unbiased);
+        interrupt.saturating_sub(unbiased)
+    }
 }
 
 /// Demande à Windows de rester éveillé (système et écran). L'état
@@ -104,7 +119,47 @@ pub fn keep_awake_for_schedules(on: bool) {
     }
 }
 
+/// Au-delà, le disque ne répond pas (dossier réseau injoignable, disque
+/// qui ne répond plus) : l'espace libre est inconnu.
+const DISK_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Espace libre pour `path`, `None` s'il est inconnu. Ne bloque jamais plus
+/// de [`DISK_TIMEOUT`] : la question est posée à Windows sur un fil à part,
+/// abandonné s'il ne répond pas (il se termine quand Windows rend la main).
+/// Tant qu'il attend, une nouvelle demande pour le même dossier répond
+/// aussitôt « inconnu », sans empiler d'autres fils bloqués.
 pub fn free_space(path: &Path) -> Option<u64> {
+    static PENDING: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
+    let pending = || PENDING.lock().unwrap_or_else(|e| e.into_inner());
+    {
+        let mut pending = pending();
+        if pending.iter().any(|p| p == path) {
+            return None;
+        }
+        pending.push(path.to_path_buf());
+    }
+    let (send, receive) = mpsc::channel();
+    let owned = path.to_path_buf();
+    let spawned = thread::Builder::new().name("espace disque".into()).spawn(move || {
+        let free = free_space_now(&owned);
+        pending().retain(|p| p != &owned);
+        let _ = send.send(free);
+    });
+    if let Err(e) = spawned {
+        pending().retain(|p| p != path);
+        log::warn!("espace libre : fil indisponible : {e}");
+        return None;
+    }
+    match receive.recv_timeout(DISK_TIMEOUT) {
+        Ok(free) => free,
+        Err(_) => {
+            log::warn!("espace libre de {} : pas de réponse du disque", path.display());
+            None
+        }
+    }
+}
+
+fn free_space_now(path: &Path) -> Option<u64> {
     // Le dossier de sortie peut ne pas encore exister.
     let mut dir = path;
     while !dir.exists() {
@@ -114,4 +169,17 @@ pub fn free_space(path: &Path) -> Option<u64> {
     let mut available = 0u64;
     unsafe { GetDiskFreeSpaceExW(&dir, Some(&mut available), None, None).ok()? };
     Some(available)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn espace_libre() {
+        let dir = std::env::temp_dir();
+        assert!(free_space(&dir).is_some_and(|free| free > 0));
+        // Dossier pas encore créé : celui qui le contiendra.
+        assert!(free_space(&dir.join("polyptyque-absent").join("sous-dossier")).is_some());
+    }
 }

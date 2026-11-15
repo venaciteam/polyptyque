@@ -103,6 +103,10 @@ impl Platform for WindowsPlatform {
         system::now_hns()
     }
 
+    fn suspended_hns(&self) -> Option<u64> {
+        Some(system::suspended_hns())
+    }
+
     fn open_video_capture(
         &self,
         handle: WindowHandle,
@@ -137,6 +141,10 @@ impl Platform for WindowsPlatform {
 
     fn prepare_encoder_process(&self, command: &mut Command) {
         command.creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP);
+    }
+
+    fn end_helper_with_polyptyque(&self, child: &std::process::Child) {
+        process::end_with_polyptyque(child);
     }
 
     fn begin_recording_session(&self) {

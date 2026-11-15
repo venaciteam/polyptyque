@@ -5,6 +5,7 @@
 
 mod controller;
 mod assistants;
+mod claims;
 mod convert;
 #[cfg(not(windows))]
 mod demo;

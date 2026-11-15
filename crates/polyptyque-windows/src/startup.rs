@@ -56,6 +56,29 @@ pub fn enable(exe: &Path, override_windows: bool) -> Result<()> {
     Ok(())
 }
 
+/// Mise à jour automatique au lancement, réglage déjà activé : inscrit
+/// `exe` seulement si l'inscription manque ou lance un programme qui
+/// n'existe plus (version portable déplacée). Une autre copie de Polyptyque
+/// encore présente garde la sienne : seul un choix explicite de
+/// l'utilisateur (`enable`) la remplace.
+pub fn refresh(exe: &Path) -> Result<()> {
+    if registered().and_then(|command| registered_exe(&command)).is_some_and(|other| other.is_file()) {
+        return Ok(());
+    }
+    enable(exe, false)
+}
+
+/// Programme lancé par une inscription (`"<chemin>" --demarrage-windows`).
+fn registered_exe(command: &str) -> Option<std::path::PathBuf> {
+    let command = command.trim();
+    let path = match command.strip_prefix('"') {
+        Some(rest) => rest.split('"').next()?,
+        None => command.split(" --").next()?,
+    };
+    let path = path.trim();
+    (!path.is_empty()).then(|| std::path::PathBuf::from(path))
+}
+
 /// Retire Polyptyque du démarrage de Windows.
 pub fn disable() -> Result<()> {
     delete(RUN_KEY)
@@ -124,4 +147,24 @@ fn delete(key: &str) -> Result<()> {
         bail!(tr::tr!("modification du démarrage de Windows impossible (code {})", status.0));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn registered_program_is_read_from_the_command() {
+        assert_eq!(
+            registered_exe(r#""C:\Users\A B\AppData\Local\PolyptyqueApp\current\polyptyque.exe" --demarrage-windows"#),
+            Some(PathBuf::from(r"C:\Users\A B\AppData\Local\PolyptyqueApp\current\polyptyque.exe"))
+        );
+        assert_eq!(
+            registered_exe(r"D:\Polyptyque\current\polyptyque.exe --demarrage-windows"),
+            Some(PathBuf::from(r"D:\Polyptyque\current\polyptyque.exe"))
+        );
+        assert_eq!(registered_exe(r#""""#), None);
+        assert_eq!(registered_exe("  "), None);
+    }
 }

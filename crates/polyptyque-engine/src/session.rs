@@ -1,7 +1,7 @@
 //! Session d'enregistrement : départ commun des sources d'une scène sur une
 //! même horloge, ajout ou arrêt d'une source en cours de route, arrêt propre.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
@@ -16,15 +16,28 @@ use polyptyque_core::encoder::{bytes_per_hour, EncoderChoice};
 use polyptyque_core::level::RECENT_SOUND_HNS;
 use polyptyque_core::naming::{self, NameParts};
 use polyptyque_core::platform::{Nv12Frame, Platform};
+use polyptyque_core::storage;
 use tr::tr;
 
 use crate::audio_task::{AudioInput, AudioTask};
 use crate::output::{clock, OutputPlan, OutputTask};
-use crate::shared::{Shared, SourceState};
+use crate::shared::{Shared, SourceState, WindowClaims};
 use crate::video_task::VideoTask;
 
 /// À l'arrêt, délai accordé aux fils de capture pour se terminer.
 const CAPTURE_JOIN_TIMEOUT: Duration = Duration::from_secs(10);
+/// À l'arrêt, le fil d'encodage vide sa file aussi longtemps qu'il donne
+/// signe de vie ; resté muet ce délai (bloqué sur un disque qui ne répond
+/// plus), il est abandonné pour ne pas suspendre l'arrêt.
+const ENCODING_SILENCE_TIMEOUT: Duration = Duration::from_secs(120);
+/// Intervalle de relevé de la taille des fichiers.
+const SIZE_INTERVAL: Duration = Duration::from_secs(1);
+/// À l'arrêt, attente du dernier relevé de taille.
+const SIZE_SETTLE_TIMEOUT: Duration = Duration::from_secs(5);
+/// Délai d'un relevé de taille : un dossier qui ne répond plus (partage
+/// réseau perdu) garde la dernière taille connue. Plus court que
+/// [`SIZE_SETTLE_TIMEOUT`], pour que le dernier relevé arrive à temps.
+const SIZE_READ_TIMEOUT: Duration = Duration::from_secs(3);
 
 pub struct SessionPlan {
     pub scene_name: String,
@@ -69,7 +82,8 @@ pub struct SourceStatus {
     /// Niveau crête depuis le dernier appel (0 à 1).
     pub audio_level: f32,
     pub audio_recent: bool,
-    /// Retard de l'encodeur, en secondes d'images en attente.
+    /// Retard de l'encodeur, en secondes d'image ou de son en attente (le
+    /// plus grand des deux).
     pub backlog_seconds: f32,
     /// Partie de fichier en cours : plus de 1 après une relance de
     /// l'encodeur.
@@ -136,7 +150,26 @@ impl SourceRuntime {
                 }
             }
             if let Some(output) = output {
-                let _ = output.join();
+                while !output.is_finished() && shared.encoding_silence() < ENCODING_SILENCE_TIMEOUT {
+                    thread::sleep(Duration::from_millis(50));
+                }
+                if output.is_finished() {
+                    let _ = output.join();
+                } else {
+                    log::error!(
+                        "[{name}] l'encodage ne répond plus depuis {} s à l'arrêt (disque ?) : abandonné",
+                        ENCODING_SILENCE_TIMEOUT.as_secs()
+                    );
+                    shared.note_error(tr!(
+                        "L'encodage ne répondait plus à l'arrêt : le fichier est peut-être incomplet (détail \
+                         dans le journal)"
+                    ));
+                }
+            }
+            // Dernier relevé de la taille, une fois les fichiers fermés.
+            let deadline = Instant::now() + SIZE_SETTLE_TIMEOUT;
+            while !shared.sizes_settled() && Instant::now() < deadline {
+                thread::sleep(Duration::from_millis(20));
             }
             shared.mark_done();
             log::info!("[{name}] fichier(s) finalisé(s) ; {}", summary_line(&shared));
@@ -160,10 +193,12 @@ impl SourceRuntime {
             frames_dropped: shared.frames_dropped.load(Ordering::Relaxed),
             audio_level: shared.take_peak(),
             audio_recent: last_sound != 0 && now.saturating_sub(last_sound) < RECENT_SOUND_HNS,
-            backlog_seconds: shared.video_backlog.load(Ordering::Relaxed) as f32 / fps,
+            // Le plus en retard de l'image et du son.
+            backlog_seconds: (shared.video_backlog.load(Ordering::Relaxed) as f32 / fps)
+                .max(shared.audio_backlog_seconds()),
             part: shared.part.load(Ordering::Relaxed),
             output: outputs.last().cloned().unwrap_or_default(),
-            file_size: total_size(&outputs),
+            file_size: shared.file_size.load(Ordering::Relaxed),
             error: shared.error(),
         }
     }
@@ -173,7 +208,7 @@ impl SourceRuntime {
         SourceSummary {
             id: self.id.clone(),
             name: self.name.clone(),
-            file_size: total_size(&outputs),
+            file_size: self.shared.file_size.load(Ordering::Relaxed),
             outputs,
             frames_total: self.shared.frames_total.load(Ordering::Relaxed),
             frames_dropped: self.shared.frames_dropped.load(Ordering::Relaxed),
@@ -200,6 +235,8 @@ pub struct Session {
     microphone: Option<SourceRuntime>,
     started_count: usize,
     taken: HashSet<PathBuf>,
+    /// Fenêtres suivies par les sources : jamais deux sources sur la même.
+    claims: Arc<WindowClaims>,
     t0_hns: u64,
     started: Instant,
 }
@@ -227,6 +264,7 @@ impl Session {
             microphone: None,
             started_count: 0,
             taken: HashSet::new(),
+            claims: Arc::new(WindowClaims::default()),
             t0_hns,
             started: Instant::now(),
         };
@@ -387,10 +425,18 @@ impl Session {
             if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| output_task.run())).is_err() {
                 output_shared.fail(format!("[{output_name}] erreur interne de l'encodage (voir le journal)"));
             }
+            output_shared.mark_encoding_finished();
         };
         match thread::Builder::new().name(format!("{name}-encodage")).spawn(encode) {
             Ok(handle) => runtime.output_thread = Some(handle),
-            Err(e) => shared.fail(tr!("fil d'encodage : {}", e)),
+            Err(e) => {
+                shared.mark_encoding_finished();
+                shared.fail(tr!("fil d'encodage : {}", e));
+            }
+        }
+        let watched = shared.clone();
+        if let Err(e) = thread::Builder::new().name(format!("{name}-taille")).spawn(move || watch_sizes(&watched)) {
+            log::warn!("[{name}] relevé de la taille des fichiers impossible : {e}");
         }
         if !shared.has_failed() {
             let input = match capture {
@@ -404,6 +450,8 @@ impl Session {
                         width: video.width,
                         height: video.height,
                         fps: video.fps,
+                        claims: self.claims.clone(),
+                        run: order,
                     };
                     match thread::Builder::new().name(format!("{name}-video")).spawn(move || video_task.run()) {
                         Ok(handle) => runtime.capture_threads.push(handle),
@@ -420,6 +468,7 @@ impl Session {
                 shared: shared.clone(),
                 queue: audio_tx,
                 t0_hns: origin_hns,
+                fps: has_video.then_some(video.fps),
             };
             match thread::Builder::new().name(format!("{name}-audio")).spawn(move || audio_task.run()) {
                 Ok(handle) => runtime.capture_threads.push(handle),
@@ -502,7 +551,7 @@ fn summary_line(shared: &Shared) -> String {
     let outputs = shared.outputs();
     let bytes_per_second = CHANNELS as u64 * 4 * SAMPLE_RATE as u64;
     let seconds = shared.audio_position.load(Ordering::SeqCst) / bytes_per_second;
-    let bytes = total_size(&outputs) as f64;
+    let bytes = shared.file_size.load(Ordering::Relaxed) as f64;
     let size = if bytes >= 1e9 { format!("{:.1} Go", bytes / 1e9) } else { format!("{:.0} Mo", bytes / 1e6) };
     let size = size.replace('.', ",");
     let mut line = format!("bilan : {} enregistrées, {} fichier(s), {size}", clock(seconds), outputs.len());
@@ -520,8 +569,56 @@ fn summary_line(shared: &Shared) -> String {
     line
 }
 
-fn total_size(outputs: &[PathBuf]) -> u64 {
-    outputs.iter().filter_map(|p| fs::metadata(p).ok()).map(|m| m.len()).sum()
+/// Relève la taille des fichiers de la source jusqu'à la fin de l'encodage,
+/// puis une dernière fois. Seul ce fil touche au disque pour cela : un
+/// dossier qui ne répond plus ne fige jamais l'interface.
+fn watch_sizes(shared: &Shared) {
+    let mut sizes = SizeWatch::default();
+    let read = |path: &Path| {
+        let path = path.to_path_buf();
+        storage::within(SIZE_READ_TIMEOUT, move || fs::metadata(&path).map(|m| m.len()).ok()).flatten()
+    };
+    loop {
+        let finished = shared.encoding_finished();
+        shared.file_size.store(sizes.total(&shared.outputs(), read), Ordering::Relaxed);
+        if finished || shared.is_done() {
+            shared.mark_sizes_settled();
+            return;
+        }
+        let next = Instant::now() + SIZE_INTERVAL;
+        while Instant::now() < next && !shared.encoding_finished() {
+            thread::sleep(Duration::from_millis(50));
+        }
+    }
+}
+
+/// Tailles connues des fichiers d'une source. Une partie fermée est relevée
+/// une fois puis gardée : restée sur un dossier perdu, elle ne fige pas le
+/// relevé de la partie en cours (dans le dossier de secours, par exemple),
+/// dont dépend aussi la fin de l'encodage. Un relevé impossible garde la
+/// dernière taille connue.
+#[derive(Default)]
+struct SizeWatch {
+    sizes: HashMap<PathBuf, u64>,
+    closed: HashSet<PathBuf>,
+}
+
+impl SizeWatch {
+    fn total(&mut self, outputs: &[PathBuf], read: impl Fn(&Path) -> Option<u64>) -> u64 {
+        if let Some((current, closed)) = outputs.split_last() {
+            for part in closed {
+                if self.closed.insert(part.clone()) {
+                    if let Some(size) = read(part) {
+                        self.sizes.insert(part.clone(), size);
+                    }
+                }
+            }
+            if let Some(size) = read(current) {
+                self.sizes.insert(current.clone(), size);
+            }
+        }
+        outputs.iter().filter_map(|p| self.sizes.get(p)).sum()
+    }
 }
 
 /// Attend un fil jusqu'à l'échéance. Renvoie faux s'il ne s'est pas
@@ -535,4 +632,39 @@ fn join_until(handle: JoinHandle<()>, deadline: Instant) -> bool {
     }
     let _ = handle.join();
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+
+    #[test]
+    fn closed_parts_are_read_once() {
+        let first = PathBuf::from("partage/a.mkv");
+        let second = PathBuf::from("secours/a_partie2.mkv");
+        let reads = RefCell::new(Vec::new());
+        // Partage perdu après la première partie : plus rien n'y répond.
+        let lost = RefCell::new(false);
+        let read = |path: &Path| {
+            reads.borrow_mut().push(path.to_path_buf());
+            if path.starts_with("partage") && *lost.borrow() {
+                None
+            } else {
+                Some(if path == first { 100 } else { 10 })
+            }
+        };
+        let mut sizes = SizeWatch::default();
+        assert_eq!(sizes.total(std::slice::from_ref(&first), read), 100);
+        *lost.borrow_mut() = true;
+        let both = [first.clone(), second.clone()];
+        // Dernière taille connue de la première partie, gardée.
+        assert_eq!(sizes.total(&both, read), 110);
+        assert_eq!(sizes.total(&both, read), 110);
+        let first_reads = reads.borrow().iter().filter(|p| **p == first).count();
+        assert_eq!(first_reads, 2, "{:?}", reads.borrow());
+        assert_eq!(reads.borrow().iter().filter(|p| **p == second).count(), 2);
+        // Partie vide retirée de la liste : plus comptée.
+        assert_eq!(sizes.total(std::slice::from_ref(&second), read), 10);
+    }
 }

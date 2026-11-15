@@ -2,7 +2,9 @@
 //! du planificateur (`polyptyque_core::schedule`), pose les questions,
 //! affiche les programmations et les modifie.
 
-use chrono::{DateTime, Datelike, Duration as Span, Local, NaiveDate, Timelike, Utc};
+use std::cell::RefCell;
+
+use chrono::{DateTime, Datelike, Duration as Span, Local, NaiveDate, TimeZone, Timelike, Utc};
 use polyptyque_core::schedule::{
     self, clock_label, day_name, when_label, Action, Repeat, Schedule, ScheduleError, Slot, TimeOfDay, PROMPT_COUNTDOWN,
 };
@@ -21,6 +23,13 @@ pub(super) enum Prompt {
     KeepAutoStop { slot: Slot, deadline: DateTime<Utc> },
     /// Enregistrement manuel déjà en cours au début du créneau.
     ManualRunning { slot: Slot },
+}
+
+thread_local! {
+    /// Démarrage programmé annulé pendant sa préparation (sa programmation
+    /// supprimée, désactivée, ou sans créneau en cours) : le message déjà
+    /// affiché. La préparation va à son terme, puis rien ne démarre.
+    static CANCELLED_START: RefCell<Option<String>> = const { RefCell::new(None) };
 }
 
 /// Choix « Répétition » du formulaire.
@@ -183,11 +192,66 @@ impl App {
         }
     }
 
+    /// Démarrage programmé annulé pendant sa préparation (voir
+    /// [`App::schedule_was_changed`]) : à vérifier avant de démarrer quoi que
+    /// ce soit. Renvoie le message déjà affiché, une seule fois.
+    pub(super) fn take_cancelled_start(&self) -> Option<String> {
+        CANCELLED_START.with(|c| c.borrow_mut().take())
+    }
+
     /// Le démarrage d'un enregistrement a échoué.
     pub(super) fn recording_start_failed(&self) {
+        CANCELLED_START.with(|c| c.borrow_mut().take());
         if let Some(slot) = self.scheduled_start.borrow_mut().take() {
             self.planner.borrow_mut().give_up(&slot);
         }
+    }
+
+    /// Programmation créée, modifiée, activée, désactivée ou supprimée : la
+    /// question posée pour l'un de ses créneaux, ou le démarrage qu'elle
+    /// prépare, porte sur une version qui n'existe plus. Accepter (ou
+    /// laisser filer le compte à rebours) lancerait un enregistrement
+    /// qu'elle ne prévoit peut-être plus. La question se ferme, et le
+    /// créneau n'est pas réglé pour autant : si la programmation en prévoit
+    /// encore un en ce moment, elle le reprend (nouvelle question).
+    pub(super) fn schedule_was_changed(&self, id: &str, now: DateTime<Utc>) {
+        let (asked, missed) = match self.prompt.borrow().as_ref() {
+            Some(Prompt::Missed { slot, .. }) if slot.schedule_id == id => (true, Some(slot.clone())),
+            Some(Prompt::KeepAutoStop { slot, .. }) if slot.schedule_id == id => (true, None),
+            _ => (false, None),
+        };
+        if asked {
+            log::info!("programmation modifiée : sa question en attente est fermée");
+            self.close_prompt();
+        }
+        if let Some(slot) = missed {
+            // Libère le créneau en cours de traitement ; le souvenir « réglé »
+            // posé ici est oublié aussitôt par `schedule_changed`.
+            self.planner.borrow_mut().give_up(&slot);
+        }
+        let starting = self.scheduled_start.borrow().clone().filter(|slot| slot.schedule_id == id);
+        if let Some(slot) = starting {
+            let current = slot_still_due(&self.config.borrow().schedules, &slot, now, &Local);
+            if let Some(current) = current {
+                // Toujours en cours (heures changées, par exemple) :
+                // l'enregistrement en préparation suit le nouveau créneau, et
+                // s'arrêtera à sa nouvelle heure de fin.
+                log::info!("programmation modifiée pendant le démarrage de son enregistrement : nouveau créneau suivi");
+                *self.scheduled_start.borrow_mut() = Some(current);
+            } else {
+                // Supprimée, désactivée, ou plus de créneau en cours pour
+                // cette scène : l'enregistrement en préparation n'a plus lieu
+                // d'être.
+                log::info!("programmation modifiée pendant le démarrage de son enregistrement : démarrage annulé");
+                self.scheduled_start.borrow_mut().take();
+                self.planner.borrow_mut().give_up(&slot);
+                let message =
+                    tr!("Programmation modifiée pendant la préparation : l'enregistrement programmé est annulé.");
+                self.toast(&message, 2);
+                CANCELLED_START.with(|c| *c.borrow_mut() = Some(message));
+            }
+        }
+        self.planner.borrow_mut().schedule_changed(id, now);
     }
 
     // ----- Questions ---------------------------------------------------------
@@ -463,7 +527,20 @@ impl App {
         {
             use polyptyque_windows::startup;
             let result = if enabled {
-                std::env::current_exe().map_err(anyhow::Error::from).and_then(|exe| startup::enable(&exe, explicit))
+                std::env::current_exe().map_err(anyhow::Error::from).and_then(|exe| {
+                    if explicit {
+                        startup::enable(&exe, true)
+                    } else if polyptyque_core::paths::packaged_copy() {
+                        // Au lancement : suivre une version portable déplacée,
+                        // sans prendre la place d'une autre copie présente.
+                        startup::refresh(&exe)
+                    } else {
+                        // Compilation de développement : elle lit les réglages
+                        // de la version installée, mais ne s'inscrit jamais
+                        // d'elle-même à sa place.
+                        Ok(())
+                    }
+                })
             } else if explicit {
                 startup::disable()
             } else {
@@ -800,7 +877,7 @@ impl App {
                 None => config.schedules.push(schedule.clone()),
             }
         }
-        self.planner.borrow_mut().schedule_changed(&schedule.id, now);
+        self.schedule_was_changed(&schedule.id, now);
         self.save();
         self.save_planner();
         log::info!(
@@ -846,7 +923,7 @@ impl App {
         if let Some(existing) = self.config.borrow_mut().schedules.iter_mut().find(|s| s.id == id) {
             existing.enabled = enabled;
         }
-        self.planner.borrow_mut().schedule_changed(id, now);
+        self.schedule_was_changed(id, now);
         self.save();
         self.save_planner();
         self.refresh_schedule_list(now);
@@ -862,7 +939,7 @@ impl App {
             return;
         }
         self.config.borrow_mut().schedules.retain(|s| s.id != id);
-        self.planner.borrow_mut().schedule_changed(id, Utc::now());
+        self.schedule_was_changed(id, Utc::now());
         self.save();
         self.save_planner();
         self.refresh_schedule_list(Utc::now());
@@ -914,5 +991,98 @@ fn remaining(span: Span) -> String {
         tr!("{} min {} s", seconds / 60, format!("{:02}", seconds % 60))
     } else {
         tr!("{} s", seconds)
+    }
+}
+
+/// Créneau en cours, à l'instant `now`, de la programmation du créneau
+/// `slot` dans sa nouvelle version (`schedules`) : `None` si elle a été
+/// supprimée ou désactivée, si elle n'a plus de créneau en cours, ou si
+/// elle enregistre maintenant une autre scène.
+fn slot_still_due<Tz: TimeZone>(schedules: &[Schedule], slot: &Slot, now: DateTime<Utc>, tz: &Tz) -> Option<Slot> {
+    schedules
+        .iter()
+        .find(|s| s.id == slot.schedule_id && s.enabled)
+        .and_then(|s| s.slot_at(now, tz))
+        .filter(|current| current.scene_id == slot.scene_id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::slot_still_due;
+    use chrono::{TimeZone, Utc};
+    use polyptyque_core::schedule::{Action, Planner, Repeat, Schedule, TimeOfDay};
+
+    /// Programmation changée pendant la préparation de son démarrage : le
+    /// nouveau créneau est suivi s'il est toujours en cours pour la même
+    /// scène ; sinon le démarrage est annulé.
+    #[test]
+    fn demarrage_en_preparation_suit_ou_annule() {
+        let mut schedule = Schedule::new(
+            "scène",
+            TimeOfDay::new(10, 0).unwrap(),
+            TimeOfDay::new(12, 0).unwrap(),
+            Repeat::Weekly { days: (1..=7).collect() },
+        );
+        let now = Utc.with_ymd_and_hms(2026, 11, 15, 10, 0, 10).unwrap();
+        let slot = schedule.slot_at(now, &Utc).unwrap();
+        let mut planner = Planner::default();
+        // Fin avancée à 11 h : le démarrage suit le nouveau créneau, et le
+        // planificateur l'arrêtera à 11 h.
+        schedule.end = TimeOfDay::new(11, 0).unwrap();
+        let current = slot_still_due(std::slice::from_ref(&schedule), &slot, now, &Utc).expect("toujours en cours");
+        assert_eq!(current.end, Utc.with_ymd_and_hms(2026, 11, 15, 11, 0, 0).unwrap());
+        planner.schedule_changed(&schedule.id, now);
+        planner.started(current.clone());
+        let at_end = current.end;
+        let schedules = std::slice::from_ref(&schedule);
+        assert_eq!(planner.tick(schedules, at_end - chrono::Duration::seconds(1), &Utc, true, false), None);
+        assert_eq!(planner.tick(schedules, at_end, &Utc, true, false), Some(Action::Stop(current)));
+        // Désactivée, supprimée, déplacée plus tard ou vers une autre scène :
+        // annulé.
+        let mut disabled = schedule.clone();
+        disabled.enabled = false;
+        assert!(slot_still_due(&[disabled], &slot, now, &Utc).is_none());
+        assert!(slot_still_due(&[], &slot, now, &Utc).is_none());
+        let mut later = schedule.clone();
+        later.start = TimeOfDay::new(14, 0).unwrap();
+        later.end = TimeOfDay::new(15, 0).unwrap();
+        assert!(slot_still_due(&[later], &slot, now, &Utc).is_none());
+        let mut other_scene = schedule.clone();
+        other_scene.scene_id = "autre".into();
+        assert!(slot_still_due(&[other_scene], &slot, now, &Utc).is_none());
+    }
+
+    /// Ce que fait `schedule_was_changed` pour une question de démarrage
+    /// manqué : le créneau est libéré sans rester réglé, la question revient
+    /// si la programmation le prévoit encore, et plus rien sinon.
+    #[test]
+    fn question_manquee_reposee_apres_modification() {
+        let start = TimeOfDay::new(10, 0).unwrap();
+        let end = TimeOfDay::new(12, 0).unwrap();
+        let mut schedule = Schedule::new("scène", start, end, Repeat::Weekly { days: (1..=7).collect() });
+        let now = Utc.with_ymd_and_hms(2026, 11, 15, 10, 30, 0).unwrap();
+        let mut planner = Planner::default();
+        let Some(Action::AskMissed(slot)) = planner.tick(std::slice::from_ref(&schedule), now, &Utc, false, false) else {
+            panic!("question de démarrage manqué attendue");
+        };
+        // Question en attente : rien d'autre n'est décidé.
+        assert_eq!(planner.tick(std::slice::from_ref(&schedule), now, &Utc, false, false), None);
+        planner.give_up(&slot);
+        planner.schedule_changed(&schedule.id, now);
+        assert!(!planner.is_done(&slot.key()));
+        let later = now + chrono::Duration::seconds(1);
+        assert!(matches!(
+            planner.tick(std::slice::from_ref(&schedule), later, &Utc, false, false),
+            Some(Action::AskMissed(_))
+        ));
+        // Désactivée : la question n'est plus posée.
+        let mut planner = Planner::default();
+        let Some(Action::AskMissed(slot)) = planner.tick(std::slice::from_ref(&schedule), now, &Utc, false, false) else {
+            panic!("question de démarrage manqué attendue");
+        };
+        schedule.enabled = false;
+        planner.give_up(&slot);
+        planner.schedule_changed(&schedule.id, now);
+        assert_eq!(planner.tick(std::slice::from_ref(&schedule), later, &Utc, false, false), None);
     }
 }

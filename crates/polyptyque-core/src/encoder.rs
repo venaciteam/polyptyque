@@ -114,13 +114,13 @@ pub fn recording_args(spec: &RecordingSpec) -> Vec<String> {
     args.push(format!("{}x{}", spec.width, spec.height));
     args.push("-framerate".into());
     args.push(spec.fps.to_string());
-    args.extend(raw_input_tuning());
+    args.extend(raw_input_tuning(raw_video_queue(spec.width, spec.height)));
     args.push("-i".into());
     args.push(spec.video_input.into());
 
     // Son brut, flottant 32 bits entrelacé.
     args.extend(raw_audio_format(spec.sample_rate, spec.channels));
-    args.extend(raw_input_tuning());
+    args.extend(raw_input_tuning(RAW_AUDIO_QUEUE));
     args.push("-i".into());
     args.push(spec.audio_input.into());
 
@@ -173,7 +173,7 @@ pub struct AudioRecordingSpec<'a> {
 pub fn audio_recording_args(spec: &AudioRecordingSpec) -> Vec<String> {
     let mut args = strings(&["-hide_banner", "-nostdin", "-loglevel", "warning"]);
     args.extend(raw_audio_format(spec.sample_rate, spec.channels));
-    args.extend(raw_input_tuning());
+    args.extend(raw_input_tuning(RAW_AUDIO_QUEUE));
     args.push("-i".into());
     args.push(spec.input.into());
     args.extend(strings(&["-map", "0:a:0", "-c:a", "aac", "-b:a"]));
@@ -205,10 +205,27 @@ fn raw_audio_format(sample_rate: u32, channels: u16) -> Vec<String> {
     args
 }
 
-fn raw_input_tuning() -> Vec<String> {
+fn raw_input_tuning(queue: usize) -> Vec<String> {
     // Pas d'analyse préalable : le format est entièrement décrit par les
-    // options, et une grande file évite de bloquer la lecture des tubes.
-    strings(&["-probesize", "32", "-analyzeduration", "0", "-thread_queue_size", "1024"])
+    // options. La file de lecture évite de bloquer la lecture des tubes.
+    let mut args = strings(&["-probesize", "32", "-analyzeduration", "0", "-thread_queue_size"]);
+    args.push(queue.to_string());
+    args
+}
+
+/// File de lecture du son brut, en paquets de quelques Ko : une grande file
+/// ne coûte que quelques Mo.
+const RAW_AUDIO_QUEUE: usize = 1024;
+
+/// File de lecture de l'image brute, en images. FFmpeg y compte un paquet
+/// par image (3 Mo en 1080p) : une file de 1 024 pourrait garder plus de
+/// 3 Go en mémoire quand l'encodeur ne suit pas, sans que le retard affiché
+/// ne le montre. Au plus 128 Mo environ, entre 8 et 64 images : au-delà,
+/// les images attendent dans la file de Polyptyque, où le retard se voit.
+pub fn raw_video_queue(width: u32, height: u32) -> usize {
+    const BUDGET: u64 = 128 * 1024 * 1024;
+    let frame = (width as u64 * height as u64 * 3 / 2).max(1);
+    (BUDGET / frame).clamp(8, 64) as usize
 }
 
 fn video_encoder_args(choice: EncoderChoice, kbps: u32) -> Vec<String> {
@@ -285,6 +302,9 @@ mod tests {
         assert!(joined.contains("-vf setparams=range=tv:colorspace=bt709"));
         assert!(joined.contains("-preset p4"));
         assert!(joined.contains("-cluster_time_limit 1000 -flush_packets 1 -f matroska sortie.mkv"));
+        // Petite file pour l'image brute (3 Mo par image), grande pour le son.
+        assert!(joined.contains("-framerate 60 -probesize 32 -analyzeduration 0 -thread_queue_size 43 -i"), "{joined}");
+        assert!(joined.contains("-ch_layout stereo -probesize 32 -analyzeduration 0 -thread_queue_size 1024 -i"));
         assert!(args.contains(&"title=Firefox 1".to_string()));
         assert_eq!(args.last().unwrap(), "sortie.mkv");
         // Les deux entrées précèdent la sélection des flux.
@@ -309,6 +329,16 @@ mod tests {
         assert!(joined.contains("-i tube -map 0:a:0 -c:a aac -b:a 192k"));
         assert!(!joined.contains("rawvideo"));
         assert!(joined.ends_with("-f matroska micro.mka"));
+    }
+
+    #[test]
+    fn raw_video_queue_is_bounded_in_memory() {
+        // 1080p : 43 images, environ 128 Mo.
+        assert_eq!(raw_video_queue(1920, 1080), 43);
+        assert_eq!(raw_video_queue(1280, 720), 64);
+        assert_eq!(raw_video_queue(3840, 2160), 10);
+        assert_eq!(raw_video_queue(7680, 4320), 8);
+        assert_eq!(raw_video_queue(0, 0), 64);
     }
 
     #[test]

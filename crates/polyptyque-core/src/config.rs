@@ -61,29 +61,67 @@ impl Config {
     /// Charge la configuration. Fichier absent : configuration par défaut.
     /// Fichier abîmé ou vide (coupure de courant, disque) : une copie en est
     /// gardée, puis la sauvegarde la plus récente encore valide est
-    /// restaurée ; à défaut, configuration par défaut. Le message éventuel
-    /// est à montrer à l'utilisateur.
+    /// restaurée ; à défaut, configuration par défaut. Fichier
+    /// momentanément verrouillé (antivirus, synchronisation) : relu
+    /// plusieurs fois ; toujours illisible, la sauvegarde est utilisée sans
+    /// être écrite par-dessus. Fichier d'une version plus récente de
+    /// Polyptyque : copié à part avant d'être réécrit sans les réglages
+    /// inconnus. Le message éventuel est à montrer à l'utilisateur.
     pub fn load_or_default(path: &Path) -> (Config, Option<String>) {
-        let problem = match fs::read_to_string(path) {
-            Ok(text) => match parse(&text) {
-                Ok(config) => return (config, None),
-                Err(e) => {
-                    let damaged = storage::sibling(path, ".invalide");
-                    let _ = fs::copy(path, &damaged);
-                    // Erreur du lecteur de réglages, en anglais : au journal.
-                    log::warn!("réglages abîmés : {e:#}");
-                    tr!("Réglages abîmés (détail dans le journal). Une copie a été gardée dans {}.", damaged.display())
+        let mut rewrite = true;
+        let read = read_retrying(path).map(|bytes| {
+            let text = String::from_utf8(bytes).map_err(anyhow::Error::from)?;
+            parse_versioned(&text).map(|parsed| (parsed, text))
+        });
+        let problem = match read {
+            Ok(Ok(((config, version), text))) => {
+                if version <= i64::from(CONFIG_VERSION) {
+                    return (config, None);
                 }
-            },
+                // Réglages inconnus de cette version : perdus au prochain
+                // enregistrement, d'où la copie complète.
+                let copy = storage::sibling(path, &format!(".v{version}"));
+                let mut message = tr!(
+                    "Réglages enregistrés par une version plus récente de Polyptyque : certains peuvent être ignorés."
+                );
+                match storage::write_atomic(&copy, text.as_bytes()) {
+                    Ok(()) => {
+                        message = format!("{message} {}", tr!("Une copie a été gardée dans {}.", copy.display()))
+                    }
+                    Err(e) => log::warn!("copie des réglages de la version {version} : {e:#}"),
+                }
+                log::warn!("réglages de la version {version}, plus récente que la version {CONFIG_VERSION}");
+                return (config, Some(message));
+            }
+            Ok(Err(e)) => {
+                let damaged = storage::sibling(path, ".invalide");
+                let _ = fs::copy(path, &damaged);
+                // Erreur du lecteur de réglages, en anglais : au journal.
+                log::warn!("réglages abîmés : {e:#}");
+                tr!("Réglages abîmés (détail dans le journal). Une copie a été gardée dans {}.", damaged.display())
+            }
             Err(e) if e.kind() == ErrorKind::NotFound => return (Config::default(), None),
-            Err(e) => tr!("Réglages illisibles ({}).", e),
+            Err(e) => {
+                // Le fichier est peut-être intact : il n'est pas remplacé par
+                // la sauvegarde, et une copie en est tentée.
+                rewrite = false;
+                let damaged = storage::sibling(path, ".invalide");
+                let mut message = tr!("Réglages illisibles ({}).", e);
+                if fs::copy(path, &damaged).is_ok() {
+                    message = format!("{message} {}", tr!("Une copie a été gardée dans {}.", damaged.display()));
+                }
+                log::warn!("réglages illisibles : {e}");
+                message
+            }
         };
         for backup in backups(path) {
             let Ok(config) = fs::read_to_string(&backup).map_err(anyhow::Error::from).and_then(|t| parse(&t)) else {
                 continue;
             };
             let name = backup.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-            let _ = config.save(path);
+            if rewrite {
+                let _ = config.save(path);
+            }
             return (config, Some(format!("{problem} {}", tr!("La sauvegarde « {} » a été restaurée.", name))));
         }
         (Config::default(), Some(format!("{problem} {}", tr!("Aucune sauvegarde valide : réglages par défaut."))))
@@ -348,17 +386,45 @@ pub enum PasteError {
 /// Jours de sauvegarde quotidienne des réglages conservés.
 const BACKUP_DAYS: usize = 5;
 
+/// Lectures du fichier de réglages tentées avant de le dire illisible.
+const READ_ATTEMPTS: u32 = 5;
+/// Attente entre deux lectures (verrou posé par un antivirus ou un outil de
+/// synchronisation, en général bref).
+const READ_RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(200);
+
+/// Lit le fichier, en réessayant quelques fois s'il est momentanément
+/// inaccessible. Fichier absent : aucune nouvelle tentative.
+fn read_retrying(path: &Path) -> std::io::Result<Vec<u8>> {
+    let mut attempt = 1;
+    loop {
+        match fs::read(path) {
+            Err(e) if e.kind() != ErrorKind::NotFound && attempt < READ_ATTEMPTS => {
+                attempt += 1;
+                std::thread::sleep(READ_RETRY_DELAY);
+            }
+            result => return result,
+        }
+    }
+}
+
 fn parse(text: &str) -> Result<Config> {
+    parse_versioned(text).map(|(config, _)| config)
+}
+
+/// Lit la configuration, avec la version écrite dans le fichier (avant
+/// mise à niveau).
+fn parse_versioned(text: &str) -> Result<(Config, i64)> {
     // Un fichier vide serait lu comme une configuration par défaut : toutes
     // les scènes disparaîtraient sans un mot.
     if text.trim().is_empty() {
         anyhow::bail!(tr!("fichier vide"));
     }
     let mut table: toml::Table = toml::from_str(text)?;
+    let version = table.get("version").and_then(toml::Value::as_integer).unwrap_or(1);
     lift_scene_sources(&mut table);
     let mut config: Config = table.try_into()?;
     config.normalize();
-    Ok(config)
+    Ok((config, version))
 }
 
 /// Version 1 : chaque scène contenait ses sources en entier. Elles passent
@@ -934,6 +1000,93 @@ mod tests {
         assert_eq!(loaded.active_sources().len(), 2);
         // Le fichier restauré est réécrit.
         assert!(!fs::read_to_string(&path).unwrap().trim().is_empty());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn invalid_utf8_is_kept_aside_then_restored() {
+        let dir = std::env::temp_dir().join(format!("polyptyque-test-{}", new_id()));
+        let path = dir.join("config.toml");
+        let mut config = sample();
+        config.save(&path).unwrap();
+        config.active_scene_mut().name = "Modifiée".into();
+        config.save(&path).unwrap();
+        let damaged: &[u8] = b"version = 2\n\xff\xfe";
+        fs::write(&path, damaged).unwrap();
+        let (loaded, warning) = Config::load_or_default(&path);
+        assert!(warning.unwrap().contains("restaurée"));
+        assert_eq!(loaded.active_sources().len(), 2);
+        assert_eq!(fs::read(dir.join("config.toml.invalide")).unwrap(), damaged);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn newer_version_is_copied_before_being_rewritten() {
+        let dir = std::env::temp_dir().join(format!("polyptyque-test-{}", new_id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("config.toml");
+        let mut text = toml::to_string_pretty(&sample()).unwrap().replace("version = 2", "version = 3");
+        text.push_str("\n[futur]\nreglage = true\n");
+        fs::write(&path, &text).unwrap();
+        let (loaded, warning) = Config::load_or_default(&path);
+        assert!(warning.unwrap().contains("config.toml.v3"));
+        assert_eq!(loaded.active_sources().len(), 2);
+        assert_eq!(fs::read_to_string(dir.join("config.toml.v3")).unwrap(), text);
+        // Version actuelle : aucun message, aucune copie.
+        loaded.save(&path).unwrap();
+        fs::remove_file(dir.join("config.toml.v3")).unwrap();
+        assert!(Config::load_or_default(&path).1.is_none());
+        assert!(!dir.join("config.toml.v3").exists());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// Ouvre le fichier sans partage : toute autre lecture échoue, comme
+    /// pendant l'analyse d'un antivirus.
+    #[cfg(windows)]
+    fn lock(path: &Path) -> fs::File {
+        use std::os::windows::fs::OpenOptionsExt;
+        fs::OpenOptions::new().read(true).share_mode(0).open(path).unwrap()
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn briefly_locked_file_is_read_again() {
+        let dir = std::env::temp_dir().join(format!("polyptyque-test-{}", new_id()));
+        let path = dir.join("config.toml");
+        let mut config = sample();
+        config.save(&path).unwrap();
+        config.active_scene_mut().name = "Modifiée".into();
+        config.save(&path).unwrap();
+        let file = lock(&path);
+        let release = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(300));
+            drop(file);
+        });
+        let (loaded, warning) = Config::load_or_default(&path);
+        release.join().unwrap();
+        assert!(warning.is_none());
+        assert_eq!(loaded.active_scene().name, "Modifiée");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn locked_file_is_not_replaced_by_a_backup() {
+        let dir = std::env::temp_dir().join(format!("polyptyque-test-{}", new_id()));
+        let path = dir.join("config.toml");
+        let mut config = sample();
+        config.save(&path).unwrap();
+        config.active_scene_mut().name = "Modifiée".into();
+        config.save(&path).unwrap();
+        let before = fs::read_to_string(&path).unwrap();
+        let file = lock(&path);
+        let (loaded, warning) = Config::load_or_default(&path);
+        drop(file);
+        assert!(warning.unwrap().contains("restaurée"));
+        // Sauvegarde utilisée, mais les derniers changements restent sur le
+        // disque.
+        assert_ne!(loaded.active_scene().name, "Modifiée");
+        assert_eq!(fs::read_to_string(&path).unwrap(), before);
         fs::remove_dir_all(dir).unwrap();
     }
 
