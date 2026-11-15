@@ -137,7 +137,7 @@ msgstr "Convert to MP4…"
 msgid "Aperçus en direct"
 msgstr "Live previews"
 
-#: polyptyque-app/ui/bridge.slint:99 polyptyque-app/ui/sheets.slint:480 polyptyque-app/src/controller.rs:1562 polyptyque-app/src/controller.rs:2163 polyptyque-app/src/controller.rs:2167 polyptyque-app/src/controller.rs:3472 polyptyque-engine/src/session.rs:274
+#: polyptyque-app/ui/bridge.slint:99 polyptyque-app/ui/sheets.slint:480 polyptyque-app/src/controller.rs:1562 polyptyque-app/src/controller.rs:2163 polyptyque-app/src/controller.rs:2167 polyptyque-app/src/controller.rs:3472 polyptyque-engine/src/session.rs:279
 msgid "Micro"
 msgstr "Mic"
 
@@ -1074,7 +1074,7 @@ msgstr "Scheduled recording not found: “{}” (ids: schedules.list)."
 msgid "Une fenêtre de saisie ou de confirmation est ouverte dans Polyptyque : y répondre ou la fermer d'abord."
 msgstr "A form or a confirmation is open in Polyptyque: answer or close it first."
 
-#: polyptyque-app/src/controller/commands.rs:384 polyptyque-app/src/controller/commands.rs:831 polyptyque-app/src/controller.rs:3921 polyptyque-app/src/convert.rs:208
+#: polyptyque-app/src/controller/commands.rs:384 polyptyque-app/src/controller/commands.rs:831 polyptyque-app/src/controller.rs:3921 polyptyque-app/src/convert.rs:221
 msgid "FFmpeg introuvable : ffmpeg.exe doit se trouver à côté de polyptyque.exe"
 msgstr "FFmpeg not found: ffmpeg.exe must be next to polyptyque.exe"
 
@@ -2344,11 +2344,11 @@ msgstr "Interrupted, playable, needs repair · {}"
 msgid "Illisible : {}"
 msgstr "Unreadable: {}"
 
-#: polyptyque-app/src/convert.rs:209
+#: polyptyque-app/src/convert.rs:222
 msgid "fichier inaccessible : {}"
 msgstr "file unavailable: {}"
 
-#: polyptyque-app/src/convert.rs:213
+#: polyptyque-app/src/convert.rs:226
 msgid "espace disque insuffisant pour la copie"
 msgstr "not enough disk space for the copy"
 
@@ -3336,7 +3336,7 @@ msgstr "{} at {}"
 msgid "le {} à {}"
 msgstr "on {} at {}"
 
-#: polyptyque-core/src/storage.rs:16 polyptyque-engine/src/session.rs:243 polyptyque-engine/src/session.rs:244
+#: polyptyque-core/src/storage.rs:16 polyptyque-engine/src/session.rs:248 polyptyque-engine/src/session.rs:249
 msgid "création du dossier {}"
 msgstr "creating folder {}"
 
@@ -3360,71 +3360,71 @@ msgstr "sound capture"
 msgid "la capture du micro"
 msgstr "mic capture"
 
-#: polyptyque-engine/src/audio_task.rs:141
+#: polyptyque-engine/src/audio_task.rs:142
 msgid "son indisponible : {}"
 msgstr "sound unavailable: {}"
 
-#: polyptyque-engine/src/output.rs:127
+#: polyptyque-engine/src/output.rs:128
 msgid "l'encodeur s'est arrêté (détail dans le journal)"
 msgstr "the encoder stopped (details in the log)"
 
-#: polyptyque-engine/src/output.rs:181
+#: polyptyque-engine/src/output.rs:187
 msgid "FFmpeg a disparu ({}) : un antivirus l'a peut-être mis en quarantaine ; le restaurer, ou réinstaller Polyptyque ({})"
 msgstr "FFmpeg is missing ({}): an antivirus may have quarantined it; restore it, or reinstall Polyptyque ({})"
 
-#: polyptyque-engine/src/output.rs:188
+#: polyptyque-engine/src/output.rs:194
 msgid "démarrage de l'encodeur impossible : {}"
 msgstr "couldn’t start the encoder: {}"
 
-#: polyptyque-engine/src/output.rs:227
+#: polyptyque-engine/src/output.rs:233
 msgid "Interruption de {} (mise en veille ou ordinateur figé) : la suite est dans la partie {}"
 msgstr "Interrupted for {} (computer asleep or frozen): recording continues in part {}"
 
-#: polyptyque-engine/src/output.rs:269
+#: polyptyque-engine/src/output.rs:275
 msgid "Windows refuse à FFmpeg l'écriture dans {} : l'« Accès contrôlé aux dossiers » de Sécurité Windows bloque peut-être {}. L'autoriser, ou choisir un autre dossier d'enregistrement"
 msgstr "Windows won’t let FFmpeg write to {}: Windows Security’s “Controlled folder access” may be blocking {}. Allow it, or choose another recordings folder"
 
-#: polyptyque-engine/src/output.rs:285
+#: polyptyque-engine/src/output.rs:291
 msgid "Limite d'encodages simultanés de la carte NVIDIA atteinte (autres logiciels compris) : cette source passe sur le processeur"
 msgstr "The NVIDIA card’s limit on simultaneous encodes was reached (other software included): this source switches to the CPU"
 
-#: polyptyque-engine/src/output.rs:288
+#: polyptyque-engine/src/output.rs:294
 msgid "{} ne démarre pas : cette source passe sur le processeur"
 msgstr "{} won’t start: this source switches to the CPU"
 
-#: polyptyque-engine/src/output.rs:294
+#: polyptyque-engine/src/output.rs:300
 msgid "{}. Suite dans la partie {}"
 msgstr "{}. Continues in part {}"
 
-#: polyptyque-engine/src/output.rs:297
+#: polyptyque-engine/src/output.rs:303
 msgid "l'encodeur s'arrête dès son démarrage : {}"
 msgstr "the encoder stops as soon as it starts: {}"
 
-#: polyptyque-engine/src/output.rs:302
+#: polyptyque-engine/src/output.rs:308
 msgid "Encodeur relancé : la suite est dans la partie {}"
 msgstr "Encoder restarted: recording continues in part {}"
 
-#: polyptyque-engine/src/output.rs:414
+#: polyptyque-engine/src/output.rs:420
 msgid "{} · partie {} (reprise à {})"
 msgstr "{} · part {} (resumed at {})"
 
-#: polyptyque-engine/src/output.rs:445
+#: polyptyque-engine/src/output.rs:451
 msgid "ouverture de {}"
 msgstr "opening {}"
 
-#: polyptyque-engine/src/output.rs:451 polyptyque-engine/src/remux.rs:59 polyptyque-engine/src/remux.rs:61 polyptyque-engine/src/remux.rs:349 polyptyque-engine/src/resolve.rs:419
+#: polyptyque-engine/src/output.rs:457 polyptyque-engine/src/remux.rs:59 polyptyque-engine/src/remux.rs:61 polyptyque-engine/src/remux.rs:351 polyptyque-engine/src/resolve.rs:419
 msgid "lancement de {}"
 msgstr "launching {}"
 
-#: polyptyque-engine/src/output.rs:530
+#: polyptyque-engine/src/output.rs:536
 msgid "l'encodeur ne répondait plus"
 msgstr "the encoder stopped responding"
 
-#: polyptyque-engine/src/output.rs:622
+#: polyptyque-engine/src/output.rs:628
 msgid "Dossier {} inaccessible : la suite est enregistrée dans {}"
 msgstr "Folder {} unavailable: recording continues in {}"
 
-#: polyptyque-engine/src/output.rs:631
+#: polyptyque-engine/src/output.rs:637
 msgid "{}_partie{}"
 msgstr "{}_part{}"
 
@@ -3456,31 +3456,31 @@ msgstr "replacing the original file: the original is kept as {}"
 msgid "remplacement du fichier d'origine"
 msgstr "replacing the original file"
 
-#: polyptyque-engine/src/remux.rs:383
+#: polyptyque-engine/src/remux.rs:385
 msgid "attente de FFmpeg"
 msgstr "waiting for FFmpeg"
 
-#: polyptyque-engine/src/remux.rs:387
+#: polyptyque-engine/src/remux.rs:389
 msgid "annulé"
 msgstr "canceled"
 
-#: polyptyque-engine/src/remux.rs:390
+#: polyptyque-engine/src/remux.rs:392
 msgid "échec de FFmpeg (détail dans le journal)"
 msgstr "FFmpeg failed (details in the log)"
 
-#: polyptyque-engine/src/remux.rs:394
+#: polyptyque-engine/src/remux.rs:396
 msgid "renommage du fichier terminé"
 msgstr "renaming the finished file"
 
-#: polyptyque-engine/src/remux.rs:429
+#: polyptyque-engine/src/remux.rs:431
 msgid "pistes manquantes après conversion ({} vidéo et {} son au lieu de {} et {})"
 msgstr "tracks missing after conversion ({} video and {} audio instead of {} and {})"
 
-#: polyptyque-engine/src/remux.rs:439
+#: polyptyque-engine/src/remux.rs:441
 msgid "durée différente après conversion ({} s au lieu de {} s)"
 msgstr "different duration after conversion ({} s instead of {} s)"
 
-#: polyptyque-engine/src/remux.rs:445
+#: polyptyque-engine/src/remux.rs:447
 msgid "durée illisible après conversion"
 msgstr "unreadable duration after conversion"
 
@@ -3492,23 +3492,23 @@ msgstr "Microsoft Store app, open it from the Start menu"
 msgid "création du profil {}"
 msgstr "creating profile {}"
 
-#: polyptyque-engine/src/session.rs:158
+#: polyptyque-engine/src/session.rs:163
 msgid "L'encodage ne répondait plus à l'arrêt : le fichier est peut-être incomplet (détail dans le journal)"
 msgstr "Encoding stopped responding while stopping: the file may be incomplete (details in the log)"
 
-#: polyptyque-engine/src/session.rs:289
+#: polyptyque-engine/src/session.rs:294
 msgid "« {} » enregistre déjà"
 msgstr "“{}” is already recording"
 
-#: polyptyque-engine/src/session.rs:429
+#: polyptyque-engine/src/session.rs:434
 msgid "fil d'encodage : {}"
 msgstr "encoding thread: {}"
 
-#: polyptyque-engine/src/session.rs:453
+#: polyptyque-engine/src/session.rs:458
 msgid "fil vidéo : {}"
 msgstr "video thread: {}"
 
-#: polyptyque-engine/src/session.rs:470
+#: polyptyque-engine/src/session.rs:475
 msgid "fil son : {}"
 msgstr "audio thread: {}"
 
