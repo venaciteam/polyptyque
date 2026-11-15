@@ -1,7 +1,7 @@
 //! Session d'enregistrement : départ commun des sources d'une scène sur une
 //! même horloge, ajout ou arrêt d'une source en cours de route, arrêt propre.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
@@ -16,6 +16,7 @@ use polyptyque_core::encoder::{bytes_per_hour, EncoderChoice};
 use polyptyque_core::level::RECENT_SOUND_HNS;
 use polyptyque_core::naming::{self, NameParts};
 use polyptyque_core::platform::{Nv12Frame, Platform};
+use polyptyque_core::storage;
 use tr::tr;
 
 use crate::audio_task::{AudioInput, AudioTask};
@@ -33,6 +34,10 @@ const ENCODING_SILENCE_TIMEOUT: Duration = Duration::from_secs(120);
 const SIZE_INTERVAL: Duration = Duration::from_secs(1);
 /// À l'arrêt, attente du dernier relevé de taille.
 const SIZE_SETTLE_TIMEOUT: Duration = Duration::from_secs(5);
+/// Délai d'un relevé de taille : un dossier qui ne répond plus (partage
+/// réseau perdu) garde la dernière taille connue. Plus court que
+/// [`SIZE_SETTLE_TIMEOUT`], pour que le dernier relevé arrive à temps.
+const SIZE_READ_TIMEOUT: Duration = Duration::from_secs(3);
 
 pub struct SessionPlan {
     pub scene_name: String,
@@ -568,9 +573,14 @@ fn summary_line(shared: &Shared) -> String {
 /// puis une dernière fois. Seul ce fil touche au disque pour cela : un
 /// dossier qui ne répond plus ne fige jamais l'interface.
 fn watch_sizes(shared: &Shared) {
+    let mut sizes = SizeWatch::default();
+    let read = |path: &Path| {
+        let path = path.to_path_buf();
+        storage::within(SIZE_READ_TIMEOUT, move || fs::metadata(&path).map(|m| m.len()).ok()).flatten()
+    };
     loop {
         let finished = shared.encoding_finished();
-        shared.file_size.store(total_size(&shared.outputs()), Ordering::Relaxed);
+        shared.file_size.store(sizes.total(&shared.outputs(), read), Ordering::Relaxed);
         if finished || shared.is_done() {
             shared.mark_sizes_settled();
             return;
@@ -582,8 +592,33 @@ fn watch_sizes(shared: &Shared) {
     }
 }
 
-fn total_size(outputs: &[PathBuf]) -> u64 {
-    outputs.iter().filter_map(|p| fs::metadata(p).ok()).map(|m| m.len()).sum()
+/// Tailles connues des fichiers d'une source. Une partie fermée est relevée
+/// une fois puis gardée : restée sur un dossier perdu, elle ne fige pas le
+/// relevé de la partie en cours (dans le dossier de secours, par exemple),
+/// dont dépend aussi la fin de l'encodage. Un relevé impossible garde la
+/// dernière taille connue.
+#[derive(Default)]
+struct SizeWatch {
+    sizes: HashMap<PathBuf, u64>,
+    closed: HashSet<PathBuf>,
+}
+
+impl SizeWatch {
+    fn total(&mut self, outputs: &[PathBuf], read: impl Fn(&Path) -> Option<u64>) -> u64 {
+        if let Some((current, closed)) = outputs.split_last() {
+            for part in closed {
+                if self.closed.insert(part.clone()) {
+                    if let Some(size) = read(part) {
+                        self.sizes.insert(part.clone(), size);
+                    }
+                }
+            }
+            if let Some(size) = read(current) {
+                self.sizes.insert(current.clone(), size);
+            }
+        }
+        outputs.iter().filter_map(|p| self.sizes.get(p)).sum()
+    }
 }
 
 /// Attend un fil jusqu'à l'échéance. Renvoie faux s'il ne s'est pas
@@ -597,4 +632,39 @@ fn join_until(handle: JoinHandle<()>, deadline: Instant) -> bool {
     }
     let _ = handle.join();
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+
+    #[test]
+    fn closed_parts_are_read_once() {
+        let first = PathBuf::from("partage/a.mkv");
+        let second = PathBuf::from("secours/a_partie2.mkv");
+        let reads = RefCell::new(Vec::new());
+        // Partage perdu après la première partie : plus rien n'y répond.
+        let lost = RefCell::new(false);
+        let read = |path: &Path| {
+            reads.borrow_mut().push(path.to_path_buf());
+            if path.starts_with("partage") && *lost.borrow() {
+                None
+            } else {
+                Some(if path == first { 100 } else { 10 })
+            }
+        };
+        let mut sizes = SizeWatch::default();
+        assert_eq!(sizes.total(std::slice::from_ref(&first), read), 100);
+        *lost.borrow_mut() = true;
+        let both = [first.clone(), second.clone()];
+        // Dernière taille connue de la première partie, gardée.
+        assert_eq!(sizes.total(&both, read), 110);
+        assert_eq!(sizes.total(&both, read), 110);
+        let first_reads = reads.borrow().iter().filter(|p| **p == first).count();
+        assert_eq!(first_reads, 2, "{:?}", reads.borrow());
+        assert_eq!(reads.borrow().iter().filter(|p| **p == second).count(), 2);
+        // Partie vide retirée de la liste : plus comptée.
+        assert_eq!(sizes.total(std::slice::from_ref(&second), read), 10);
+    }
 }

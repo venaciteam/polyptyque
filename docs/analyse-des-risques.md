@@ -169,7 +169,7 @@ Chaque scénario porte un identifiant (A1, B3…) repris dans le plan d'action.
 > - [x] **Instance unique** (A4) : un second lancement ramène la fenêtre existante. *2026-11-15 : aussi face à une copie lancée en administrateur.*
 > - [x] **Réglages sauvegardés** (A5) : écriture forcée sur le disque, cinq sauvegardes tournantes, restauration automatique. *2026-11-15 : fichier verrouillé relu cinq fois et jamais écrasé, fichier illisible copié en `.invalide`, fichier d'une version plus récente copié en `config.toml.vN` avec un avertissement.*
 > - [x] **Rouvrir et rétablir** (C1, C2, B4) : boutons « Rouvrir » (fenêtre perdue) et « Rétablir la fenêtre » (fenêtre réduite) pendant l'enregistrement ; relance automatique des sources qui l'autorisent.
-> - [x] **Dossier de secours** (D4) : si le dossier d'enregistrement devient inaccessible, la suite est écrite dans `Vidéos\Polyptyque`, avec message. *2026-11-15 : un dossier qui ne répond pas en 5 s compte comme inaccessible ; espace libre et tailles lus avec délai, hors du fil de l'interface.*
+> - [x] **Dossier de secours** (D4) : si le dossier d'enregistrement devient inaccessible, la suite est écrite dans `Vidéos\Polyptyque`, avec message. *2026-11-15 : un dossier qui ne répond pas en 5 s compte comme inaccessible ; espace libre et tailles lus avec délai, hors du fil de l'interface ; une partie fermée n'est mesurée qu'une fois, celle restée sur le dossier perdu ne fige pas la mesure de la suite.*
 
 ### Lot 2 - Situations prévisibles
 
