@@ -7,9 +7,8 @@ use std::thread;
 use std::time::Duration;
 
 use crossbeam_channel::Sender;
-use polyptyque_core::config::Source;
+use polyptyque_core::config::{Source, SAMPLE_RATE};
 use polyptyque_core::platform::{Nv12Frame, Platform, VideoCapture, WindowHandle};
-use polyptyque_core::config::SAMPLE_RATE;
 use polyptyque_core::timeline::{cut_resume_point, frame_time_hns, frames_due, CLOCK_JUMP_HNS, HNS_PER_SEC};
 use polyptyque_core::video::black_nv12;
 
