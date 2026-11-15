@@ -49,7 +49,8 @@ fn window(handle: isize, title: &str) -> WindowInfo {
 
 impl Platform for SimPlatform {
     fn list_windows(&self) -> Vec<WindowInfo> {
-        let mut windows = vec![window(1, "immediate")];
+        // Une fenêtre par source : deux sources ne partagent jamais une fenêtre.
+        let mut windows = vec![window(1, "immediate"), window(3, "temoin"), window(4, "seconde")];
         // La deuxième fenêtre n'apparaît qu'après une seconde.
         if self.start.elapsed() > Duration::from_secs(1) {
             windows.push(window(2, "tardive"));
@@ -305,7 +306,7 @@ fn crashed_encoder_resumes_in_a_new_part() {
         return;
     }
     let Sim { root, platform } = sim();
-    let plan = plan(&root, vec![application("Plantée", "immediate"), application("Témoin", "immediate")]);
+    let plan = plan(&root, vec![application("Plantée", "immediate"), application("Témoin", "temoin")]);
     let mut session = Session::start(platform, plan).expect("démarrage");
     thread::sleep(Duration::from_secs(3));
     // Plantage brutal du FFmpeg de la première source.
@@ -458,7 +459,7 @@ fn sources_start_and_stop_individually() {
     }
     let Sim { root, platform } = sim();
     let first = application("Première", "immediate");
-    let second = application("Seconde", "immediate");
+    let second = application("Seconde", "seconde");
     let mut session = Session::start(platform, plan(&root, vec![first.clone()])).expect("démarrage");
     thread::sleep(Duration::from_secs(1));
     session.add_source(&second).expect("ajout");
