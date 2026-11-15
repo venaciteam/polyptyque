@@ -303,8 +303,24 @@ impl Schedule {
         let days: Vec<NaiveDate> = match &self.repeat {
             Repeat::Once { date } => vec![*date],
             // Deux semaines : tous les cas d'une répétition hebdomadaire,
-            // et toute programmation unique proche.
-            Repeat::Weekly { .. } => (-1..=14).filter_map(|o| today.checked_add_signed(Duration::days(o))).collect(),
+            // et toute programmation unique proche. Une programmation unique
+            // plus lointaine est comparée à sa date (et aux jours voisins,
+            // pour les créneaux qui passent minuit).
+            Repeat::Weekly { .. } => {
+                let mut days: Vec<NaiveDate> =
+                    (-1..=14).filter_map(|o| today.checked_add_signed(Duration::days(o))).collect();
+                let last = days.last().copied().unwrap_or(today);
+                for other in others.iter().filter(|o| o.enabled && o.id != self.id) {
+                    if let Repeat::Once { date } = &other.repeat {
+                        if *date >= last {
+                            days.extend([date.pred_opt(), Some(*date), date.succ_opt()].into_iter().flatten());
+                        }
+                    }
+                }
+                days.sort_unstable();
+                days.dedup();
+                days
+            }
         };
         let mine: Vec<_> = days.iter().filter(|d| self.runs_on(**d)).map(|d| self.naive_interval(*d)).collect();
         for other in others.iter().filter(|o| o.enabled && o.id != self.id) {
@@ -809,6 +825,28 @@ mod tests {
         assert_eq!(off.validate(&[morning], now, &Paris), Ok(()));
         // Elle-même ne compte pas.
         assert_eq!(daily.validate(&others, now, &Paris), Ok(()));
+    }
+
+    #[test]
+    fn weekly_schedule_meets_a_distant_once_schedule() {
+        let now = paris(2026, 10, 23, 12, 0);
+        // Mardi 23/02/2027, bien au-delà des deux semaines examinées.
+        let distant = once("21:30", "23:00", date(2027, 2, 23));
+        assert_eq!(
+            weekly("21:00", "22:00", &[2]).validate(std::slice::from_ref(&distant), now, &Paris),
+            Err(ScheduleError::Overlap(distant.id.clone()))
+        );
+        // Un autre jour de la semaine : pas de chevauchement.
+        assert_eq!(weekly("21:00", "22:00", &[3]).validate(std::slice::from_ref(&distant), now, &Paris), Ok(()));
+        // La nuit du lundi déborde sur le mardi matin.
+        let morning = once("01:00", "02:00", date(2027, 2, 23));
+        assert!(matches!(
+            weekly("23:00", "03:00", &[1]).validate(std::slice::from_ref(&morning), now, &Paris),
+            Err(ScheduleError::Overlap(_))
+        ));
+        // Une programmation unique déjà passée ne gêne pas.
+        let past = once("21:30", "23:00", date(2026, 10, 13));
+        assert_eq!(weekly("21:00", "22:00", &[2]).validate(&[past], now, &Paris), Ok(()));
     }
 
     #[test]
