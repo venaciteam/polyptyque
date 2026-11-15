@@ -238,11 +238,24 @@ impl OutputTask {
             // erreurs après le refus, hors des dernières lignes.
             let part_log = part_log(&plan.log, part);
             let refused = nvenc_session_refused(&part_log) || nvenc_session_refused(&reason);
+            // Windows refuse à FFmpeg d'écrire le fichier (« Accès contrôlé
+            // aux dossiers », droits) alors que Polyptyque a pu tester le
+            // dossier : un message qui dit la cause, et aucun changement
+            // d'encodeur, qui n'y changerait rien.
+            let denied = write_denied(&part_log, &output).then(|| {
+                tr!(
+                    "Windows refuse à FFmpeg l'écriture dans {} : l'« Accès contrôlé aux dossiers » de Sécurité \
+                     Windows bloque peut-être {}. L'autoriser, ou choisir un autre dossier d'enregistrement",
+                    output.parent().unwrap_or(Path::new(".")).display(),
+                    plan.ffmpeg.display()
+                )
+            });
             // Sans FFmpeg, changer d'encodeur ne servirait à rien.
             let ffmpeg_missing = plan.ffmpeg.is_absolute() && !plan.ffmpeg.exists();
             let switch = plan.video
                 && plan.encoder.kind != EncoderKind::Software
                 && !ffmpeg_missing
+                && denied.is_none()
                 && (refused || quick_failures >= MAX_QUICK_FAILURES);
             if switch {
                 let note = if refused {
@@ -258,12 +271,13 @@ impl OutputTask {
                 shared.note_error(tr!("{}. Suite dans la partie {}", note, part));
             } else if quick_failures >= MAX_QUICK_FAILURES {
                 log::warn!("[{}] l'encodeur s'arrête dès son démarrage : {reason}", plan.title);
-                shared.fail(tr!("l'encodeur s'arrête dès son démarrage : {}", shown));
+                shared.fail(denied.unwrap_or_else(|| tr!("l'encodeur s'arrête dès son démarrage : {}", shown)));
                 return;
             } else {
                 part += 1;
                 log::warn!("[{}] {reason} ; relance dans un nouveau fichier (partie {part})", plan.title);
-                shared.note_error(tr!("Encodeur relancé : la suite est dans la partie {}", part));
+                let note = denied.unwrap_or_else(|| tr!("Encodeur relancé : la suite est dans la partie {}", part));
+                shared.note_error(note);
             }
             // Courte pause, plus longue si les échecs se répètent.
             let resume_at = Instant::now() + Duration::from_secs(quick_failures as u64);
@@ -640,6 +654,17 @@ fn part_log(path: &Path, part: u32) -> String {
     after.split_once('\n').map(|(_, messages)| messages.to_string()).unwrap_or_default()
 }
 
+/// FFmpeg n'a pas pu créer ou écrire `output` : « Permission denied »
+/// (« Access is denied » selon les versions) sur une ligne qui concerne le
+/// fichier de sortie.
+fn write_denied(part_log: &str, output: &Path) -> bool {
+    let name = output.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    part_log.lines().any(|line| {
+        (line.contains("Permission denied") || line.contains("Access is denied"))
+            && ((!name.is_empty() && line.contains(&name)) || line.contains("output"))
+    })
+}
+
 /// Dernières lignes utiles du journal de FFmpeg, pour expliquer un échec.
 pub(crate) fn log_tail(path: &Path) -> String {
     let text = std::fs::read_to_string(path).unwrap_or_default();
@@ -707,6 +732,21 @@ mod tests {
         assert_eq!(part_log(&path, 2), "[aost#0:1/aac @ 0x4] Broken pipe\n");
         assert_eq!(part_log(&path, 3), "");
         std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn denied_output_is_recognised() {
+        let output = Path::new(r"C:\Users\x\Videos\Scène_Firefox.mkv");
+        // FFmpeg 8, dossier protégé par l'« Accès contrôlé aux dossiers ».
+        let log = "[out#0/matroska @ 0x1] Error opening output C:\\Users\\x\\Videos\\Scène_Firefox.mkv: \
+                   Permission denied\n\
+                   Error opening output file C:\\Users\\x\\Videos\\Scène_Firefox.mkv.\n\
+                   Error opening output files: Permission denied\n";
+        assert!(write_denied(log, output));
+        assert!(write_denied("Error opening output files: Permission denied\n", output));
+        // Un tube refusé n'est pas le fichier de sortie.
+        assert!(!write_denied("\\\\.\\pipe\\polyptyque-1-0-p1-video: Permission denied\n", output));
+        assert!(!write_denied("[aost#0:1/aac @ 0x4] Broken pipe\n", output));
     }
 
     #[test]
