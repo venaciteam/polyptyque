@@ -75,6 +75,9 @@ const WRITE_CHECK_TIMEOUT: Duration = Duration::from_secs(5);
 /// programme automatiquement (le temps qu'il redémarre seul, après une mise
 /// à jour par exemple), puis entre deux essais.
 const AUTO_REOPEN_DELAY: Duration = Duration::from_secs(20);
+/// Intervalle de recherche des fenêtres des anciennes sources du Store, pour
+/// inscrire leur vrai programme (seulement s'il en reste).
+const STORE_UPGRADE_INTERVAL: Duration = Duration::from_secs(10);
 const AUTO_REOPEN_RETRY: Duration = Duration::from_secs(60);
 /// Essais automatiques par disparition, puis sur tout l'enregistrement :
 /// au-delà, seul le bouton « Rouvrir » reste.
@@ -242,6 +245,10 @@ pub struct App {
     deferred: RefCell<Vec<Deferred>>,
     /// Ouverture des fenêtres de la scène en cours.
     opening_windows: Cell<bool>,
+    /// Mise à niveau des anciennes sources du Store : prochaine recherche,
+    /// et recherche en cours.
+    store_upgrade_at: Cell<Option<Instant>>,
+    store_upgrade_running: Cell<bool>,
     /// Source copiée (Ctrl+C), à coller dans une autre scène.
     copied_source: RefCell<Option<String>>,
     /// Micros proposés dans les réglages : identifiant et nom.
@@ -419,6 +426,8 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
         pending_repairs: RefCell::new(Vec::new()),
         deferred: RefCell::new(Vec::new()),
         opening_windows: Cell::new(false),
+        store_upgrade_at: Cell::new(None),
+        store_upgrade_running: Cell::new(false),
         copied_source: RefCell::new(None),
         mic_choices: RefCell::new(Vec::new()),
         mic_warned: Cell::new(false),
@@ -1638,6 +1647,7 @@ impl App {
             let Some(session) = session.as_mut() else {
                 // Emprunt rendu avant : la mesure du disque relit la session.
                 drop(session);
+                self.upgrade_store_sources();
                 self.set_tracked_windows(HashMap::new());
                 self.refresh_disk(false);
                 self.tick_meters(&[]);
@@ -1720,6 +1730,72 @@ impl App {
         self.reopen_lost_windows(&statuses);
         self.refresh_disk(false);
         self.tick_meters(&statuses);
+    }
+
+    /// Anciennes sources du Store (programme `ApplicationFrameHost.exe`) de
+    /// la scène : retrouvées sur leur fenêtre exacte, attribuée au vrai
+    /// processus de leur application, elles prennent ce programme dans la
+    /// configuration. Recherche hors du fil de l'interface, enregistrement
+    /// sur celui-ci ; jamais pendant un enregistrement ou une opération.
+    fn upgrade_store_sources(&self) {
+        if self.locked() || self.store_upgrade_running.get() {
+            return;
+        }
+        let now = Instant::now();
+        if self.store_upgrade_at.get().is_some_and(|at| now < at) {
+            return;
+        }
+        self.store_upgrade_at.set(Some(now + STORE_UPGRADE_INTERVAL));
+        let sources = self.config.borrow().active_sources();
+        if !sources.iter().any(resolve::is_legacy_store_source) {
+            return;
+        }
+        self.store_upgrade_running.set(true);
+        let platform = self.platform.clone();
+        thread::spawn(move || {
+            let found = catch_unwind(AssertUnwindSafe(|| {
+                let windows = platform.list_windows();
+                sources
+                    .iter()
+                    .filter(|source| resolve::is_legacy_store_source(source))
+                    .filter_map(|source| {
+                        let exclusions = resolve::Exclusions::among(source, &sources, HashSet::new(), &windows);
+                        let window = resolve::find_window_excluding(platform.as_ref(), source, &windows, &exclusions)?;
+                        resolve::store_upgrade(source, &window).map(|exe| (source.id.clone(), exe))
+                    })
+                    .collect::<Vec<_>>()
+            }))
+            .unwrap_or_default();
+            post(move |app| app.finish_store_upgrade(found));
+        });
+    }
+
+    fn finish_store_upgrade(&self, found: Vec<(String, PathBuf)>) {
+        self.store_upgrade_running.set(false);
+        if found.is_empty() || self.locked() {
+            return;
+        }
+        let mut changed = false;
+        {
+            let mut config = self.config.borrow_mut();
+            for (id, exe) in found {
+                let Some(source) = config.sources.iter_mut().find(|s| s.id == id) else {
+                    continue;
+                };
+                if !resolve::is_legacy_store_source(source) {
+                    continue;
+                }
+                if let SourceKind::Application { exe_path, .. } = &mut source.kind {
+                    log::info!("[{}] source du Store : programme {} inscrit", source.name, exe.display());
+                    *exe_path = exe;
+                    changed = true;
+                }
+            }
+        }
+        if changed {
+            self.save();
+            self.refresh_all();
+        }
     }
 
     /// Fenêtres que suit l'enregistrement, pour les aperçus et les vumètres.

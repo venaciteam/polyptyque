@@ -79,6 +79,30 @@ fn is_store_frame_host(exe: &Path) -> bool {
     file_stem(exe).as_deref() == Some(STORE_FRAME_HOST)
 }
 
+/// Source du Store ajoutée avant le 2026-11-15 : son programme est
+/// `ApplicationFrameHost.exe`, commun à toutes les applications du Store.
+pub fn is_legacy_store_source(source: &Source) -> bool {
+    matches!(&source.kind, SourceKind::Application { exe_path, window_class, .. }
+        if window_class == STORE_FRAME_CLASS && is_store_frame_host(exe_path))
+}
+
+/// Programme réel à inscrire dans une ancienne source du Store
+/// ([`is_legacy_store_source`]) retrouvée sur `window` : seulement sur sa
+/// fenêtre exacte (même classe, même titre) attribuée au vrai processus de
+/// son application. Jamais sur une fenêtre prise à défaut, qui pourrait
+/// être celle d'une autre application du Store.
+pub fn store_upgrade(source: &Source, window: &WindowInfo) -> Option<std::path::PathBuf> {
+    let SourceKind::Application { window_class, window_title, .. } = &source.kind else {
+        return None;
+    };
+    (is_legacy_store_source(source)
+        && &window.class == window_class
+        && &window.title == window_title
+        && !window.exe.as_os_str().is_empty()
+        && !is_store_frame_host(&window.exe))
+    .then(|| window.exe.clone())
+}
+
 /// Source du Store enregistrée avant cette attribution : son programme est
 /// `ApplicationFrameHost.exe`, et tout cadre du Store lui appartient, quel
 /// que soit le programme auquel il est désormais attribué (comportement
@@ -805,6 +829,13 @@ mod tests {
         assert!(find_window_excluding(&FakePlatform, &store(calc, "Calculatrice"), &unresolved, &taken).is_none());
         // Une source récente ne prend jamais le cadre d'une autre application.
         assert!(find_window(&FakePlatform, &store(calc, "Calculatrice"), &windows[..1]).is_none());
+        // Mise à niveau : sur la fenêtre exacte attribuée au vrai programme.
+        assert!(is_legacy_store_source(&old));
+        assert!(!is_legacy_store_source(&store(calc, "Calculatrice")));
+        assert_eq!(store_upgrade(&old, &windows[1]), Some(PathBuf::from(calc)));
+        assert_eq!(store_upgrade(&store(host, "Autre"), &windows[1]), None);
+        assert_eq!(store_upgrade(&old, &unresolved[0]), None);
+        assert_eq!(store_upgrade(&store(calc, "Calculatrice"), &windows[1]), None);
         // Jamais de lancement direct d'une application du Store.
         assert!(launch(&old).is_err());
         assert!(launch(&store(calc, "Calculatrice")).is_err());
