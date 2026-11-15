@@ -416,7 +416,11 @@ fn refused_gpu_encoder_falls_back_to_the_processor() {
     let deadline = Instant::now() + Duration::from_secs(20);
     loop {
         let status = &session.status()[0];
-        if status.error.as_deref().is_some_and(|e| e.contains("passe sur le processeur")) {
+        if let Some(error) = status.error.as_deref().filter(|e| e.contains("passe sur le processeur")) {
+            // Sans carte NVIDIA, NVENC ne démarre pas : ce n'est pas la
+            // limite d'encodages simultanés de la carte, et le message le dit.
+            assert!(error.contains("ne démarre pas"), "{error}");
+            assert!(!error.contains("Limite d'encodages"), "{error}");
             break;
         }
         assert!(Instant::now() < deadline, "pas de bascule sur le processeur : {status:?}");

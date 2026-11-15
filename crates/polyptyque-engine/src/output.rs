@@ -234,7 +234,10 @@ impl OutputTask {
             // Encodeur de la carte graphique refusé (limite d'encodages de
             // la carte, pilote) : la source passe sur le processeur plutôt
             // que de s'arrêter.
-            let refused = nvenc_session_refused(&reason);
+            // Tout le journal de la partie : FFmpeg 7 et 8 écrivent d'autres
+            // erreurs après le refus, hors des dernières lignes.
+            let part_log = part_log(&plan.log, part);
+            let refused = nvenc_session_refused(&part_log) || nvenc_session_refused(&reason);
             // Sans FFmpeg, changer d'encodeur ne servirait à rien.
             let ffmpeg_missing = plan.ffmpeg.is_absolute() && !plan.ffmpeg.exists();
             let switch = plan.video
@@ -623,6 +626,20 @@ fn wait_exit(child: &mut Child, shared: &Shared, log: &Path) -> Option<std::proc
     }
 }
 
+/// Ce que FFmpeg a écrit au journal pour la partie `part`, après sa ligne
+/// `--- partie N ---` et la commande qui la suit : de quoi reconnaître la
+/// cause d'un échec, même suivie d'autres erreurs.
+fn part_log(path: &Path, part: u32) -> String {
+    let text = std::fs::read_to_string(path).unwrap_or_default();
+    let header = format!("--- partie {part} ---\n");
+    let Some(start) = text.rfind(&header) else {
+        return String::new();
+    };
+    let after = &text[start + header.len()..];
+    // La ligne de commande (titre de la source compris) n'est pas un message de FFmpeg.
+    after.split_once('\n').map(|(_, messages)| messages.to_string()).unwrap_or_default()
+}
+
 /// Dernières lignes utiles du journal de FFmpeg, pour expliquer un échec.
 pub(crate) fn log_tail(path: &Path) -> String {
     let text = std::fs::read_to_string(path).unwrap_or_default();
@@ -667,6 +684,29 @@ mod tests {
                       out of memory (10): (no details) | Error while opening encoder";
         assert!(nvenc_session_refused(reason));
         assert!(!nvenc_session_refused("l'encodeur s'est arrêté (exit code: 1) : Broken pipe"));
+    }
+
+    #[test]
+    fn nvenc_refusal_is_found_in_the_whole_part() {
+        let path = std::env::temp_dir().join(format!("polyptyque-log-{}.txt", polyptyque_core::config::new_id()));
+        // FFmpeg 8 : le refus, puis quatre autres lignes d'erreur.
+        let first = "--- partie 1 ---\nffmpeg -c:v h264_nvenc\n\
+                     [h264_nvenc @ 0x1] OpenEncodeSessionEx failed: out of memory (10): (no details)\n\
+                     [h264_nvenc @ 0x1] No capable devices found\n\
+                     [vost#0:0/h264_nvenc @ 0x2] Error while opening encoder - maybe incorrect parameters\n\
+                     [vf#0:0 @ 0x3] Error sending frames to consumers: Generic error in an external library\n\
+                     [vf#0:0 @ 0x3] Task finished with error code: -542398533\n";
+        std::fs::write(&path, first).unwrap();
+        assert!(!nvenc_session_refused(&log_tail(&path)), "le refus n'est plus dans les dernières lignes");
+        assert!(nvenc_session_refused(&part_log(&path, 1)));
+        // Une partie suivante ne reprend ni le refus précédent ni sa commande.
+        let second = "--- partie 2 ---\nffmpeg -c:v libx264 -metadata title=OpenEncodeSessionEx failed\n\
+                      [aost#0:1/aac @ 0x4] Broken pipe\n";
+        std::fs::write(&path, format!("{first}{second}")).unwrap();
+        assert!(!nvenc_session_refused(&part_log(&path, 2)));
+        assert_eq!(part_log(&path, 2), "[aost#0:1/aac @ 0x4] Broken pipe\n");
+        assert_eq!(part_log(&path, 3), "");
+        std::fs::remove_file(path).unwrap();
     }
 
     #[test]
