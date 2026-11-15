@@ -12,6 +12,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -58,6 +59,12 @@ use scheduling::Prompt;
 const LAUNCH_WAIT: Duration = Duration::from_secs(30);
 const DISK_STOP_THRESHOLD: u64 = 1_000_000_000;
 const DISK_WARNING_THRESHOLD: u64 = 10_000_000_000;
+/// Mesure de l'espace libre sans réponse depuis ce délai (dossier réseau
+/// figé) : abandonnée, une autre peut partir.
+const DISK_CHECK_STALE: Duration = Duration::from_secs(30);
+/// Fils de mesure bloqués tolérés : au-delà, plus aucune mesure n'est
+/// lancée avant le retour de l'un d'eux.
+const DISK_CHECK_MAX_THREADS: usize = 3;
 const BACKLOG_WARNING_SECONDS: f32 = 2.0;
 /// Fenêtre perdue pendant l'enregistrement : délai avant de rouvrir le
 /// programme automatiquement (le temps qu'il redémarre seul, après une mise
@@ -194,7 +201,11 @@ pub struct App {
     toast_timer: Timer,
     free_space: Cell<Option<u64>>,
     last_disk_check: Cell<Option<Instant>>,
-    disk_check_running: Cell<bool>,
+    /// Mesure de l'espace libre en cours : son numéro et son début.
+    disk_check: Cell<Option<(u64, Instant)>>,
+    disk_check_number: Cell<u64>,
+    /// Fils de mesure pas encore revenus (dossier réseau figé…).
+    disk_check_threads: Arc<AtomicUsize>,
     quitting: Cell<bool>,
     /// Windows ferme la session (arrêt, redémarrage, déconnexion) : il ferme
     /// lui-même les navigateurs.
@@ -379,7 +390,9 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
         toast_timer: Timer::default(),
         free_space: Cell::new(None),
         last_disk_check: Cell::new(None),
-        disk_check_running: Cell::new(false),
+        disk_check: Cell::new(None),
+        disk_check_number: Cell::new(0),
+        disk_check_threads: Arc::new(AtomicUsize::new(0)),
         quitting: Cell::new(false),
         session_ending: Cell::new(false),
         joining: RefCell::new(HashSet::new()),
@@ -899,11 +912,21 @@ impl App {
     /// réseau lent ne doit pas la figer.
     fn refresh_disk(&self, force: bool) {
         let due = self.last_disk_check.get().is_none_or(|t| t.elapsed() >= Duration::from_secs(10));
-        if (!force && !due) || self.disk_check_running.get() {
+        if !force && !due {
             return;
         }
+        // Mesure précédente sans réponse : attendue un moment, puis
+        // abandonnée (dossier réseau figé) pour en lancer une autre, sans
+        // accumuler les fils bloqués.
+        if self.disk_check.get().is_some_and(|(_, started)| started.elapsed() < DISK_CHECK_STALE)
+            || self.disk_check_threads.load(Ordering::SeqCst) >= DISK_CHECK_MAX_THREADS
+        {
+            return;
+        }
+        let number = self.disk_check_number.get() + 1;
+        self.disk_check_number.set(number);
         self.last_disk_check.set(Some(Instant::now()));
-        self.disk_check_running.set(true);
+        self.disk_check.set(Some((number, Instant::now())));
         // Pendant un enregistrement : le dossier réellement utilisé (celui de
         // secours si le dossier choisi est devenu inaccessible).
         let recording = self
@@ -924,14 +947,21 @@ impl App {
             }
         };
         let platform = self.platform.clone();
+        let threads = self.disk_check_threads.clone();
+        threads.fetch_add(1, Ordering::SeqCst);
         thread::spawn(move || {
             let free = platform.free_disk_space(&dir);
-            post(move |app| app.apply_disk(free, per_hour));
+            threads.fetch_sub(1, Ordering::SeqCst);
+            post(move |app| app.apply_disk(number, free, per_hour));
         });
     }
 
-    fn apply_disk(&self, free: Option<u64>, per_hour: u64) {
-        self.disk_check_running.set(false);
+    fn apply_disk(&self, number: u64, free: Option<u64>, per_hour: u64) {
+        // Résultat d'une mesure abandonnée : périmé.
+        if self.disk_check.get().is_none_or(|(current, _)| current != number) {
+            return;
+        }
+        self.disk_check.set(None);
         self.free_space.set(free);
         let (text, warning) = match free {
             Some(free) => {
