@@ -287,6 +287,34 @@ impl App {
         self.with_bridge_value(|b| b.get_sheet().to_string())
     }
 
+    /// Refuse quand une fenêtre de saisie ou de confirmation est ouverte :
+    /// ce qu'elle s'apprête à faire porte sur une scène, ses sources ou une
+    /// programmation, qu'une commande ne doit pas changer sous elle. Avec
+    /// `settings` : aussi les réglages, les assistants et le signalement
+    /// (un démarrage les fermerait sans enregistrer la saisie).
+    fn check_no_input_sheet(&self, settings: bool) -> Result<(), CommandError> {
+        let sheet = self.sheet();
+        let open = matches!(
+            sheet.as_str(),
+            "confirm"
+                | "scene-new"
+                | "scene-rename"
+                | "scene-duplicate"
+                | "browser"
+                | "application"
+                | "crop"
+                | "schedule-new"
+                | "schedule-edit"
+        ) || (settings && matches!(sheet.as_str(), "settings" | "assistants" | "report"));
+        if open {
+            return Err(CommandError::new(
+                Reason::Busy,
+                tr!("Une fenêtre de saisie ou de confirmation est ouverte dans Polyptyque : y répondre ou la fermer d'abord."),
+            ));
+        }
+        Ok(())
+    }
+
     // ----- Généralités ------------------------------------------------------------
 
     fn cmd_hello(&self, client: u64, params: &Value) -> Outcome {
@@ -428,6 +456,7 @@ impl App {
 
     fn cmd_scene_create(&self, params: &Value) -> Outcome {
         self.check_unlocked()?;
+        self.check_no_input_sheet(false)?;
         let name = Self::scene_name_param(params)?;
         let activate = flag(params, "activate").unwrap_or(true);
         let id = self.create_scene(&name, activate);
@@ -437,6 +466,7 @@ impl App {
 
     fn cmd_scene_rename(&self, params: &Value) -> Outcome {
         self.check_unlocked()?;
+        self.check_no_input_sheet(false)?;
         let scene = self.find_scene(required(params, "scene")?)?;
         let name = Self::scene_name_param(params)?;
         self.rename_scene(&scene.id, &name);
@@ -446,6 +476,7 @@ impl App {
 
     fn cmd_scene_duplicate(&self, params: &Value) -> Outcome {
         self.check_unlocked()?;
+        self.check_no_input_sheet(false)?;
         let scene = self.scene_param(params)?;
         let name = match text(params, "name").map(str::trim) {
             Some("") => return Err(CommandError::invalid(tr!("Nom de scène manquant."))),
@@ -461,6 +492,7 @@ impl App {
 
     fn cmd_scene_delete(&self, params: &Value) -> Outcome {
         self.check_unlocked()?;
+        self.check_no_input_sheet(false)?;
         let scene = self.find_scene(required(params, "scene")?)?;
         if self.config.borrow().scenes.len() <= 1 {
             return Err(refused(tr!("La dernière scène ne peut pas être supprimée.")));
@@ -476,6 +508,7 @@ impl App {
         let scene = self.find_scene(required(params, "scene")?)?;
         if self.config.borrow().active_scene != scene.id {
             self.check_unlocked()?;
+            self.check_no_input_sheet(false)?;
             self.select_scene(&scene.id);
         }
         Ok(Reply::ok(json!({ "scene": self.scene_json(&scene) })))
@@ -585,6 +618,7 @@ impl App {
 
     fn cmd_add_browser(&self, params: &Value) -> Outcome {
         self.check_unlocked()?;
+        self.check_no_input_sheet(false)?;
         let scene = self.scene_param(params)?;
         let wanted = required(params, "browser")?.trim();
         let installed = self.platform.detect_browsers();
@@ -616,6 +650,7 @@ impl App {
 
     fn cmd_add_application(&self, params: &Value) -> Outcome {
         self.check_unlocked()?;
+        self.check_no_input_sheet(false)?;
         let scene = self.scene_param(params)?;
         let window_id = required(params, "window")?;
         let window = window_id
@@ -642,6 +677,7 @@ impl App {
 
     fn cmd_add_to_scene(&self, params: &Value) -> Outcome {
         self.check_unlocked()?;
+        self.check_no_input_sheet(false)?;
         let source = self.find_source(required(params, "source")?, None)?;
         let scene = self.find_scene(required(params, "scene")?)?;
         let result = self.config.borrow_mut().link_source(&scene.id, &source.id);
@@ -665,6 +701,7 @@ impl App {
 
     fn cmd_remove_source(&self, params: &Value) -> Outcome {
         self.check_unlocked()?;
+        self.check_no_input_sheet(false)?;
         let scene = self.scene_param(params)?;
         let source = self.find_source(required(params, "source")?, Some(&scene))?;
         if !confirmed(params) {
@@ -678,6 +715,7 @@ impl App {
 
     fn cmd_move_source(&self, params: &Value) -> Outcome {
         self.check_unlocked()?;
+        self.check_no_input_sheet(false)?;
         let scene = self.scene_param(params)?;
         let source = self.find_source(required(params, "source")?, Some(&scene))?;
         let count = scene.source_ids.len() as i64;
@@ -781,13 +819,18 @@ impl App {
                 tr!("FFmpeg introuvable : ffmpeg.exe doit se trouver à côté de polyptyque.exe"),
             ));
         }
-        if scene.id != active.id {
-            self.select_scene(&scene.id);
-        }
+        // Le démarrage fermerait sans l'enregistrer une saisie en cours
+        // (réglages, programmation, rognage…).
+        self.check_no_input_sheet(true)?;
+        // Tout est vérifié avant de changer de scène : une commande refusée
+        // ne change rien.
         let only = match text(params, "source") {
             Some(reference) => Some(self.find_source(reference, Some(&scene))?.id),
             None => None,
         };
+        if scene.id != active.id {
+            self.select_scene(&scene.id);
+        }
         self.control.borrow_mut().start_request = Some(request);
         self.start_recording(only.as_deref());
         Ok(Reply::Wait {

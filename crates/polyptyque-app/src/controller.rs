@@ -91,8 +91,10 @@ const HARDWARE: [HardwarePreference; 3] = [HardwarePreference::Auto, HardwarePre
 /// Actions qui demandent une confirmation.
 #[derive(Clone)]
 enum Confirm {
-    DeleteScene,
-    RemoveSource(String),
+    /// Supprimer cette scène.
+    DeleteScene(String),
+    /// Retirer cette source (premier identifiant) de cette scène.
+    RemoveSource(String, String),
     QuitWhileRecording,
     QuitWhileConverting,
     CancelConversion,
@@ -186,6 +188,9 @@ pub struct App {
     browsers: RefCell<Vec<BrowserInstall>>,
     windows: RefCell<Vec<WindowInfo>>,
     confirm: RefCell<Option<Confirm>>,
+    /// Scène visée par la fenêtre de saisie ouverte (renommer, dupliquer,
+    /// ajouter une source) : celle en cours à son ouverture.
+    sheet_scene: RefCell<String>,
     toast_timer: Timer,
     free_space: Cell<Option<u64>>,
     last_disk_check: Cell<Option<Instant>>,
@@ -370,6 +375,7 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
         browsers: RefCell::new(Vec::new()),
         windows: RefCell::new(Vec::new()),
         confirm: RefCell::new(None),
+        sheet_scene: RefCell::new(String::new()),
         toast_timer: Timer::default(),
         free_space: Cell::new(None),
         last_disk_check: Cell::new(None),
@@ -2327,6 +2333,7 @@ impl App {
 
     fn open_scene_sheet(&self, new: bool) {
         let current = self.config.borrow().active_scene().name.clone();
+        self.remember_sheet_scene();
         self.with_bridge(|b| {
             b.set_scene_name_input(if new { SharedString::new() } else { current.into() });
             b.set_sheet(if new { "scene-new" } else { "scene-rename" }.into());
@@ -2335,6 +2342,7 @@ impl App {
 
     fn open_scene_sheet_duplicate(&self) {
         let name = tr!("{} (copie)", self.config.borrow().active_scene().name);
+        self.remember_sheet_scene();
         self.with_bridge(|b| {
             b.set_scene_name_input(name.into());
             b.set_sheet("scene-duplicate".into());
@@ -2355,17 +2363,39 @@ impl App {
             return;
         }
         let mode = bridge.get_sheet();
-        bridge.set_sheet("".into());
-        let active = self.config.borrow().active_scene.clone();
-        match mode.as_str() {
-            "scene-new" => {
-                self.create_scene(&name, true);
-            }
-            "scene-duplicate" => {
-                self.duplicate_scene(&active, &name);
-            }
-            _ => self.rename_scene(&active, &name),
+        if mode == "scene-new" {
+            bridge.set_sheet("".into());
+            self.create_scene(&name, true);
+            return;
         }
+        let Some(scene) = self.sheet_scene_id() else {
+            return;
+        };
+        bridge.set_sheet("".into());
+        if mode == "scene-duplicate" {
+            self.duplicate_scene(&scene, &name);
+        } else {
+            self.rename_scene(&scene, &name);
+        }
+    }
+
+    /// Mémorise la scène en cours, visée par la fenêtre de saisie qui
+    /// s'ouvre.
+    fn remember_sheet_scene(&self) {
+        *self.sheet_scene.borrow_mut() = self.config.borrow().active_scene.clone();
+    }
+
+    /// Scène visée par la fenêtre de saisie ouverte (la scène en cours a pu
+    /// changer entre-temps). Disparue : la fenêtre se ferme, avec un
+    /// message.
+    fn sheet_scene_id(&self) -> Option<String> {
+        let id = self.sheet_scene.borrow().clone();
+        if self.config.borrow().scene(&id).is_some() {
+            return Some(id);
+        }
+        self.close_sheet();
+        self.toast(&tr!("Cette scène n'existe plus."), 3);
+        None
     }
 
     /// Nouvelle scène, vide (interface, pilotage). Renvoie son identifiant.
@@ -2427,7 +2457,7 @@ impl App {
     fn request_delete_scene(&self) {
         let id = self.config.borrow().active_scene.clone();
         self.ask(
-            Confirm::DeleteScene,
+            Confirm::DeleteScene(id.clone()),
             &tr!("Supprimer la scène"),
             &self.delete_scene_text(&id),
             &tr!("Bouton : supprimer une scène" => "Supprimer"),
@@ -2476,6 +2506,7 @@ impl App {
             .map(|b| format!("{} {count}", b.name.split_whitespace().last().unwrap_or(&b.name)))
             .unwrap_or_else(|| tr!("Navigateur {}", count));
         *self.browsers.borrow_mut() = browsers;
+        self.remember_sheet_scene();
         self.with_bridge(|b| {
             b.set_browser_choices(ModelRc::new(VecModel::from(choices)));
             b.set_browser_index(0);
@@ -2516,8 +2547,10 @@ impl App {
         }
         let url = bridge.get_new_url().to_string();
         let open_now = bridge.get_open_now();
+        let Some(scene) = self.sheet_scene_id() else {
+            return;
+        };
         bridge.set_sheet("".into());
-        let scene = self.config.borrow().active_scene.clone();
         self.add_browser_source(&bridge.get_new_name(), browser, Some(url.as_str()), open_now, &scene);
     }
 
@@ -2580,6 +2613,7 @@ impl App {
 
     fn open_application_sheet(&self) {
         self.refresh_windows();
+        self.remember_sheet_scene();
         self.with_bridge(|b| {
             b.set_window_index(-1);
             b.set_new_name("".into());
@@ -2633,8 +2667,10 @@ impl App {
             self.toast(&tr!("Nom de source manquant."), 2);
             return;
         }
+        let Some(scene) = self.sheet_scene_id() else {
+            return;
+        };
         bridge.set_sheet("".into());
-        let scene = self.config.borrow().active_scene.clone();
         self.add_application_source(
             &bridge.get_new_name(),
             &window,
@@ -2681,7 +2717,7 @@ impl App {
         };
         let scene = self.config.borrow().active_scene.clone();
         self.ask(
-            Confirm::RemoveSource(source.id.clone()),
+            Confirm::RemoveSource(source.id.clone(), scene.clone()),
             &tr!("Supprimer la source"),
             &self.remove_source_text(&source, &scene),
             &tr!("Bouton : retirer une source" => "Supprimer"),
@@ -3366,20 +3402,17 @@ impl App {
         let action = self.confirm.borrow_mut().take();
         self.with_bridge(|b| b.set_sheet("".into()));
         match action {
-            Some(Confirm::DeleteScene) | Some(Confirm::RemoveSource(_)) if self.locked() => {}
-            Some(Confirm::DeleteScene) => {
-                let id = self.config.borrow().active_scene.clone();
-                self.delete_scene(&id);
-            }
+            Some(Confirm::DeleteScene(_)) | Some(Confirm::RemoveSource(..)) if self.locked() => {}
+            // La scène et la source sont celles de la question : la scène en
+            // cours a pu changer entre-temps.
+            Some(Confirm::DeleteScene(id)) => self.delete_scene(&id),
             Some(Confirm::EnableMicrophone) => {
                 log::info!("pilotage : activation du micro acceptée");
                 self.control.borrow_mut().mic_answer = Some(true);
             }
-            Some(Confirm::RemoveSource(id)) => {
-                self.config.borrow_mut().remove_source(&id);
-                self.save();
-                self.refresh_all();
-                self.restart_previews();
+            Some(Confirm::RemoveSource(id, scene)) => {
+                self.config.borrow_mut().remove_source_from(&scene, &id);
+                self.after_source_change(&scene);
             }
             Some(Confirm::InstallUpdate) => self.download_update(),
             Some(Confirm::RepairFiles(files)) => self.enqueue_jobs(files, JobKind::Repair),
