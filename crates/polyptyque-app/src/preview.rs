@@ -85,11 +85,7 @@ impl PreviewWorker {
 /// l'image a les proportions de la fenêtre (sans bandes noires).
 /// `claims` : celles des aperçus des cartes, pour montrer la même fenêtre
 /// que la carte de la source.
-pub fn start_whole(
-    platform: &Arc<dyn Platform>,
-    source: &Source,
-    claims: Arc<WindowClaims>,
-) -> Option<PreviewWorker> {
+pub fn start_whole(platform: &Arc<dyn Platform>, source: &Source, claims: Arc<WindowClaims>) -> Option<PreviewWorker> {
     spawn(platform, source, Arc::new(AtomicU64::new(pack(WHOLE_SIZE))), true, claims)
 }
 
@@ -153,12 +149,7 @@ pub struct PreviewManager {
 }
 
 impl PreviewManager {
-    pub fn start(
-        platform: &Arc<dyn Platform>,
-        sources: &[Source],
-        size: (u32, u32),
-        tracked: &TrackedWindows,
-    ) -> Self {
+    pub fn start(platform: &Arc<dyn Platform>, sources: &[Source], size: (u32, u32), tracked: &TrackedWindows) -> Self {
         let wanted = Arc::new(AtomicU64::new(pack(size)));
         let claims = WindowClaims::new(sources, tracked.clone());
         let workers = sources

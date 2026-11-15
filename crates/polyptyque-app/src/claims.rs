@@ -44,7 +44,13 @@ impl WindowClaims {
     /// [`WindowClaims::release`] : celle que l'enregistrement suit pour
     /// elle, sinon la meilleure parmi celles que ni l'enregistrement ni les
     /// autres sources n'ont prises.
-    pub fn find(&self, platform: &dyn Platform, run: u64, source: &Source, windows: &[WindowInfo]) -> Option<WindowInfo> {
+    pub fn find(
+        &self,
+        platform: &dyn Platform,
+        run: u64,
+        source: &Source,
+        windows: &[WindowInfo],
+    ) -> Option<WindowInfo> {
         self.release(run);
         let tracked = lock(&self.tracked).clone();
         let found = match tracked.get(&source.id) {

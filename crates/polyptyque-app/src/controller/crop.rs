@@ -39,9 +39,10 @@ impl App {
         };
         let index = self.config.borrow().active_scene().source_ids.iter().position(|s| s == id);
         // La fenêtre que montrerait la carte de la source.
-        let claims = self.previews.borrow().claims().unwrap_or_else(|| {
-            WindowClaims::new(&self.config.borrow().active_sources(), self.tracked_windows.clone())
-        });
+        let claims =
+            self.previews.borrow().claims().unwrap_or_else(|| {
+                WindowClaims::new(&self.config.borrow().active_sources(), self.tracked_windows.clone())
+            });
         let worker = preview::start_whole(&self.platform, &source, claims);
         let choices: Vec<SharedString> = CropRatio::ALL.iter().map(|r| r.label().into()).collect();
         *self.crop.borrow_mut() = Some(CropEditor {
