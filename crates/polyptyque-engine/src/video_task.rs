@@ -35,13 +35,13 @@ pub(crate) struct VideoTask {
     pub run: usize,
 }
 
-/// Libère la fenêtre réservée à la sortie du fil, même sur une erreur
-/// interne.
+/// Libère la fenêtre suivie et la réservation de la source à la sortie du
+/// fil, même sur une erreur interne.
 struct ClaimGuard<'a>(&'a WindowClaims, usize);
 
 impl Drop for ClaimGuard<'_> {
     fn drop(&mut self) {
-        self.0.release(self.1);
+        self.0.unregister(self.1);
     }
 }
 
@@ -58,6 +58,7 @@ impl VideoTask {
         let (platform, source, shared, queue) = (&self.platform, &self.source, &self.shared, &self.queue);
         let (t0_hns, width, height, fps) = (self.t0_hns, self.width, self.height, self.fps);
         let (claims, run) = (self.claims.as_ref(), self.run);
+        claims.register(run, source);
         let _claim = ClaimGuard(claims, run);
         let black: Nv12Frame = Arc::new(black_nv12(width, height));
         let mut latest = black.clone();
@@ -104,8 +105,8 @@ impl VideoTask {
                 let windows = platform.list_windows();
                 // Jamais la fenêtre d'une autre source de la session (deux
                 // sources d'un même programme).
-                let taken = claims.taken_by_others(&source.id);
-                let found = resolve::find_window_excluding(platform.as_ref(), source, &windows, &taken)
+                let exclusions = claims.exclusions(&source.id, &windows);
+                let found = resolve::find_window_excluding(platform.as_ref(), source, &windows, &exclusions)
                     // Prise entre-temps par une autre source : nouvel essai au tour suivant.
                     .filter(|window| claims.claim(run, &source.id, window.handle));
                 if let Some(window) = found {

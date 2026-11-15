@@ -22,26 +22,62 @@ use tr::tr;
 /// - Application : même exécutable, même classe et même titre ; à défaut
 ///   même classe ; à défaut la seule fenêtre de ce programme.
 pub fn find_window(platform: &dyn Platform, source: &Source, windows: &[WindowInfo]) -> Option<WindowInfo> {
-    find_window_excluding(platform, source, windows, &HashSet::new())
+    find_window_excluding(platform, source, windows, &Exclusions::default())
 }
 
-/// Comme [`find_window`], sans jamais retenir une fenêtre de `taken` (déjà
-/// enregistrée par une autre source de la session) : deux sources d'un même
-/// programme (deux VLC, deux applications Chrome) n'enregistrent jamais la
-/// même fenêtre.
+/// Fenêtres que les autres sources d'une session suivent ou attendent.
+#[derive(Debug, Default, Clone)]
+pub struct Exclusions {
+    /// Déjà enregistrées par une autre source : jamais retenues.
+    pub taken: HashSet<WindowHandle>,
+    /// Même programme, même classe et même titre qu'une autre source : à
+    /// elle d'abord. Retenues seulement si elles portent aussi exactement le
+    /// titre de la source cherchée, jamais à défaut.
+    pub reserved: HashSet<WindowHandle>,
+}
+
+impl Exclusions {
+    /// Fenêtres de `windows` qui correspondent exactement à l'une des
+    /// sources `others`.
+    pub fn reserve_for(&mut self, others: &[&Source], windows: &[WindowInfo]) {
+        for window in windows {
+            if others.iter().any(|other| exact_match(other, window)) {
+                self.reserved.insert(window.handle);
+            }
+        }
+    }
+}
+
+/// La fenêtre porte exactement le programme, la classe et le titre d'une
+/// source application.
+fn exact_match(source: &Source, window: &WindowInfo) -> bool {
+    let SourceKind::Application { exe_path, window_class, window_title, .. } = &source.kind else {
+        return false;
+    };
+    (same_path(&window.exe, exe_path) || same_file_name(&window.exe, exe_path))
+        && &window.class == window_class
+        && &window.title == window_title
+}
+
+/// Comme [`find_window`], sans jamais retenir une fenêtre déjà enregistrée
+/// par une autre source de la session, ni à défaut celle qu'une autre
+/// source attend (voir [`Exclusions`]) : deux sources d'un même programme
+/// (deux VLC, deux applications Chrome) n'enregistrent jamais la même
+/// fenêtre, ni l'une celle de l'autre.
 ///
 /// Ordre de préférence pour une application, parmi les fenêtres libres de
-/// ce programme : même classe et même titre, puis même classe (la plus haute
-/// dans l'ordre d'empilement, c'est-à-dire la dernière utilisée), puis la
-/// seule fenêtre du programme si elle est libre. Une fois rattachée, une
-/// source garde sa fenêtre (par sa poignée) tant qu'elle existe : ce choix
-/// ne se refait qu'au démarrage ou après une perte.
+/// ce programme : même classe et même titre ; puis même classe (la plus
+/// haute dans l'ordre d'empilement, c'est-à-dire la dernière utilisée) ;
+/// puis la seule fenêtre du programme. Une fois rattachée, une source garde
+/// sa fenêtre (par sa poignée) tant qu'elle existe : ce choix ne se refait
+/// qu'au démarrage ou après une perte.
 pub fn find_window_excluding(
     platform: &dyn Platform,
     source: &Source,
     windows: &[WindowInfo],
-    taken: &HashSet<WindowHandle>,
+    exclusions: &Exclusions,
 ) -> Option<WindowInfo> {
+    let taken = &exclusions.taken;
     match &source.kind {
         SourceKind::Browser { profile_dir, browser, .. } => {
             let class = window_class(browser.family);
@@ -66,13 +102,17 @@ pub fn find_window_excluding(
                 same_program = windows.iter().filter(|w| same_file_name(&w.exe, exe_path)).collect();
             }
             let free: Vec<&WindowInfo> = same_program.iter().copied().filter(|w| !taken.contains(&w.handle)).collect();
+            let unreserved = |w: &&&WindowInfo| !exclusions.reserved.contains(&w.handle);
             free.iter()
                 .find(|w| &w.class == window_class && &w.title == window_title)
-                .or_else(|| free.iter().find(|w| &w.class == window_class))
+                .or_else(|| free.iter().filter(unreserved).find(|w| &w.class == window_class))
                 .copied()
                 // La seule fenêtre du programme, pas la seule restée libre :
                 // une autre source peut suivre ses autres fenêtres.
-                .or_else(|| (same_program.len() == 1 && free.len() == 1).then(|| free[0]))
+                .or_else(|| {
+                    (same_program.len() == 1 && free.len() == 1 && !exclusions.reserved.contains(&free[0].handle))
+                        .then(|| free[0])
+                })
                 .cloned()
         }
     }
@@ -183,8 +223,21 @@ pub fn prepare_windows(
     let windows = platform.list_windows();
     let mut waiting: Vec<&Source> = Vec::new();
     let mut missing = Vec::new();
+    // Une fenêtre par source, avec les mêmes règles que l'enregistrement :
+    // deux sources d'un même programme ne comptent jamais la même fenêtre.
+    let mut taken: HashSet<WindowHandle> = HashSet::new();
+    let mut find = |source: &Source, windows: &[WindowInfo]| {
+        let others: Vec<&Source> = sources.iter().filter(|s| s.id != source.id).collect();
+        let mut exclusions = Exclusions { taken: taken.clone(), ..Default::default() };
+        exclusions.reserve_for(&others, windows);
+        let found = find_window_excluding(platform, source, windows, &exclusions);
+        if let Some(window) = &found {
+            taken.insert(window.handle);
+        }
+        found.is_some()
+    };
     for source in sources {
-        if find_window(platform, source, &windows).is_some() {
+        if find(source, &windows) {
             on_event(PrepareEvent::Found(source));
         } else if source.should_launch() {
             // Déjà en train de s'ouvrir (lancé il y a peu, ou Firefox encore
@@ -208,7 +261,7 @@ pub fn prepare_windows(
         thread::sleep(Duration::from_millis(500));
         let windows = platform.list_windows();
         waiting.retain(|source| {
-            let found = find_window(platform, source, &windows).is_some();
+            let found = find(source, &windows);
             if found {
                 on_event(PrepareEvent::Opened(source));
             }
@@ -354,7 +407,7 @@ mod tests {
 
     impl Platform for FakePlatform {
         fn list_windows(&self) -> Vec<WindowInfo> {
-            vec![]
+            vec![window(9, 9, "VLC", "Qt5QWindowIcon", r"C:\VLC\vlc.exe")]
         }
         fn is_window_alive(&self, _: WindowHandle) -> bool {
             true
@@ -553,9 +606,9 @@ mod tests {
         // Titres changés : sans exclusion, les deux sources prendraient la 1.
         let first = vlc("autre1 - VLC");
         let second = vlc("autre2 - VLC");
-        let none = HashSet::new();
+        let none = Exclusions::default();
         assert_eq!(find_window_excluding(&FakePlatform, &first, &windows, &none).map(|w| w.handle), Some(1));
-        let taken = HashSet::from([1]);
+        let taken = Exclusions { taken: HashSet::from([1]), ..Default::default() };
         assert_eq!(find_window_excluding(&FakePlatform, &second, &windows, &taken).map(|w| w.handle), Some(2));
         // Titre exact d'une fenêtre déjà prise : jamais retenue.
         assert_eq!(
@@ -563,7 +616,8 @@ mod tests {
             Some(2)
         );
         // Plus aucune fenêtre libre.
-        assert!(find_window_excluding(&FakePlatform, &second, &windows, &HashSet::from([1, 2])).is_none());
+        let all = Exclusions { taken: HashSet::from([1, 2]), ..Default::default() };
+        assert!(find_window_excluding(&FakePlatform, &second, &windows, &all).is_none());
 
         // Seule fenêtre du programme, d'une autre classe : retenue si libre,
         // jamais si une autre source la suit.
@@ -575,7 +629,67 @@ mod tests {
             launch_args: vec![],
         });
         assert_eq!(find_window(&FakePlatform, &discord, &single).map(|w| w.handle), Some(3));
-        assert!(find_window_excluding(&FakePlatform, &discord, &single, &HashSet::from([3])).is_none());
+        let taken = Exclusions { taken: HashSet::from([3]), ..Default::default() };
+        assert!(find_window_excluding(&FakePlatform, &discord, &single, &taken).is_none());
+    }
+
+    #[test]
+    fn window_awaited_by_another_source_is_left_to_it() {
+        let exe = r"C:\VLC\vlc.exe";
+        let windows = vec![
+            window(1, 5, "film2.mkv - VLC", "Qt5QWindowIcon", exe),
+            window(2, 6, "film3.mkv - VLC", "Qt5QWindowIcon", exe),
+        ];
+        let vlc = |title: &str| {
+            source(SourceKind::Application {
+                exe_path: exe.into(),
+                window_class: "Qt5QWindowIcon".into(),
+                window_title: title.into(),
+                launch_args: vec![],
+            })
+        };
+        // La première source a changé de film ; la seconde attend « film2 »,
+        // la plus haute : la première prend l'autre fenêtre, quel que soit
+        // l'ordre de démarrage.
+        let first = vlc("film1.mkv - VLC");
+        let second = vlc("film2.mkv - VLC");
+        let mut exclusions = Exclusions::default();
+        exclusions.reserve_for(&[&second], &windows);
+        assert_eq!(exclusions.reserved, HashSet::from([1]));
+        assert_eq!(find_window_excluding(&FakePlatform, &first, &windows, &exclusions).map(|w| w.handle), Some(2));
+        // Deux sources au même titre : la fenêtre reste à qui la prend.
+        let mut same = Exclusions::default();
+        same.reserve_for(&[&second], &windows);
+        assert_eq!(find_window_excluding(&FakePlatform, &second, &windows, &same).map(|w| w.handle), Some(1));
+        // Seule fenêtre du programme, attendue par une autre : pas à défaut.
+        let alone = vec![windows[0].clone()];
+        let mut reserved = Exclusions::default();
+        reserved.reserve_for(&[&second], &alone);
+        assert!(find_window_excluding(&FakePlatform, &first, &alone, &reserved).is_none());
+    }
+
+    #[test]
+    fn prepared_windows_are_one_per_source() {
+        let vlc = |id: &str| {
+            let kind = SourceKind::Application {
+                exe_path: r"C:\VLC\vlc.exe".into(),
+                window_class: "Qt5QWindowIcon".into(),
+                window_title: "VLC".into(),
+                launch_args: vec![],
+            };
+            Source { id: id.into(), ..source(kind) }
+        };
+        let sources = [vlc("a"), vlc("b")];
+        let mut found = Vec::new();
+        let missing = prepare_windows(&FakePlatform, &sources, Duration::ZERO, |event| {
+            if let PrepareEvent::Found(source) = event {
+                found.push(source.id.clone());
+            }
+        });
+        // Une seule fenêtre VLC (celle de FakePlatform) : une seule source la
+        // compte, l'autre manque.
+        assert_eq!(found, ["a"]);
+        assert_eq!(missing, [sources[1].name.clone()]);
     }
 
     #[test]
@@ -593,7 +707,7 @@ mod tests {
                 family: BrowserFamily::Gecko,
             },
         });
-        let taken = HashSet::from([1]);
+        let taken = Exclusions { taken: HashSet::from([1]), ..Default::default() };
         assert_eq!(find_window_excluding(&FakePlatform, &src, &windows, &taken).map(|w| w.handle), Some(2));
     }
 

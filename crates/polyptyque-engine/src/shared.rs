@@ -5,8 +5,10 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use polyptyque_core::config::{CHANNELS, SAMPLE_RATE};
+use polyptyque_core::config::{Source, CHANNELS, SAMPLE_RATE};
 use polyptyque_core::platform::{WindowHandle, WindowInfo};
+
+use crate::resolve::Exclusions;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SourceState {
@@ -353,6 +355,9 @@ pub(crate) struct WindowClaims {
     /// Par exécution (rang de démarrage dans la session) : identifiant de
     /// la source et fenêtre suivie.
     claims: Mutex<HashMap<usize, (String, WindowHandle)>>,
+    /// Sources dont la capture tourne, par exécution : leur fenêtre exacte
+    /// (même titre) leur est réservée.
+    sources: Mutex<HashMap<usize, Source>>,
 }
 
 impl WindowClaims {
@@ -360,6 +365,29 @@ impl WindowClaims {
     /// exécution précédente de la même source (relancée) ne compte pas.
     pub fn taken_by_others(&self, source_id: &str) -> HashSet<WindowHandle> {
         lock(&self.claims).values().filter(|(id, _)| id != source_id).map(|(_, handle)| *handle).collect()
+    }
+
+    /// Ce que la source `source_id` ne doit pas prendre parmi `windows` :
+    /// les fenêtres suivies par les autres sources, et à défaut de son titre
+    /// exact celles qu'elles attendent.
+    pub fn exclusions(&self, source_id: &str, windows: &[WindowInfo]) -> Exclusions {
+        let mut exclusions = Exclusions { taken: self.taken_by_others(source_id), ..Default::default() };
+        let sources = lock(&self.sources);
+        let others: Vec<&Source> = sources.values().filter(|s| s.id != source_id).collect();
+        exclusions.reserve_for(&others, windows);
+        exclusions
+    }
+
+    /// La capture de `source` démarre (exécution `run`).
+    pub fn register(&self, run: usize, source: &Source) {
+        lock(&self.sources).insert(run, source.clone());
+    }
+
+    /// La capture de l'exécution `run` s'arrête : fenêtre et réservation
+    /// libérées.
+    pub fn unregister(&self, run: usize) {
+        self.release(run);
+        lock(&self.sources).remove(&run);
     }
 
     /// Réserve `handle` pour l'exécution `run`. Faux si une autre source
@@ -530,6 +558,25 @@ mod tests {
         claims.release(0);
         claims.release(2);
         assert!(claims.claim(1, "b", 7));
+
+        // La fenêtre exacte d'une source qui enregistre lui est réservée.
+        let window = |handle, title: &str| WindowInfo {
+            handle,
+            pid: 1,
+            title: title.into(),
+            class: "Classe".into(),
+            exe: PathBuf::from("vlc.exe"),
+        };
+        let windows = [window(8, "film1"), window(9, "film2")];
+        let mut second = Source::application("Seconde", &windows[1], true, true);
+        second.id = "c".into();
+        claims.register(3, &second);
+        let exclusions = claims.exclusions("a", &windows);
+        assert_eq!(exclusions.taken, HashSet::from([7]));
+        assert_eq!(exclusions.reserved, HashSet::from([9]));
+        assert!(claims.exclusions("c", &windows).reserved.is_empty());
+        claims.unregister(3);
+        assert!(claims.exclusions("a", &windows).reserved.is_empty());
     }
 
     #[test]
