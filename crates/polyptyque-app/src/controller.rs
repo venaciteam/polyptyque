@@ -490,8 +490,9 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
     app.register_hotkeys();
     app.apply_remote_control();
     app.check_interrupted_session();
-    // Emplacement inscrit au démarrage de Windows remis à jour (version
-    // portable déplacée).
+    // Emplacement inscrit au démarrage de Windows remis à jour si le
+    // programme inscrit n'existe plus (version portable déplacée) ; jamais
+    // par une compilation de développement.
     app.apply_launch_at_startup(false);
     // Lancé par Windows : les fenêtres de la scène s'ouvriront au début du
     // créneau, comme pour tout enregistrement.

@@ -527,7 +527,20 @@ impl App {
         {
             use polyptyque_windows::startup;
             let result = if enabled {
-                std::env::current_exe().map_err(anyhow::Error::from).and_then(|exe| startup::enable(&exe, explicit))
+                std::env::current_exe().map_err(anyhow::Error::from).and_then(|exe| {
+                    if explicit {
+                        startup::enable(&exe, true)
+                    } else if polyptyque_core::paths::packaged_copy() {
+                        // Au lancement : suivre une version portable déplacée,
+                        // sans prendre la place d'une autre copie présente.
+                        startup::refresh(&exe)
+                    } else {
+                        // Compilation de développement : elle lit les réglages
+                        // de la version installée, mais ne s'inscrit jamais
+                        // d'elle-même à sa place.
+                        Ok(())
+                    }
+                })
             } else if explicit {
                 startup::disable()
             } else {

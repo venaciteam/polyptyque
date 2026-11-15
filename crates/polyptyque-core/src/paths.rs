@@ -32,12 +32,32 @@ pub fn portable_root() -> Option<PathBuf> {
 }
 
 fn portable_root_of(exe: &Path) -> Option<PathBuf> {
+    let root = current_root_of(exe)?;
+    root.join(".portable").is_file().then(|| root.to_path_buf())
+}
+
+/// Copie livrée de Polyptyque : installée par Velopack (`Update.exe` à la
+/// racine) ou portable (marqueur `.portable`), programme dans
+/// `<racine>\current`. Une compilation de développement (`target\debug`,
+/// `dist`…) n'en est pas une : elle partage pourtant les réglages de la
+/// version installée, et ne doit donc pas prendre sa place au démarrage de
+/// Windows.
+pub fn packaged_copy() -> bool {
+    static PACKAGED: OnceLock<bool> = OnceLock::new();
+    *PACKAGED.get_or_init(|| std::env::current_exe().is_ok_and(|exe| packaged_copy_of(&exe)))
+}
+
+fn packaged_copy_of(exe: &Path) -> bool {
+    current_root_of(exe).is_some_and(|root| root.join(".portable").is_file() || root.join("Update.exe").is_file())
+}
+
+/// Racine d'un programme rangé dans `<racine>\current`.
+fn current_root_of(exe: &Path) -> Option<&Path> {
     let current = exe.parent()?;
     if !current.file_name().is_some_and(|n| n.eq_ignore_ascii_case(OsStr::new("current"))) {
         return None;
     }
-    let root = current.parent()?;
-    root.join(".portable").is_file().then(|| root.to_path_buf())
+    current.parent()
 }
 
 pub fn config_file() -> PathBuf {
@@ -106,6 +126,27 @@ mod tests {
         assert_eq!(portable_root_of(&exe), Some(root.clone()));
         // Programme lancé ailleurs (développement) : pas portable.
         assert_eq!(portable_root_of(&root.join("polyptyque.exe")), None);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn only_packaged_copies_are_recognised() {
+        let root = std::env::temp_dir().join(format!("polyptyque-livree-{}", crate::config::new_id()));
+        let exe = root.join("current").join("polyptyque.exe");
+        std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        // Dossier `current` seul : rien ne dit que c'est une copie livrée.
+        assert!(!packaged_copy_of(&exe));
+        // Installée par Velopack.
+        std::fs::write(root.join("Update.exe"), b"").unwrap();
+        assert!(packaged_copy_of(&exe));
+        std::fs::remove_file(root.join("Update.exe")).unwrap();
+        // Portable.
+        std::fs::write(root.join(".portable"), b"").unwrap();
+        assert!(packaged_copy_of(&exe));
+        // Compilation de développement, même à côté d'un marqueur.
+        std::fs::write(root.join("Update.exe"), b"").unwrap();
+        assert!(!packaged_copy_of(&root.join("target").join("debug").join("polyptyque.exe")));
+        assert!(!packaged_copy_of(&root.join("polyptyque.exe")));
         std::fs::remove_dir_all(root).unwrap();
     }
 }
