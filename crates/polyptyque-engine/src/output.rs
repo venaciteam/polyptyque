@@ -55,6 +55,10 @@ const SUPERVISION_INTERVAL: Duration = Duration::from_millis(100);
 const DISK_TIMEOUT: Duration = Duration::from_secs(5);
 /// À une coupure, délai accordé au second flux pour atteindre sa marque.
 const CUT_GRACE: Duration = Duration::from_secs(5);
+/// À l'arrêt, des files vides doivent le rester ce délai pour que la
+/// source soit tenue pour vidée : la capture peut livrer ses dernières
+/// données juste après la demande d'arrêt.
+const DRAIN_SETTLE: Duration = Duration::from_secs(1);
 
 pub(crate) struct OutputPlan {
     /// Image et son, ou son seul (micro).
@@ -198,8 +202,7 @@ impl OutputTask {
             let (shown, reason) = match end {
                 PartEnd::Closed => return,
                 PartEnd::Cut => {
-                    let queued = video.as_ref().is_some_and(|q| !q.is_empty()) || !audio.is_empty();
-                    if stopping(&shared) && !queued {
+                    if stopping(&shared) && drained(&shared, video.as_ref(), &audio) {
                         return;
                     }
                     let cut = shared.last_cut();
@@ -226,11 +229,27 @@ impl OutputTask {
                 }
                 PartEnd::Crashed(crash) => (crash.shown, crash.detail),
             };
-            if stopping(&shared) {
+            // À l'arrêt (demandé, ou source en erreur), une partie de plus
+            // seulement s'il reste de quoi l'alimenter : ce qui était en file
+            // n'est pas perdu.
+            let finishing = stopping(&shared);
+            if finishing && drained(&shared, video.as_ref(), &audio) {
                 log::warn!("[{}] encodeur arrêté pendant la finalisation : {reason}", plan.title);
                 return;
             }
-            quick_failures = if started.elapsed() < QUICK_FAILURE { quick_failures + 1 } else { 1 };
+            if finishing {
+                log::warn!(
+                    "[{}] encodeur arrêté pendant la finalisation, données encore en file : {reason}",
+                    plan.title
+                );
+            }
+            // À l'arrêt, une partie qui n'a rien fait avancer compte comme un
+            // échec rapide quelle que soit sa durée : un encodeur qui replante
+            // sans cesse n'est pas relancé sans fin.
+            let advanced = (shared.video_position.load(Ordering::SeqCst), shared.audio_position.load(Ordering::SeqCst))
+                != positions;
+            quick_failures =
+                if started.elapsed() < QUICK_FAILURE || (finishing && !advanced) { quick_failures + 1 } else { 1 };
             // Encodeur de la carte graphique refusé (limite d'encodages de
             // la carte, pilote) : la source passe sur le processeur plutôt
             // que de s'arrêter.
@@ -282,7 +301,7 @@ impl OutputTask {
             // Courte pause, plus longue si les échecs se répètent.
             let resume_at = Instant::now() + Duration::from_secs(quick_failures as u64);
             while Instant::now() < resume_at {
-                if stopping(&shared) {
+                if stopping(&shared) && queues_empty(video.as_ref(), &audio) {
                     return;
                 }
                 shared.encoding_beat();
@@ -293,9 +312,30 @@ impl OutputTask {
 }
 
 /// Arrêt demandé, capture abandonnée ou source en erreur : plus rien ne
-/// viendra après ce qui est déjà en file, inutile de relancer l'encodeur.
+/// viendra après ce qui est déjà en file, inutile de relancer l'encodeur
+/// une fois les files vidées.
 fn stopping(shared: &Shared) -> bool {
     shared.stop_at().is_some() || shared.capture_abandoned() || shared.has_failed()
+}
+
+fn queues_empty(video: Option<&Receiver<Nv12Frame>>, audio: &Receiver<Vec<u8>>) -> bool {
+    !video.is_some_and(|q| !q.is_empty()) && audio.is_empty()
+}
+
+/// Files vides, et qui le restent [`DRAIN_SETTLE`] : rien ne reste à
+/// encoder.
+fn drained(shared: &Shared, video: Option<&Receiver<Nv12Frame>>, audio: &Receiver<Vec<u8>>) -> bool {
+    let until = Instant::now() + DRAIN_SETTLE;
+    loop {
+        if !queues_empty(video, audio) {
+            return false;
+        }
+        if Instant::now() >= until {
+            return true;
+        }
+        shared.encoding_beat();
+        thread::sleep(SUPERVISION_INTERVAL);
+    }
 }
 
 /// Flux à brancher sur une nouvelle partie, et point de reprise.
@@ -454,8 +494,10 @@ impl Part {
             let writers_done = self.writers.iter().all(|w| w.handle.is_finished());
             if writers_done {
                 self.join_writers();
-                if self.control.broken.load(Ordering::SeqCst) && !stopping(shared) {
+                if self.control.broken.load(Ordering::SeqCst) {
                     // Les tubes ne passent plus : l'encodeur est hors service.
+                    // Même à l'arrêt : ce qui reste en file ira dans une
+                    // nouvelle partie.
                     let _ = self.child.kill();
                     let status = self.child.wait().map(|s| s.to_string()).unwrap_or_default();
                     return PartEnd::Crashed(Crash::stopped(status, log));
@@ -485,7 +527,15 @@ impl Part {
                 } else {
                     Crash::stopped(status, log)
                 };
-                return if stopping(shared) && !stalled { PartEnd::Closed } else { PartEnd::Crashed(crash) };
+                // Fermeture normale seulement si FFmpeg a fini sans erreur ;
+                // sinon, à l'arrêt comme pendant l'enregistrement, le
+                // superviseur décide d'une nouvelle partie selon ce qui
+                // reste en file.
+                return if stopping(shared) && !stalled && status.success() {
+                    PartEnd::Closed
+                } else {
+                    PartEnd::Crashed(crash)
+                };
             }
             if self.control.cuts.load(Ordering::SeqCst) > 0 && !self.control.cancel.load(Ordering::SeqCst) {
                 // Un flux a atteint sa marque de coupure : l'autre doit la

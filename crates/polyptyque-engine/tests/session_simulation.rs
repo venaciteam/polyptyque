@@ -471,6 +471,38 @@ fn frozen_encoder_is_detected_and_replaced() {
 }
 
 #[test]
+fn encoder_lost_while_finishing_does_not_lose_the_queue() {
+    let pkill = Command::new("pkill").arg("--version").output().is_ok_and(|o| o.status.success());
+    if !ffmpeg_available() || !pkill {
+        eprintln!("FFmpeg ou pkill absent : test ignoré");
+        return;
+    }
+    let Sim { root, platform } = sim();
+    let session = Session::start(platform, plan(&root, vec![application("Vidée", "immediate")])).expect("démarrage");
+    thread::sleep(Duration::from_secs(2));
+    // FFmpeg suspendu : image et son s'accumulent en file.
+    let pattern = format!("{}/.*-0-p1-video", regex_escape(&root.join("tubes").display().to_string()));
+    let frozen = Command::new("pkill").args(["-STOP", "-f", &pattern]).status().unwrap();
+    assert!(frozen.success(), "FFmpeg introuvable");
+    thread::sleep(Duration::from_secs(3));
+    let elapsed = session.elapsed().as_secs_f64();
+    // Arrêt demandé, puis FFmpeg tué au lieu de vider la file : une partie
+    // de plus la vide.
+    let stopping = thread::spawn(move || session.stop());
+    thread::sleep(Duration::from_millis(500));
+    let killed = Command::new("pkill").args(["-KILL", "-f", &pattern]).status().unwrap();
+    assert!(killed.success(), "FFmpeg introuvable");
+    let summaries = stopping.join().expect("arrêt");
+    let outputs = &summaries[0].outputs;
+    assert_eq!(outputs.len(), 2, "{outputs:?}");
+    // Rien de ce qui attendait n'est perdu, hormis ce que FFmpeg gardait en
+    // mémoire.
+    let total = check_parts("Vidée", outputs);
+    assert!(total > elapsed - 2.0 && total <= elapsed + 0.5, "{total} s pour {elapsed} s");
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn clock_jump_continues_in_a_new_part_without_filling() {
     if !ffmpeg_available() {
         eprintln!("FFmpeg absent : test ignoré");
