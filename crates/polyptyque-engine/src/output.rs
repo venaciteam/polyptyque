@@ -25,6 +25,7 @@ use polyptyque_core::encoder::{
 use polyptyque_core::naming;
 use polyptyque_core::platform::{Nv12Frame, Platform};
 use polyptyque_core::storage;
+use polyptyque_core::timeline::HNS_PER_SEC;
 use tr::tr;
 
 use crate::shared::Shared;
@@ -35,14 +36,25 @@ use crate::writer::{self, PartControl, WriterJob};
 /// vider sa file, aussi longue soit-elle : rien de ce qui a été capturé
 /// n'est perdu.
 const STALL_TIMEOUT: Duration = Duration::from_secs(30);
-/// Délai accordé à FFmpeg pour finaliser un fichier.
-const FINALIZE_TIMEOUT: Duration = Duration::from_secs(60);
+/// Ses entrées fermées, FFmpeg encode ce qui lui reste puis écrit l'index
+/// du fichier. Tant que le fichier ou son journal grossit, il avance : il
+/// n'est arrêté de force qu'après ce délai sans aucune avancée (un fichier
+/// tué en finalisation n'a pas d'index)…
+const FINALIZE_STALL: Duration = Duration::from_secs(60);
+/// …ou au-delà de ce plafond.
+const FINALIZE_MAX: Duration = Duration::from_secs(10 * 60);
 /// Une partie qui s'arrête avant ce délai compte comme un échec au
 /// démarrage.
 const QUICK_FAILURE: Duration = Duration::from_secs(20);
 /// Échecs au démarrage tolérés d'affilée avant d'abandonner la source.
 const MAX_QUICK_FAILURES: u32 = 3;
 const SUPERVISION_INTERVAL: Duration = Duration::from_millis(100);
+/// Délai accordé à un accès au dossier d'enregistrement (test d'écriture,
+/// taille d'un fichier) : un disque qui ne répond plus ne bloque pas
+/// l'encodage des autres parties.
+const DISK_TIMEOUT: Duration = Duration::from_secs(5);
+/// À une coupure, délai accordé au second flux pour atteindre sa marque.
+const CUT_GRACE: Duration = Duration::from_secs(5);
 
 pub(crate) struct OutputPlan {
     /// Image et son, ou son seul (micro).
@@ -81,6 +93,9 @@ enum PartEnd {
     Closed,
     /// L'encodeur s'est arrêté ou figé pendant l'enregistrement.
     Crashed(Crash),
+    /// Fichier fermé à une coupure (saut de l'horloge) : la suite part dans
+    /// une nouvelle partie.
+    Cut,
 }
 
 /// Arrêt de l'encodeur : ce qui est affiché, et le détail pour le journal
@@ -112,26 +127,34 @@ impl OutputTask {
         let OutputTask { platform, mut plan, shared, video, audio } = self;
         let mut part = 1u32;
         let mut quick_failures = 0u32;
+        // Positions des flux (images, octets de son) et instant (secondes
+        // depuis le départ de la source) de la dernière reprise après une
+        // coupure : image et son y repartent ensemble, les relances
+        // suivantes se recalent à partir de là.
+        let mut base = (0u64, 0u64, 0u64);
+        let mut after_cut = false;
         loop {
             let output = if part == 1 { plan.first_output.clone() } else { next_part_path(&plan, &shared, part) };
-            let (video_start, audio_start) = if part == 1 {
-                (0, 0)
+            let positions =
+                (shared.video_position.load(Ordering::SeqCst), shared.audio_position.load(Ordering::SeqCst));
+            let (video_start, audio_start) = if part == 1 || after_cut {
+                positions
             } else if plan.video {
-                resume_positions(
-                    shared.video_position.load(Ordering::SeqCst),
-                    shared.audio_position.load(Ordering::SeqCst),
-                    plan.fps,
-                )
+                let (video, audio) =
+                    resume_positions(positions.0.saturating_sub(base.0), positions.1.saturating_sub(base.1), plan.fps);
+                (video + base.0, audio + base.1)
             } else {
                 // Son seul : il reprend là où il en est.
                 let frame_bytes = CHANNELS as u64 * 4;
-                (0, shared.audio_position.load(Ordering::SeqCst).div_ceil(frame_bytes) * frame_bytes)
+                (0, positions.1.div_ceil(frame_bytes) * frame_bytes)
             };
-            let resume_seconds = if plan.video {
-                video_start / plan.fps.max(1) as u64
-            } else {
-                audio_start / (CHANNELS as u64 * 4) / SAMPLE_RATE as u64
-            };
+            after_cut = false;
+            let resume_seconds = base.2
+                + if plan.video {
+                    video_start.saturating_sub(base.0) / plan.fps.max(1) as u64
+                } else {
+                    audio_start.saturating_sub(base.1) / (CHANNELS as u64 * 4) / SAMPLE_RATE as u64
+                };
             shared.part.store(part, Ordering::Relaxed);
             shared.push_output(output.clone());
             if part > 1 {
@@ -157,13 +180,16 @@ impl OutputTask {
                     PartEnd::Crashed(Crash::plain(tr!("démarrage de l'encodeur impossible : {}", format!("{e:#}"))))
                 }
             };
-            let nothing_written = match std::fs::metadata(&output) {
+            let checked = output.clone();
+            let nothing_written = storage::within(DISK_TIMEOUT, move || match std::fs::metadata(&checked) {
                 Ok(meta) => meta.len() == 0,
                 // Fichier absent d'un dossier accessible : jamais créé. Un
                 // dossier devenu inaccessible (disque débranché) garde au
                 // contraire son fichier dans la liste.
-                Err(_) => output.parent().is_some_and(Path::is_dir),
-            };
+                Err(_) => checked.parent().is_some_and(Path::is_dir),
+            })
+            // Disque qui ne répond pas : le fichier reste dans la liste.
+            .unwrap_or(false);
             if nothing_written {
                 // Rien d'écrit : on ne garde pas de fichier vide.
                 let _ = std::fs::remove_file(&output);
@@ -171,6 +197,33 @@ impl OutputTask {
             }
             let (shown, reason) = match end {
                 PartEnd::Closed => return,
+                PartEnd::Cut => {
+                    let queued = video.as_ref().is_some_and(|q| !q.is_empty()) || !audio.is_empty();
+                    if stopping(&shared) && !queued {
+                        return;
+                    }
+                    let cut = shared.last_cut();
+                    let gap = cut.map_or(0, |c| c.to_hns.saturating_sub(c.from_hns) / HNS_PER_SEC);
+                    base = (
+                        shared.video_position.load(Ordering::SeqCst),
+                        shared.audio_position.load(Ordering::SeqCst),
+                        cut.map_or(0, |c| c.resume_offset_hns / HNS_PER_SEC),
+                    );
+                    after_cut = true;
+                    part += 1;
+                    log::warn!(
+                        "[{}] interruption de {} (veille non signalée, ordinateur ou programme figé) : suite dans \
+                         la partie {part}, sans combler l'interruption",
+                        plan.title,
+                        clock(gap)
+                    );
+                    shared.note_error(tr!(
+                        "Interruption de {} (mise en veille ou ordinateur figé) : la suite est dans la partie {}",
+                        clock(gap),
+                        part
+                    ));
+                    continue;
+                }
                 PartEnd::Crashed(crash) => (crash.shown, crash.detail),
             };
             if stopping(&shared) {
@@ -181,12 +234,28 @@ impl OutputTask {
             // Encodeur de la carte graphique refusé (limite d'encodages de
             // la carte, pilote) : la source passe sur le processeur plutôt
             // que de s'arrêter.
-            let refused = nvenc_session_refused(&reason);
+            // Tout le journal de la partie : FFmpeg 7 et 8 écrivent d'autres
+            // erreurs après le refus, hors des dernières lignes.
+            let part_log = part_log(&plan.log, part);
+            let refused = nvenc_session_refused(&part_log) || nvenc_session_refused(&reason);
+            // Windows refuse à FFmpeg d'écrire le fichier (« Accès contrôlé
+            // aux dossiers », droits) alors que Polyptyque a pu tester le
+            // dossier : un message qui dit la cause, et aucun changement
+            // d'encodeur, qui n'y changerait rien.
+            let denied = write_denied(&part_log, &output).then(|| {
+                tr!(
+                    "Windows refuse à FFmpeg l'écriture dans {} : l'« Accès contrôlé aux dossiers » de Sécurité \
+                     Windows bloque peut-être {}. L'autoriser, ou choisir un autre dossier d'enregistrement",
+                    output.parent().unwrap_or(Path::new(".")).display(),
+                    plan.ffmpeg.display()
+                )
+            });
             // Sans FFmpeg, changer d'encodeur ne servirait à rien.
             let ffmpeg_missing = plan.ffmpeg.is_absolute() && !plan.ffmpeg.exists();
             let switch = plan.video
                 && plan.encoder.kind != EncoderKind::Software
                 && !ffmpeg_missing
+                && denied.is_none()
                 && (refused || quick_failures >= MAX_QUICK_FAILURES);
             if switch {
                 let note = if refused {
@@ -202,12 +271,13 @@ impl OutputTask {
                 shared.note_error(tr!("{}. Suite dans la partie {}", note, part));
             } else if quick_failures >= MAX_QUICK_FAILURES {
                 log::warn!("[{}] l'encodeur s'arrête dès son démarrage : {reason}", plan.title);
-                shared.fail(tr!("l'encodeur s'arrête dès son démarrage : {}", shown));
+                shared.fail(denied.unwrap_or_else(|| tr!("l'encodeur s'arrête dès son démarrage : {}", shown)));
                 return;
             } else {
                 part += 1;
                 log::warn!("[{}] {reason} ; relance dans un nouveau fichier (partie {part})", plan.title);
-                shared.note_error(tr!("Encodeur relancé : la suite est dans la partie {}", part));
+                let note = denied.unwrap_or_else(|| tr!("Encodeur relancé : la suite est dans la partie {}", part));
+                shared.note_error(note);
             }
             // Courte pause, plus longue si les échecs se répètent.
             let resume_at = Instant::now() + Duration::from_secs(quick_failures as u64);
@@ -215,14 +285,17 @@ impl OutputTask {
                 if stopping(&shared) {
                     return;
                 }
+                shared.encoding_beat();
                 thread::sleep(SUPERVISION_INTERVAL);
             }
         }
     }
 }
 
+/// Arrêt demandé, capture abandonnée ou source en erreur : plus rien ne
+/// viendra après ce qui est déjà en file, inutile de relancer l'encodeur.
 fn stopping(shared: &Shared) -> bool {
-    shared.stop_at().is_some() || shared.capture_abandoned()
+    shared.stop_at().is_some() || shared.capture_abandoned() || shared.has_failed()
 }
 
 /// Flux à brancher sur une nouvelle partie, et point de reprise.
@@ -376,6 +449,7 @@ impl Part {
     /// l'arrêt de l'encodeur.
     fn supervise(mut self, shared: &Shared, log: &Path) -> PartEnd {
         let mut stalled = false;
+        let mut cut_seen: Option<Instant> = None;
         loop {
             let writers_done = self.writers.iter().all(|w| w.handle.is_finished());
             if writers_done {
@@ -386,8 +460,16 @@ impl Part {
                     let status = self.child.wait().map(|s| s.to_string()).unwrap_or_default();
                     return PartEnd::Crashed(Crash::stopped(status, log));
                 }
+                if self.control.cuts.load(Ordering::SeqCst) > 0 {
+                    // Coupure : FFmpeg termine ce fichier, la suite part dans
+                    // le suivant quoi qu'il arrive.
+                    if let Some(status) = wait_exit(&mut self.child, shared, log).filter(|s| !s.success()) {
+                        log::warn!("encodeur terminé en erreur à la coupure ({status}) : {}", log_tail(log));
+                    }
+                    return PartEnd::Cut;
+                }
                 // Flux fermés : FFmpeg termine le fichier.
-                return match wait_exit(&mut self.child, FINALIZE_TIMEOUT) {
+                return match wait_exit(&mut self.child, shared, log) {
                     Some(status) if !status.success() && !stopping(shared) => {
                         PartEnd::Crashed(Crash::stopped(status, log))
                     }
@@ -404,6 +486,14 @@ impl Part {
                     Crash::stopped(status, log)
                 };
                 return if stopping(shared) && !stalled { PartEnd::Closed } else { PartEnd::Crashed(crash) };
+            }
+            if self.control.cuts.load(Ordering::SeqCst) > 0 && !self.control.cancel.load(Ordering::SeqCst) {
+                // Un flux a atteint sa marque de coupure : l'autre doit la
+                // recevoir sous peu. Sinon, la partie est fermée quand même.
+                if cut_seen.get_or_insert_with(Instant::now).elapsed() >= CUT_GRACE {
+                    log::warn!("coupure : un flux n'a pas reçu sa marque, partie fermée quand même");
+                    self.control.cancel.store(true, Ordering::SeqCst);
+                }
             }
             if self.control.broken.load(Ordering::SeqCst) && !stalled {
                 // Un tube ne passe plus alors que FFmpeg tourne encore.
@@ -425,6 +515,7 @@ impl Part {
                 stalled = true;
                 let _ = self.child.kill();
             }
+            shared.encoding_beat();
             thread::sleep(SUPERVISION_INTERVAL);
         }
     }
@@ -463,7 +554,8 @@ impl Part {
 /// de secours si ce dossier n'est plus accessible.
 fn next_part_path(plan: &OutputPlan, shared: &Shared, part: u32) -> PathBuf {
     let dir = plan.first_output.parent().unwrap_or(Path::new("."));
-    if storage::dir_writable(dir) || !storage::dir_writable(&plan.fallback_dir) {
+    let writable = |dir: &Path| storage::dir_writable_within(dir, DISK_TIMEOUT);
+    if writable(dir) || !writable(&plan.fallback_dir) {
         return part_path(&plan.first_output, dir, part);
     }
     let message =
@@ -503,23 +595,74 @@ pub(crate) fn clock(seconds: u64) -> String {
     format!("{:02}:{:02}:{:02}", seconds / 3600, seconds / 60 % 60, seconds % 60)
 }
 
-fn wait_exit(child: &mut Child, timeout: Duration) -> Option<std::process::ExitStatus> {
-    let deadline = Instant::now() + timeout;
+/// Attend que FFmpeg termine le fichier, ses entrées fermées. Il n'est
+/// arrêté de force que s'il n'avance plus (ni le fichier, relevé par le fil
+/// des tailles, ni son journal ne grossissent) pendant [`FINALIZE_STALL`],
+/// ou au-delà de [`FINALIZE_MAX`].
+fn wait_exit(child: &mut Child, shared: &Shared, log: &Path) -> Option<std::process::ExitStatus> {
+    let started = Instant::now();
+    let progress = || (shared.file_size.load(Ordering::Relaxed), std::fs::metadata(log).map(|m| m.len()).ok());
+    let mut last = progress();
+    let mut last_progress = Instant::now();
     loop {
+        shared.encoding_beat();
         match child.try_wait() {
             Ok(Some(status)) => {
                 log::info!("encodeur terminé : {status}");
                 return Some(status);
             }
-            Ok(None) if Instant::now() < deadline => thread::sleep(SUPERVISION_INTERVAL),
-            _ => {
-                log::warn!("l'encodeur ne se termine pas : arrêt forcé");
-                let _ = child.kill();
-                let _ = child.wait();
-                return None;
+            Ok(None) => {
+                let now = progress();
+                if now != last {
+                    last = now;
+                    last_progress = Instant::now();
+                }
+                let stalled = last_progress.elapsed() >= FINALIZE_STALL;
+                if !stalled && started.elapsed() < FINALIZE_MAX {
+                    thread::sleep(SUPERVISION_INTERVAL);
+                    continue;
+                }
+                if stalled {
+                    log::warn!(
+                        "l'encodeur n'avance plus depuis {} s en finalisant le fichier : arrêt forcé",
+                        FINALIZE_STALL.as_secs()
+                    );
+                } else {
+                    let minutes = FINALIZE_MAX.as_secs() / 60;
+                    log::warn!("l'encodeur finalise depuis plus de {minutes} min : arrêt forcé");
+                }
             }
+            Err(e) => log::warn!("état de l'encodeur illisible ({e}) : arrêt forcé"),
         }
+        let _ = child.kill();
+        let _ = child.wait();
+        return None;
     }
+}
+
+/// Ce que FFmpeg a écrit au journal pour la partie `part`, après sa ligne
+/// `--- partie N ---` et la commande qui la suit : de quoi reconnaître la
+/// cause d'un échec, même suivie d'autres erreurs.
+fn part_log(path: &Path, part: u32) -> String {
+    let text = std::fs::read_to_string(path).unwrap_or_default();
+    let header = format!("--- partie {part} ---\n");
+    let Some(start) = text.rfind(&header) else {
+        return String::new();
+    };
+    let after = &text[start + header.len()..];
+    // La ligne de commande (titre de la source compris) n'est pas un message de FFmpeg.
+    after.split_once('\n').map(|(_, messages)| messages.to_string()).unwrap_or_default()
+}
+
+/// FFmpeg n'a pas pu créer ou écrire `output` : « Permission denied »
+/// (« Access is denied » selon les versions) sur une ligne qui concerne le
+/// fichier de sortie.
+fn write_denied(part_log: &str, output: &Path) -> bool {
+    let name = output.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    part_log.lines().any(|line| {
+        (line.contains("Permission denied") || line.contains("Access is denied"))
+            && ((!name.is_empty() && line.contains(&name)) || line.contains("output"))
+    })
 }
 
 /// Dernières lignes utiles du journal de FFmpeg, pour expliquer un échec.
@@ -566,6 +709,44 @@ mod tests {
                       out of memory (10): (no details) | Error while opening encoder";
         assert!(nvenc_session_refused(reason));
         assert!(!nvenc_session_refused("l'encodeur s'est arrêté (exit code: 1) : Broken pipe"));
+    }
+
+    #[test]
+    fn nvenc_refusal_is_found_in_the_whole_part() {
+        let path = std::env::temp_dir().join(format!("polyptyque-log-{}.txt", polyptyque_core::config::new_id()));
+        // FFmpeg 8 : le refus, puis quatre autres lignes d'erreur.
+        let first = "--- partie 1 ---\nffmpeg -c:v h264_nvenc\n\
+                     [h264_nvenc @ 0x1] OpenEncodeSessionEx failed: out of memory (10): (no details)\n\
+                     [h264_nvenc @ 0x1] No capable devices found\n\
+                     [vost#0:0/h264_nvenc @ 0x2] Error while opening encoder - maybe incorrect parameters\n\
+                     [vf#0:0 @ 0x3] Error sending frames to consumers: Generic error in an external library\n\
+                     [vf#0:0 @ 0x3] Task finished with error code: -542398533\n";
+        std::fs::write(&path, first).unwrap();
+        assert!(!nvenc_session_refused(&log_tail(&path)), "le refus n'est plus dans les dernières lignes");
+        assert!(nvenc_session_refused(&part_log(&path, 1)));
+        // Une partie suivante ne reprend ni le refus précédent ni sa commande.
+        let second = "--- partie 2 ---\nffmpeg -c:v libx264 -metadata title=OpenEncodeSessionEx failed\n\
+                      [aost#0:1/aac @ 0x4] Broken pipe\n";
+        std::fs::write(&path, format!("{first}{second}")).unwrap();
+        assert!(!nvenc_session_refused(&part_log(&path, 2)));
+        assert_eq!(part_log(&path, 2), "[aost#0:1/aac @ 0x4] Broken pipe\n");
+        assert_eq!(part_log(&path, 3), "");
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn denied_output_is_recognised() {
+        let output = Path::new(r"C:\Users\x\Videos\Scène_Firefox.mkv");
+        // FFmpeg 8, dossier protégé par l'« Accès contrôlé aux dossiers ».
+        let log = "[out#0/matroska @ 0x1] Error opening output C:\\Users\\x\\Videos\\Scène_Firefox.mkv: \
+                   Permission denied\n\
+                   Error opening output file C:\\Users\\x\\Videos\\Scène_Firefox.mkv.\n\
+                   Error opening output files: Permission denied\n";
+        assert!(write_denied(log, output));
+        assert!(write_denied("Error opening output files: Permission denied\n", output));
+        // Un tube refusé n'est pas le fichier de sortie.
+        assert!(!write_denied("\\\\.\\pipe\\polyptyque-1-0-p1-video: Permission denied\n", output));
+        assert!(!write_denied("[aost#0:1/aac @ 0x4] Broken pipe\n", output));
     }
 
     #[test]

@@ -11,7 +11,7 @@ use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -29,11 +29,17 @@ const FPS: u32 = 30;
 struct SimPlatform {
     start: Instant,
     pipes_dir: PathBuf,
+    /// Saut de l'horloge simulé (veille non signalée), en hns.
+    jump: Arc<AtomicU64>,
 }
 
 impl SimPlatform {
+    fn new(pipes_dir: PathBuf) -> Self {
+        SimPlatform { start: Instant::now(), pipes_dir, jump: Default::default() }
+    }
+
     fn elapsed_hns(&self) -> u64 {
-        self.start.elapsed().as_nanos() as u64 / 100
+        self.start.elapsed().as_nanos() as u64 / 100 + self.jump.load(Ordering::SeqCst)
     }
 }
 
@@ -49,7 +55,8 @@ fn window(handle: isize, title: &str) -> WindowInfo {
 
 impl Platform for SimPlatform {
     fn list_windows(&self) -> Vec<WindowInfo> {
-        let mut windows = vec![window(1, "immediate")];
+        // Une fenêtre par source : deux sources ne partagent jamais une fenêtre.
+        let mut windows = vec![window(1, "immediate"), window(3, "temoin"), window(4, "seconde")];
         // La deuxième fenêtre n'apparaît qu'après une seconde.
         if self.start.elapsed() > Duration::from_secs(1) {
             windows.push(window(2, "tardive"));
@@ -83,7 +90,7 @@ impl Platform for SimPlatform {
         Ok(Box::new(SimVideo { width: w, height: h, counter: 0 }))
     }
     fn open_audio_capture(&self, _: u32, sample_rate: u32, channels: u16) -> Result<Box<dyn AudioCapture>> {
-        Ok(Box::new(SimAudio { start: self.start, sample_rate, channels, next_frame: None, phase: 0.0 }))
+        Ok(Box::new(SimAudio::new(self, sample_rate, channels)))
     }
     fn list_microphones(&self) -> Vec<AudioDevice> {
         vec![AudioDevice { id: "sim".into(), name: "Micro simulé".into() }]
@@ -94,7 +101,7 @@ impl Platform for SimPlatform {
         sample_rate: u32,
         channels: u16,
     ) -> Result<Box<dyn AudioCapture>> {
-        Ok(Box::new(SimAudio { start: self.start, sample_rate, channels, next_frame: None, phase: 0.0 }))
+        Ok(Box::new(SimAudio::new(self, sample_rate, channels)))
     }
     fn create_stream_pipe(&self, name: &str) -> Result<Box<dyn StreamPipe>> {
         let path = self.pipes_dir.join(name);
@@ -130,10 +137,18 @@ impl VideoCapture for SimVideo {
 /// paquets de 10 ms comme le ferait WASAPI.
 struct SimAudio {
     start: Instant,
+    jump: Arc<AtomicU64>,
     sample_rate: u32,
     channels: u16,
     next_frame: Option<u64>,
     phase: f32,
+}
+
+impl SimAudio {
+    fn new(platform: &SimPlatform, sample_rate: u32, channels: u16) -> Self {
+        let jump = platform.jump.clone();
+        SimAudio { start: platform.start, jump, sample_rate, channels, next_frame: None, phase: 0.0 }
+    }
 }
 
 impl AudioCapture for SimAudio {
@@ -150,7 +165,8 @@ impl AudioCapture for SimAudio {
                     data.extend_from_slice(&sample.to_le_bytes());
                 }
             }
-            let timestamp = 5_000_000_000 + next * 10_000_000 / self.sample_rate as u64;
+            let timestamp =
+                5_000_000_000 + next * 10_000_000 / self.sample_rate as u64 + self.jump.load(Ordering::SeqCst);
             out.push(AudioPacket { data, timestamp_hns: Some(timestamp), silent: false });
             next += 480;
         }
@@ -251,7 +267,7 @@ fn sim() -> Sim {
     let root = std::env::temp_dir().join(format!("polyptyque-sim-{}", new_id()));
     let pipes_dir = root.join("tubes");
     fs::create_dir_all(&pipes_dir).unwrap();
-    Sim { platform: Arc::new(SimPlatform { start: Instant::now(), pipes_dir }), root }
+    Sim { platform: Arc::new(SimPlatform::new(pipes_dir)), root }
 }
 
 fn plan(root: &Path, sources: Vec<Source>) -> SessionPlan {
@@ -305,7 +321,7 @@ fn crashed_encoder_resumes_in_a_new_part() {
         return;
     }
     let Sim { root, platform } = sim();
-    let plan = plan(&root, vec![application("Plantée", "immediate"), application("Témoin", "immediate")]);
+    let plan = plan(&root, vec![application("Plantée", "immediate"), application("Témoin", "temoin")]);
     let mut session = Session::start(platform, plan).expect("démarrage");
     thread::sleep(Duration::from_secs(3));
     // Plantage brutal du FFmpeg de la première source.
@@ -332,7 +348,7 @@ fn crashed_encoder_resumes_in_a_new_part() {
 
     // La première partie, coupée net, n'a ni durée ni index : la réparation
     // les reconstruit sans rien perdre, et remplace le fichier sur place.
-    let sim_platform = SimPlatform { start: Instant::now(), pipes_dir: root.clone() };
+    let sim_platform = SimPlatform::new(root.clone());
     let ffmpeg = Path::new("ffmpeg");
     let cut = &crashed.outputs[0];
     let before = measure(cut);
@@ -400,7 +416,11 @@ fn refused_gpu_encoder_falls_back_to_the_processor() {
     let deadline = Instant::now() + Duration::from_secs(20);
     loop {
         let status = &session.status()[0];
-        if status.error.as_deref().is_some_and(|e| e.contains("passe sur le processeur")) {
+        if let Some(error) = status.error.as_deref().filter(|e| e.contains("passe sur le processeur")) {
+            // Sans carte NVIDIA, NVENC ne démarre pas : ce n'est pas la
+            // limite d'encodages simultanés de la carte, et le message le dit.
+            assert!(error.contains("ne démarre pas"), "{error}");
+            assert!(!error.contains("Limite d'encodages"), "{error}");
             break;
         }
         assert!(Instant::now() < deadline, "pas de bascule sur le processeur : {status:?}");
@@ -451,6 +471,45 @@ fn frozen_encoder_is_detected_and_replaced() {
 }
 
 #[test]
+fn clock_jump_continues_in_a_new_part_without_filling() {
+    if !ffmpeg_available() {
+        eprintln!("FFmpeg absent : test ignoré");
+        return;
+    }
+    let Sim { root, platform } = sim();
+    let mut plan = plan(&root, vec![application("Veille", "immediate")]);
+    plan.microphone = Some(MicrophonePlan { device_id: None });
+    let started = Instant::now();
+    let mut session = Session::start(platform.clone(), plan).expect("démarrage");
+    thread::sleep(Duration::from_secs(2));
+    // Une heure de veille non signalée : l'horloge saute d'un coup.
+    platform.jump.store(3_600 * 10_000_000, Ordering::SeqCst);
+    thread::sleep(Duration::from_secs(3));
+    let status = &session.status()[0];
+    assert_eq!(status.part, 2, "{status:?}");
+    assert_eq!(status.state, SourceState::Connected, "{status:?}");
+    assert!(status.error.as_deref().is_some_and(|e| e.contains("Interruption de 01:00:0")), "{status:?}");
+    assert!(status.backlog_seconds < 2.0, "rattrapage en cours : {status:?}");
+    let summaries = session.stop();
+    let real = started.elapsed().as_secs_f64();
+
+    // Ni images figées ni silence pour l'heure de veille : deux parties
+    // calées, environ 2 s et 3 s.
+    let source = &summaries[0];
+    assert_eq!(source.outputs.len(), 2, "{:?}", source.outputs);
+    assert!(source.outputs[1].ends_with("Simulation_Veille_partie2.mkv"), "{:?}", source.outputs);
+    let (first, _) = measure(&source.outputs[0]);
+    assert!((first - 2.0).abs() < 0.3, "première partie : {first} s");
+    let total = check_parts(&source.name, &source.outputs);
+    assert!(total > real - 1.0 && total < real + 0.25, "{total} s pour {real} s");
+    let micro = &summaries[1];
+    assert_eq!(micro.outputs.len(), 2, "{:?}", micro.outputs);
+    let micro_total: f64 = micro.outputs.iter().map(|o| audio_seconds(o)).sum();
+    assert!(micro_total > real - 1.0 && micro_total < real + 0.25, "micro : {micro_total} s pour {real} s");
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn sources_start_and_stop_individually() {
     if !ffmpeg_available() {
         eprintln!("FFmpeg absent : test ignoré");
@@ -458,7 +517,7 @@ fn sources_start_and_stop_individually() {
     }
     let Sim { root, platform } = sim();
     let first = application("Première", "immediate");
-    let second = application("Seconde", "immediate");
+    let second = application("Seconde", "seconde");
     let mut session = Session::start(platform, plan(&root, vec![first.clone()])).expect("démarrage");
     thread::sleep(Duration::from_secs(1));
     session.add_source(&second).expect("ajout");
@@ -562,7 +621,7 @@ fn simulated_session_produces_synchronised_files() {
     let mkv = &summaries[0].outputs[0];
     let mut progress = Vec::new();
     let mp4 = remux::convert(
-        &SimPlatform { start: Instant::now(), pipes_dir: root.clone() },
+        &SimPlatform::new(root.clone()),
         Path::new("ffmpeg"),
         mkv,
         &mut |p| progress.push(p),
@@ -583,7 +642,7 @@ fn simulated_session_produces_synchronised_files() {
     assert!(decode.stderr.is_empty(), "{}", String::from_utf8_lossy(&decode.stderr));
     // Une deuxième conversion n'écrase pas la première.
     let again = remux::convert(
-        &SimPlatform { start: Instant::now(), pipes_dir: root.clone() },
+        &SimPlatform::new(root.clone()),
         Path::new("ffmpeg"),
         mkv,
         &mut |_| {},
@@ -593,7 +652,7 @@ fn simulated_session_produces_synchronised_files() {
     assert!(again.ends_with("Simulation_Immédiate (2).mp4"));
     // Une conversion annulée ne laisse rien derrière elle.
     let cancelled = remux::convert(
-        &SimPlatform { start: Instant::now(), pipes_dir: root.clone() },
+        &SimPlatform::new(root.clone()),
         Path::new("ffmpeg"),
         mkv,
         &mut |_| {},

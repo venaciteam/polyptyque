@@ -1,10 +1,14 @@
 //! État partagé entre les fils d'une source et l'interface.
 
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use polyptyque_core::platform::WindowInfo;
+use polyptyque_core::config::{Source, CHANNELS, SAMPLE_RATE};
+use polyptyque_core::platform::{WindowHandle, WindowInfo};
+
+use crate::resolve::Exclusions;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SourceState {
@@ -69,6 +73,9 @@ pub(crate) struct Shared {
     /// Images en attente d'encodage : un retard qui grandit signale un
     /// encodeur qui ne suit pas.
     pub video_backlog: AtomicU64,
+    /// Octets de son mis en file depuis le départ : moins `audio_position`,
+    /// le son en attente d'encodage.
+    pub audio_queued: AtomicU64,
     /// Octets transmis à l'encodeur (sert à vérifier qu'il avance encore).
     pub bytes_sent: AtomicU64,
     /// Position dans chaque flux depuis le départ de la source : images
@@ -90,6 +97,20 @@ pub(crate) struct Shared {
     stop_at_hns: AtomicU64,
     /// Fils de capture bloqués à l'arrêt : l'écriture se termine sans eux.
     abandoned: AtomicBool,
+    /// Taille de toutes les parties, relevée par un fil à part : l'interface
+    /// ne touche jamais au disque (dossier réseau, disque qui ne répond plus).
+    pub file_size: AtomicU64,
+    /// Le fil d'encodage est terminé (fichiers fermés ou abandonnés).
+    encoding_finished: AtomicBool,
+    /// Taille relevée une dernière fois après la fin de l'encodage.
+    sizes_settled: AtomicBool,
+    /// Signe de vie du fil d'encodage, en millisecondes depuis `created` :
+    /// un fil bloqué sur le disque n'empêche pas l'arrêt de la session.
+    /// Dernière coupure demandée (saut de l'horloge) : chaque fil de capture
+    /// la traite une fois.
+    cut: Mutex<Option<Cut>>,
+    created: std::time::Instant,
+    encoding_heartbeat_ms: AtomicU64,
 }
 
 impl Shared {
@@ -100,6 +121,7 @@ impl Shared {
             frames_new: AtomicU64::new(0),
             frames_dropped: AtomicU64::new(0),
             video_backlog: AtomicU64::new(0),
+            audio_queued: AtomicU64::new(0),
             bytes_sent: AtomicU64::new(0),
             video_position: Arc::new(AtomicU64::new(0)),
             audio_position: Arc::new(AtomicU64::new(0)),
@@ -115,7 +137,66 @@ impl Shared {
             error: Mutex::new(None),
             stop_at_hns: AtomicU64::new(0),
             abandoned: AtomicBool::new(false),
+            file_size: AtomicU64::new(0),
+            encoding_finished: AtomicBool::new(false),
+            sizes_settled: AtomicBool::new(false),
+            cut: Mutex::new(None),
+            created: std::time::Instant::now(),
+            encoding_heartbeat_ms: AtomicU64::new(0),
         }
+    }
+
+    /// Demande une coupure : l'horloge a sauté de `from_hns` à `to_hns`
+    /// (veille non signalée, programme figé). Ignorée si c'est la même
+    /// interruption, déjà signalée par l'autre fil de capture.
+    pub fn request_cut(&self, from_hns: u64, to_hns: u64, t0_hns: u64) {
+        let mut cut = lock(&self.cut);
+        if cut.is_some_and(|last| last.to_hns >= from_hns) {
+            return;
+        }
+        let generation = cut.map_or(1, |last| last.generation + 1);
+        *cut = Some(Cut { generation, from_hns, to_hns, resume_offset_hns: to_hns.saturating_sub(t0_hns) });
+    }
+
+    /// Rang de la dernière coupure (0 : aucune).
+    pub fn cut_generation(&self) -> u64 {
+        lock(&self.cut).map_or(0, |cut| cut.generation)
+    }
+
+    /// Coupure plus récente que `seen`, à traiter.
+    pub fn pending_cut(&self, seen: u64) -> Option<Cut> {
+        lock(&self.cut).filter(|cut| cut.generation > seen)
+    }
+
+    pub fn last_cut(&self) -> Option<Cut> {
+        *lock(&self.cut)
+    }
+
+    pub fn mark_encoding_finished(&self) {
+        self.encoding_finished.store(true, Ordering::SeqCst);
+    }
+
+    pub fn encoding_finished(&self) -> bool {
+        self.encoding_finished.load(Ordering::SeqCst)
+    }
+
+    pub fn mark_sizes_settled(&self) {
+        self.sizes_settled.store(true, Ordering::SeqCst);
+    }
+
+    pub fn sizes_settled(&self) -> bool {
+        self.sizes_settled.load(Ordering::SeqCst)
+    }
+
+    /// Le fil d'encodage est en vie (appelé à chaque tour de ses attentes).
+    pub fn encoding_beat(&self) {
+        self.encoding_heartbeat_ms.store(self.created.elapsed().as_millis() as u64, Ordering::Relaxed);
+    }
+
+    /// Temps écoulé depuis le dernier signe de vie du fil d'encodage.
+    pub fn encoding_silence(&self) -> std::time::Duration {
+        let last = std::time::Duration::from_millis(self.encoding_heartbeat_ms.load(Ordering::Relaxed));
+        self.created.elapsed().saturating_sub(last)
     }
 
     /// État affiché : un échec prime, puis l'arrêt en cours ou terminé.
@@ -194,6 +275,31 @@ impl Shared {
         self.failed.load(Ordering::SeqCst)
     }
 
+    /// Son en attente d'encodage, en secondes.
+    pub fn audio_backlog_seconds(&self) -> f32 {
+        let queued = self.audio_queued.load(Ordering::Relaxed);
+        let pending = queued.saturating_sub(self.audio_position.load(Ordering::Relaxed));
+        pending as f32 / (CHANNELS as u64 * 4 * SAMPLE_RATE as u64) as f32
+    }
+
+    /// Retard de l'encodeur (image ou son) au-delà de [`MAX_BACKLOG_SECONDS`] :
+    /// il ne rattrapera pas. Plutôt que d'accumuler sans fin (mémoire, puis
+    /// finalisation interminable), la source s'arrête ; ce qui est déjà
+    /// capturé est encodé et le fichier fermé proprement. Renvoie vrai si la
+    /// source vient de passer en erreur.
+    pub fn check_backlog(&self, name: &str, seconds: f32) -> bool {
+        if seconds < MAX_BACKLOG_SECONDS as f32 || self.has_failed() || self.stop_at().is_some() {
+            return false;
+        }
+        log::error!("[{name}] l'encodeur ne suit plus : {seconds:.0} s de retard, source arrêtée");
+        self.fail(tr::tr!(
+            "L'encodeur ne suit plus ({} min de retard) : enregistrement de cette source arrêté, fichier conservé. \
+             Réduire la résolution, les images par seconde ou le débit vidéo",
+            MAX_BACKLOG_SECONDS / 60
+        ));
+        true
+    }
+
     /// Problème non bloquant, affiché à l'utilisateur.
     pub fn note_error(&self, message: String) {
         if !self.has_failed() {
@@ -241,6 +347,82 @@ impl Shared {
         f32::from_bits(self.audio_peak_bits.swap(0, Ordering::Relaxed))
     }
 }
+
+/// Fenêtres suivies par les sources d'une session : une fenêtre n'est
+/// jamais enregistrée par deux sources à la fois.
+#[derive(Default)]
+pub(crate) struct WindowClaims {
+    /// Par exécution (rang de démarrage dans la session) : identifiant de
+    /// la source et fenêtre suivie.
+    claims: Mutex<HashMap<usize, (String, WindowHandle)>>,
+    /// Sources dont la capture tourne, par exécution : leur fenêtre exacte
+    /// (même titre) leur est réservée.
+    sources: Mutex<HashMap<usize, Source>>,
+}
+
+impl WindowClaims {
+    /// Fenêtres suivies par les autres sources que `source_id`. Une
+    /// exécution précédente de la même source (relancée) ne compte pas.
+    pub fn taken_by_others(&self, source_id: &str) -> HashSet<WindowHandle> {
+        lock(&self.claims).values().filter(|(id, _)| id != source_id).map(|(_, handle)| *handle).collect()
+    }
+
+    /// Ce que la source `source_id` ne doit pas prendre parmi `windows` :
+    /// les fenêtres suivies par les autres sources, et à défaut de son titre
+    /// exact celles qu'elles attendent.
+    pub fn exclusions(&self, source_id: &str, windows: &[WindowInfo]) -> Exclusions {
+        let mut exclusions = Exclusions { taken: self.taken_by_others(source_id), ..Default::default() };
+        let sources = lock(&self.sources);
+        let others: Vec<&Source> = sources.values().filter(|s| s.id != source_id).collect();
+        exclusions.reserve_for(&others, windows);
+        exclusions
+    }
+
+    /// La capture de `source` démarre (exécution `run`).
+    pub fn register(&self, run: usize, source: &Source) {
+        lock(&self.sources).insert(run, source.clone());
+    }
+
+    /// La capture de l'exécution `run` s'arrête : fenêtre et réservation
+    /// libérées.
+    pub fn unregister(&self, run: usize) {
+        self.release(run);
+        lock(&self.sources).remove(&run);
+    }
+
+    /// Réserve `handle` pour l'exécution `run`. Faux si une autre source
+    /// vient de la prendre.
+    pub fn claim(&self, run: usize, source_id: &str, handle: WindowHandle) -> bool {
+        let mut claims = lock(&self.claims);
+        if claims.iter().any(|(r, (id, h))| *r != run && id != source_id && *h == handle) {
+            return false;
+        }
+        claims.insert(run, (source_id.to_string(), handle));
+        true
+    }
+
+    pub fn release(&self, run: usize) {
+        lock(&self.claims).remove(&run);
+    }
+}
+
+/// Coupure d'une source après un saut de l'horloge : les fils de capture
+/// placent une marque de coupure dans leur file à la fin de ce qui précède,
+/// puis reprennent à `to_hns` sans combler l'interruption ; l'encodage
+/// ferme la partie à la marque et continue dans la suivante.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Cut {
+    pub generation: u64,
+    /// Dernier instant vu avant l'interruption.
+    pub from_hns: u64,
+    /// Instant de la reprise.
+    pub to_hns: u64,
+    /// Reprise depuis le départ de la source.
+    pub resume_offset_hns: u64,
+}
+
+/// Retard d'encodage (image ou son) au-delà duquel la source s'arrête.
+pub(crate) const MAX_BACKLOG_SECONDS: u64 = 300;
 
 /// Relances d'un fil de capture après une erreur interne, au-delà
 /// desquelles la source passe en erreur.
@@ -328,6 +510,73 @@ mod tests {
         });
         assert_eq!(runs, MAX_TASK_RESTARTS + 1);
         assert!(shared.has_failed());
+    }
+
+    #[test]
+    fn endless_backlog_stops_the_source() {
+        let second = CHANNELS as u64 * 4 * SAMPLE_RATE as u64;
+        let shared = Shared::new();
+        shared.audio_queued.store(10 * second, Ordering::Relaxed);
+        shared.audio_position.store(4 * second, Ordering::Relaxed);
+        assert_eq!(shared.audio_backlog_seconds(), 6.0);
+        assert!(!shared.check_backlog("essai", shared.audio_backlog_seconds()));
+        // Arrêt demandé : la file se vide, rien ne s'arrête plus.
+        let stopping = Shared::new();
+        stopping.request_stop(1);
+        assert!(!stopping.check_backlog("essai", 1_000.0));
+        shared.audio_queued.store((MAX_BACKLOG_SECONDS + 10) * second, Ordering::Relaxed);
+        assert!(shared.check_backlog("essai", shared.audio_backlog_seconds()));
+        assert!(shared.has_failed());
+        assert!(shared.error().is_some_and(|e| e.contains("ne suit plus")));
+    }
+
+    #[test]
+    fn one_interruption_gives_one_cut() {
+        let shared = Shared::new();
+        assert_eq!(shared.cut_generation(), 0);
+        assert!(shared.pending_cut(0).is_none());
+        // Vue par le fil vidéo, puis par le fil audio : une seule coupure.
+        shared.request_cut(100, 5_000, 40);
+        shared.request_cut(120, 5_010, 40);
+        let cut = shared.pending_cut(0).unwrap();
+        assert_eq!((cut.generation, cut.from_hns, cut.to_hns, cut.resume_offset_hns), (1, 100, 5_000, 4_960));
+        assert!(shared.pending_cut(1).is_none());
+        // Une interruption plus tard : nouvelle coupure.
+        shared.request_cut(9_000, 20_000, 40);
+        assert_eq!(shared.pending_cut(1).map(|c| c.generation), Some(2));
+    }
+
+    #[test]
+    fn a_window_is_claimed_by_one_source_only() {
+        let claims = WindowClaims::default();
+        assert!(claims.claim(0, "a", 7));
+        assert!(!claims.claim(1, "b", 7));
+        assert_eq!(claims.taken_by_others("b"), HashSet::from([7]));
+        assert!(claims.taken_by_others("a").is_empty());
+        // La même source relancée (nouvelle exécution) peut la reprendre.
+        assert!(claims.claim(2, "a", 7));
+        claims.release(0);
+        claims.release(2);
+        assert!(claims.claim(1, "b", 7));
+
+        // La fenêtre exacte d'une source qui enregistre lui est réservée.
+        let window = |handle, title: &str| WindowInfo {
+            handle,
+            pid: 1,
+            title: title.into(),
+            class: "Classe".into(),
+            exe: PathBuf::from("vlc.exe"),
+        };
+        let windows = [window(8, "film1"), window(9, "film2")];
+        let mut second = Source::application("Seconde", &windows[1], true, true);
+        second.id = "c".into();
+        claims.register(3, &second);
+        let exclusions = claims.exclusions("a", &windows);
+        assert_eq!(exclusions.taken, HashSet::from([7]));
+        assert_eq!(exclusions.reserved, HashSet::from([9]));
+        assert!(claims.exclusions("c", &windows).reserved.is_empty());
+        claims.unregister(3);
+        assert!(claims.exclusions("a", &windows).reserved.is_empty());
     }
 
     #[test]

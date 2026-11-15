@@ -36,6 +36,27 @@ pub fn dir_writable(dir: &Path) -> bool {
     writable
 }
 
+/// Exécute `f` dans un fil à part et attend au plus `timeout` : un dossier
+/// réseau ou un disque qui ne répond plus ne bloque jamais l'appelant.
+/// `None` si `f` n'a pas répondu à temps (il finit seul, plus tard).
+pub fn within<T: Send + 'static>(timeout: Duration, f: impl FnOnce() -> T + Send + 'static) -> Option<T> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::Builder::new()
+        .name("polyptyque-disque".into())
+        .spawn(move || {
+            let _ = tx.send(f());
+        })
+        .ok()?;
+    rx.recv_timeout(timeout).ok()
+}
+
+/// [`dir_writable`] en au plus `timeout` : un dossier qui ne répond pas à
+/// temps compte comme inaccessible.
+pub fn dir_writable_within(dir: &Path, timeout: Duration) -> bool {
+    let dir = dir.to_path_buf();
+    within(timeout, move || dir_writable(&dir)).unwrap_or(false)
+}
+
 /// Durée de conservation des journaux.
 pub const LOG_RETENTION: Duration = Duration::from_secs(30 * 24 * 3600);
 
@@ -102,6 +123,16 @@ mod tests {
         fs::write(&file, b"").unwrap();
         // Un fichier à la place du dossier : impossible d'y écrire.
         assert!(!dir_writable(&file.join("sous-dossier")));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn slow_disk_access_is_given_up() {
+        assert_eq!(within(Duration::from_secs(5), || 42), Some(42));
+        let slow = within(Duration::from_millis(50), || std::thread::sleep(Duration::from_secs(2)));
+        assert!(slow.is_none());
+        let dir = std::env::temp_dir().join(format!("polyptyque-storage-{}", crate::config::new_id()));
+        assert!(dir_writable_within(&dir, Duration::from_secs(10)));
         fs::remove_dir_all(dir).unwrap();
     }
 
