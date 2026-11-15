@@ -108,7 +108,7 @@ impl Reason {
     pub fn rpc_code(self) -> i64 {
         match self {
             Reason::Internal => -32603,
-            Reason::InvalidRequest => -32602,
+            Reason::InvalidRequest => INVALID_PARAMS,
             Reason::NotRunning => -32010,
             Reason::ControlDisabled => -32011,
             Reason::Locked => -32001,
@@ -198,54 +198,73 @@ pub struct Request {
     pub params: Value,
 }
 
+/// Codes d'erreur de la norme JSON-RPC propres aux messages qui ne sont pas
+/// des requêtes exécutables (la raison reste `invalid_request`).
+/// Message illisible (JSON ou UTF-8 invalide, trop long).
+pub const PARSE_ERROR: i64 = -32700;
+/// Message lisible, mais qui n'est pas une requête (lot compris).
+pub const INVALID_REQUEST: i64 = -32600;
+/// Commande inconnue.
+pub const METHOD_NOT_FOUND: i64 = -32601;
+/// Paramètres invalides : le code de [`Reason::InvalidRequest`].
+pub const INVALID_PARAMS: i64 = -32602;
+
 /// Ligne reçue par Polyptyque : une requête, ou un message invalide à
-/// signaler (avec l'identifiant de la requête s'il a pu être lu).
+/// signaler (avec l'identifiant de la requête s'il a pu être lu, et le code
+/// JSON-RPC du cas).
 #[derive(Debug, Clone, PartialEq)]
 pub enum Incoming {
     Request(Request),
-    Invalid { id: Option<Value>, error: CommandError },
+    Invalid { id: Option<Value>, error: CommandError, code: i64 },
 }
 
 pub fn parse_request(line: &str) -> Incoming {
+    let invalid = |id: Option<Value>, message: String, code: i64| Incoming::Invalid {
+        id,
+        error: CommandError::invalid(message),
+        code,
+    };
     let value: Value = match serde_json::from_str(line) {
         Ok(value) => value,
         Err(e) => {
             log::warn!("pilotage : message illisible : {e}");
-            return Incoming::Invalid {
-                id: None,
-                error: CommandError::invalid(tr!("Message illisible : un objet JSON par ligne est attendu.")),
-            };
+            return invalid(None, tr!("Message illisible : un objet JSON par ligne est attendu."), PARSE_ERROR);
         }
     };
-    let Value::Object(mut object) = value else {
-        return Incoming::Invalid { id: None, error: CommandError::invalid(tr!("Un objet JSON est attendu.")) };
+    let mut object = match value {
+        Value::Object(object) => object,
+        Value::Array(_) => {
+            return invalid(
+                None,
+                tr!("Les lots de requêtes (tableau JSON) ne sont pas pris en charge : envoyer une requête par ligne."),
+                INVALID_REQUEST,
+            )
+        }
+        _ => return invalid(None, tr!("Un objet JSON est attendu."), INVALID_REQUEST),
     };
     let id = object.remove("id");
     if id.as_ref().is_some_and(|id| !(id.is_string() || id.is_number() || id.is_null())) {
-        return Incoming::Invalid {
-            id: None,
-            error: CommandError::invalid(tr!("Identifiant de requête invalide : un nombre ou un texte est attendu.")),
-        };
+        return invalid(
+            None,
+            tr!("Identifiant de requête invalide : un nombre ou un texte est attendu."),
+            INVALID_REQUEST,
+        );
     }
     if object.get("jsonrpc").and_then(Value::as_str) != Some("2.0") {
-        return Incoming::Invalid { id, error: CommandError::invalid(tr!("« jsonrpc »: \"2.0\" est attendu.")) };
+        return invalid(id, tr!("« jsonrpc »: \"2.0\" est attendu."), INVALID_REQUEST);
     }
     let Some(method) = object.get("method").and_then(Value::as_str).map(str::to_string) else {
-        return Incoming::Invalid {
-            id,
-            error: CommandError::invalid(tr!("Nom de la commande (« method ») manquant.")),
-        };
+        return invalid(id, tr!("Nom de la commande (« method ») manquant."), INVALID_REQUEST);
     };
     let params = match object.remove("params") {
         None | Some(Value::Null) => Value::Object(Map::new()),
         Some(params @ Value::Object(_)) => params,
         Some(_) => {
-            return Incoming::Invalid {
+            return invalid(
                 id,
-                error: CommandError::invalid(tr!(
-                    "Les paramètres (« params ») sont attendus sous forme d'objet nommé."
-                )),
-            }
+                tr!("Les paramètres (« params ») sont attendus sous forme d'objet nommé."),
+                INVALID_PARAMS,
+            )
         }
     };
     Incoming::Request(Request { id, method, params })
@@ -258,6 +277,12 @@ pub fn success(id: &Value, result: Value) -> String {
 
 /// Réponse en erreur (identifiant `null` s'il n'a pas pu être lu).
 pub fn failure(id: Option<&Value>, error: &CommandError) -> String {
+    failure_with_code(id, error, error.reason.rpc_code())
+}
+
+/// Comme [`failure`], avec un code JSON-RPC choisi ([`PARSE_ERROR`],
+/// [`INVALID_REQUEST`], [`METHOD_NOT_FOUND`]).
+pub fn failure_with_code(id: Option<&Value>, error: &CommandError, code: i64) -> String {
     let mut data = Map::new();
     data.insert("reason".into(), error.reason.as_str().into());
     for (key, value) in &error.details {
@@ -266,7 +291,7 @@ pub fn failure(id: Option<&Value>, error: &CommandError) -> String {
     json!({
         "jsonrpc": "2.0",
         "id": id.cloned().unwrap_or(Value::Null),
-        "error": { "code": error.reason.rpc_code(), "message": error.message, "data": data },
+        "error": { "code": code, "message": error.message, "data": data },
     })
     .to_string()
 }
@@ -368,19 +393,46 @@ mod tests {
 
     #[test]
     fn reports_invalid_messages() {
-        for line in ["pas du json", "[1,2]", r#"{"jsonrpc":"2.0","id":{"a":1},"method":"x"}"#] {
-            assert!(matches!(parse_request(line), Incoming::Invalid { id: None, .. }), "{line}");
-        }
-        // L'identifiant lu est rendu, pour que le client reconnaisse sa requête.
-        for line in [
-            r#"{"id":3,"method":"status"}"#,
-            r#"{"jsonrpc":"2.0","id":3}"#,
-            r#"{"jsonrpc":"2.0","id":3,"method":"status","params":[1]}"#,
+        // Codes de la norme : message illisible, puis pas une requête.
+        for (line, expected) in [
+            ("pas du json", PARSE_ERROR),
+            ("[1,2]", INVALID_REQUEST),
+            (r#"[{"jsonrpc":"2.0","id":1,"method":"status"}]"#, INVALID_REQUEST),
+            ("12", INVALID_REQUEST),
+            (r#"{"jsonrpc":"2.0","id":{"a":1},"method":"x"}"#, INVALID_REQUEST),
         ] {
-            let Incoming::Invalid { id, error } = parse_request(line) else { panic!("{line}") };
-            assert_eq!(id, Some(json!(3)));
+            let Incoming::Invalid { id: None, error, code } = parse_request(line) else { panic!("{line}") };
+            assert_eq!(code, expected, "{line}");
             assert_eq!(error.reason, Reason::InvalidRequest);
         }
+        // L'identifiant lu est rendu, pour que le client reconnaisse sa requête.
+        for (line, expected) in [
+            (r#"{"id":3,"method":"status"}"#, INVALID_REQUEST),
+            (r#"{"jsonrpc":"2.0","id":3}"#, INVALID_REQUEST),
+            (r#"{"jsonrpc":"2.0","id":3,"method":"status","params":[1]}"#, INVALID_PARAMS),
+        ] {
+            let Incoming::Invalid { id, error, code } = parse_request(line) else { panic!("{line}") };
+            assert_eq!(id, Some(json!(3)));
+            assert_eq!(code, expected, "{line}");
+            assert_eq!(error.reason, Reason::InvalidRequest);
+        }
+    }
+
+    #[test]
+    fn standard_codes_keep_the_reason() {
+        let error = CommandError::invalid("Commande inconnue");
+        let line = failure_with_code(Some(&json!(5)), &error, METHOD_NOT_FOUND);
+        let value: Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(value["error"]["code"], METHOD_NOT_FOUND);
+        let ClientMessage::Response { id, result } = parse_client_message(&line).unwrap() else {
+            panic!("réponse attendue");
+        };
+        assert_eq!(id, json!(5));
+        assert_eq!(result, Err(error));
+        // Sans code choisi : celui de la raison.
+        let value: Value = serde_json::from_str(&failure(None, &CommandError::invalid("x"))).unwrap();
+        assert_eq!(value["error"]["code"], INVALID_PARAMS);
+        assert_eq!(value["id"], Value::Null);
     }
 
     #[test]

@@ -214,7 +214,7 @@ fn serve(id: u64, mut connection: Box<dyn Connection>, peer: Peer, stop: Arc<Ato
             match line {
                 Ok(line) => post(move |app| app.control_request(id, line)),
                 Err(error) => {
-                    let mut line = protocol::failure(None, &error);
+                    let mut line = protocol::failure_with_code(None, &error, protocol::PARSE_ERROR);
                     line.push('\n');
                     let _ = connection.write_all(line.as_bytes());
                     break 'connection;
@@ -367,10 +367,15 @@ impl App {
     // ----- Requêtes -------------------------------------------------------------
 
     fn control_request(&self, client: u64, line: String) {
+        // Ligne transmise par le fil de sa connexion avant que le pilotage
+        // soit désactivé, ou que le programme soit déconnecté : ignorée.
+        if !self.control.borrow().clients.contains_key(&client) {
+            return;
+        }
         let request = match protocol::parse_request(&line) {
             Incoming::Request(request) => request,
-            Incoming::Invalid { id, error } => {
-                self.control_send(client, protocol::failure(id.as_ref(), &error));
+            Incoming::Invalid { id, error, code } => {
+                self.control_send(client, protocol::failure_with_code(id.as_ref(), &error, code));
                 return;
             }
         };
@@ -380,7 +385,10 @@ impl App {
                 "Commande inconnue : « {} ». La liste est donnée par « polyptyque-cli commands ».",
                 request.method
             ));
-            self.control_answer(client, request.id, &request.method, Err(error), since);
+            log::info!("pilotage : {} refusé ({}) : commande inconnue", request.method, error.reason.as_str());
+            if let Some(id) = &request.id {
+                self.control_send(client, protocol::failure_with_code(Some(id), &error, protocol::METHOD_NOT_FOUND));
+            }
             return;
         };
         if let Err(error) = command.check_params(&request.params) {
