@@ -1170,7 +1170,7 @@ impl App {
                 tr!("La fenêtre des réglages est ouverte dans Polyptyque : la fermer d'abord (elle remplacerait ces réglages)."),
             ));
         }
-        let (mut settings, enable_microphone) = self.settings_from(params)?;
+        let (settings, enable_microphone) = self.settings_from(params)?;
         if !enable_microphone {
             self.apply_settings(settings);
             return Ok(Reply::ok(json!({ "settings": self.settings_json() })));
@@ -1182,28 +1182,37 @@ impl App {
                 tr!("Une fenêtre est ouverte dans Polyptyque : la fermer d'abord, pour que la question du micro puisse s'afficher."),
             ));
         }
-        settings.microphone.enabled = true;
         self.control.borrow_mut().mic_answer = None;
+        let client_id = client;
         let client = self.control_client_name(client);
         self.bring_window_forward();
         self.ask(
-            Confirm::EnableMicrophone,
+            Confirm::EnableMicrophone(client_id),
             &tr!("Activer le micro"),
             &tr!(
-                "« {} » demande d'activer le micro. Ce qu'il capte sera alors enregistré dans un fichier séparé, pendant chaque enregistrement. Windows doit autoriser l'accès au micro pour les applications de bureau.",
-                client
+                "{} demande d'activer le micro. Ce qu'il capte sera alors enregistré dans un fichier séparé, pendant chaque enregistrement. Windows doit autoriser l'accès au micro pour les applications de bureau.",
+                self.control_client_identity(client_id)
             ),
             &tr!("Activer le micro"),
         );
         log::info!("pilotage : activation du micro demandée par {client}, question posée");
         let deadline = Instant::now() + MIC_ANSWER_LIMIT;
+        let params = params.clone();
         Ok(Reply::Wait {
             check: Box::new(move |app| {
                 let answer = app.control.borrow_mut().mic_answer.take();
                 match answer {
                     Some(true) if app.recording() || app.busy.get() => Some(Err(locked())),
                     Some(true) => {
-                        app.apply_settings(settings.clone());
+                        // Réglages relus au moment de l'accord : ceux changés
+                        // pendant la question restent, seuls les champs de la
+                        // commande s'y appliquent.
+                        let mut settings = match app.settings_from(&params) {
+                            Ok((settings, _)) => settings,
+                            Err(error) => return Some(Err(error)),
+                        };
+                        settings.microphone.enabled = true;
+                        app.apply_settings(settings);
                         Some(Ok(json!({ "settings": app.settings_json() })))
                     }
                     Some(false) => Some(Err(CommandError::new(
@@ -1211,7 +1220,7 @@ impl App {
                         tr!("Activation du micro non acceptée (question refusée, ou fermée par une autre action) : aucun réglage n'a changé."),
                     ))),
                     None if Instant::now() >= deadline => {
-                        if matches!(*app.confirm.borrow(), Some(Confirm::EnableMicrophone)) {
+                        if matches!(*app.confirm.borrow(), Some(Confirm::EnableMicrophone(c)) if c == client_id) {
                             app.close_sheet();
                             app.control.borrow_mut().mic_answer = None;
                         }

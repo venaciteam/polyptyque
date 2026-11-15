@@ -1191,86 +1191,86 @@ msgid "Activer le micro"
 msgstr "Turn on the mic"
 
 #: polyptyque-app/src/controller/commands.rs:1192
-msgid "« {} » demande d'activer le micro. Ce qu'il capte sera alors enregistré dans un fichier séparé, pendant chaque enregistrement. Windows doit autoriser l'accès au micro pour les applications de bureau."
-msgstr "“{}” is asking to turn on the mic. What it picks up will then be recorded to a separate file during every recording. Windows must allow desktop apps to access the microphone."
+msgid "{} demande d'activer le micro. Ce qu'il capte sera alors enregistré dans un fichier séparé, pendant chaque enregistrement. Windows doit autoriser l'accès au micro pour les applications de bureau."
+msgstr "{} is asking to turn on the mic. What it picks up will then be recorded to a separate file during every recording. Windows must allow desktop apps to access the microphone."
 
-#: polyptyque-app/src/controller/commands.rs:1211
+#: polyptyque-app/src/controller/commands.rs:1220
 msgid "Activation du micro non acceptée (question refusée, ou fermée par une autre action) : aucun réglage n'a changé."
 msgstr "The mic wasn’t turned on (the question was declined, or closed by another action): no settings changed."
 
-#: polyptyque-app/src/controller/commands.rs:1220
+#: polyptyque-app/src/controller/commands.rs:1229
 msgid "Pas de réponse en deux minutes : le micro n'a pas été activé, aucun réglage n'a changé."
 msgstr "No answer within two minutes: the mic wasn’t turned on and no settings changed."
 
-#: polyptyque-app/src/controller/commands.rs:1274
+#: polyptyque-app/src/controller/commands.rs:1283
 msgid "Une programmation est en cours de modification dans Polyptyque : fermer son formulaire d'abord."
 msgstr "A scheduled recording is being edited in Polyptyque: close its form first."
 
-#: polyptyque-app/src/controller/commands.rs:1283
+#: polyptyque-app/src/controller/commands.rs:1292
 msgid "Donner date ou days, pas les deux."
 msgstr "Give either date or days, not both."
 
-#: polyptyque-app/src/controller/commands.rs:1286
+#: polyptyque-app/src/controller/commands.rs:1295
 msgid "Date invalide : « {} » (format AAAA-MM-JJ)."
 msgstr "Invalid date: “{}” (format YYYY-MM-DD)."
 
-#: polyptyque-app/src/controller/commands.rs:1306
+#: polyptyque-app/src/controller/commands.rs:1315
 msgid "Heure invalide : « {} » (format HH:MM sur 24 h)."
 msgstr "Invalid time: “{}” (format HH:MM, 24-hour)."
 
-#: polyptyque-app/src/controller/commands.rs:1315
+#: polyptyque-app/src/controller/commands.rs:1324
 msgid "Heure de début manquante."
 msgstr "Missing start time."
 
-#: polyptyque-app/src/controller/commands.rs:1317
+#: polyptyque-app/src/controller/commands.rs:1326
 msgid "Heure de fin manquante."
 msgstr "Missing end time."
 
-#: polyptyque-app/src/controller/commands.rs:1319
+#: polyptyque-app/src/controller/commands.rs:1328
 msgid "Donner date (une seule fois) ou days (chaque semaine)."
 msgstr "Give date (once) or days (every week)."
 
-#: polyptyque-app/src/controller/commands.rs:1334 polyptyque-app/src/controller/commands.rs:1361 polyptyque-app/src/controller/scheduling.rs:619 polyptyque-app/src/controller/scheduling.rs:752
+#: polyptyque-app/src/controller/commands.rs:1343 polyptyque-app/src/controller/commands.rs:1370 polyptyque-app/src/controller/scheduling.rs:619 polyptyque-app/src/controller/scheduling.rs:752
 msgid "Cette programmation enregistre en ce moment : modifiable une fois son créneau terminé."
 msgstr "This scheduled recording is recording right now: it can be edited once its time slot is over."
 
-#: polyptyque-app/src/controller/commands.rs:1375 polyptyque-app/src/controller/scheduling.rs:859
+#: polyptyque-app/src/controller/commands.rs:1384 polyptyque-app/src/controller/scheduling.rs:859
 msgid "Cette programmation enregistre en ce moment : supprimable une fois son créneau terminé."
 msgstr "This scheduled recording is recording right now: it can be deleted once its time slot is over."
 
-#: polyptyque-app/src/controller/commands.rs:1426
+#: polyptyque-app/src/controller/commands.rs:1435
 msgid "Aucun fichier à convertir."
 msgstr "No files to convert."
 
-#: polyptyque-app/src/controller/commands.rs:1430
+#: polyptyque-app/src/controller/commands.rs:1439
 msgid "Fichier introuvable : {}"
 msgstr "File not found: {}"
 
-#: polyptyque-app/src/controller/commands.rs:1433
+#: polyptyque-app/src/controller/commands.rs:1442
 msgid "Seuls les fichiers MKV et MKA se convertissent : {}"
 msgstr "Only MKV and MKA files can be converted: {}"
 
-#: polyptyque-app/src/controller/commands.rs:1440
+#: polyptyque-app/src/controller/commands.rs:1449
 msgid "En cours d'enregistrement : {} (à convertir une fois l'enregistrement arrêté)."
 msgstr "Still recording: {} (it can be converted once the recording stops)."
 
-#: polyptyque-app/src/controller/commands.rs:1454
+#: polyptyque-app/src/controller/commands.rs:1463
 msgid "Aucune conversion en cours."
 msgstr "No conversion in progress."
 
-#: polyptyque-app/src/controller/commands.rs:1470 polyptyque-app/src/controller/commands.rs:1475
+#: polyptyque-app/src/controller/commands.rs:1479 polyptyque-app/src/controller/commands.rs:1484
 msgid "Aucune nouvelle version proposée."
 msgstr "No new version available."
 
-#: polyptyque-app/src/controller/commands.rs:1483 polyptyque-app/src/controller.rs:2009
+#: polyptyque-app/src/controller/commands.rs:1492 polyptyque-app/src/controller.rs:2009
 msgid "Télécharger la version {} ({}) puis redémarrer Polyptyque ? Scènes, réglages et connexions des navigateurs sont conservés."
 msgstr "Download version {} ({}) and restart Polyptyque? Scenes, settings and browser sign-ins are kept."
 
-#: polyptyque-app/src/controller/commands.rs:1506 polyptyque-app/src/controller.rs:3499
+#: polyptyque-app/src/controller/commands.rs:1515 polyptyque-app/src/controller.rs:3499
 msgid "Arrêter l'enregistrement et quitter Polyptyque ? Les fichiers seront finalisés proprement."
 msgstr "Stop recording and quit Polyptyque? The files will be finalized properly."
 
-#: polyptyque-app/src/controller/commands.rs:1511 polyptyque-app/src/controller.rs:3532
+#: polyptyque-app/src/controller/commands.rs:1520 polyptyque-app/src/controller.rs:3532
 msgid "Quitter maintenant interrompt la conversion MP4. Les fichiers MKV d'origine sont conservés : ils pourront être convertis plus tard."
 msgstr "Quitting now interrupts the MP4 conversion. The original MKV files are kept: they can be converted later."
 
@@ -1278,19 +1278,39 @@ msgstr "Quitting now interrupts the MP4 conversion. The original MKV files are k
 msgid "Pilotage indisponible : le canal de commande n'a pas pu s'ouvrir (détail dans le journal)."
 msgstr "Remote control unavailable: the command channel couldn’t open (details in the log)."
 
-#: polyptyque-app/src/controller/control.rs:316 polyptyque-app/src/controller/control.rs:534
+#: polyptyque-app/src/controller/control.rs:335
+msgid "Question du micro fermée : la connexion de « {} » a pris fin. Le micro n'a pas été activé."
+msgstr "Mic question closed: “{}” disconnected. The mic wasn’t turned on."
+
+#: polyptyque-app/src/controller/control.rs:348 polyptyque-app/src/controller/control.rs:577
 msgid "un programme"
 msgstr "a program"
 
-#: polyptyque-app/src/controller/control.rs:384
+#: polyptyque-app/src/controller/control.rs:427
 msgid "Commande inconnue : « {} ». La liste est donnée par « polyptyque-cli commands »."
 msgstr "Unknown command: “{}”. “polyptyque-cli commands” lists them all."
 
-#: polyptyque-app/src/controller/control.rs:430
+#: polyptyque-app/src/controller/control.rs:473
 msgid "« {} » n'a pas abouti dans le délai prévu (voir l'état et les messages de Polyptyque)."
 msgstr "“{}” didn’t finish in time (see Polyptyque’s status and messages)."
 
-#: polyptyque-app/src/controller/control.rs:549
+#: polyptyque-app/src/controller/control.rs:584 polyptyque-app/src/controller/control.rs:587 polyptyque-app/src/controller.rs:2736
+msgid "« {} »"
+msgstr "“{}”"
+
+#: polyptyque-app/src/controller/control.rs:585
+msgid "« {} » (programme : {})"
+msgstr "“{}” (program: {})"
+
+#: polyptyque-app/src/controller/control.rs:586
+msgid "« {} » (programme non identifié)"
+msgstr "“{}” (unidentified program)"
+
+#: polyptyque-app/src/controller/control.rs:588
+msgid "Un programme non identifié"
+msgstr "An unidentified program"
+
+#: polyptyque-app/src/controller/control.rs:604
 msgid "Pilotage · {}"
 msgstr "Remote control · {}"
 
@@ -2067,10 +2087,6 @@ msgstr "“{}” added."
 msgctxt "Bouton : retirer une source"
 msgid "Supprimer"
 msgstr "Remove"
-
-#: polyptyque-app/src/controller.rs:2736
-msgid "« {} »"
-msgstr "“{}”"
 
 #: polyptyque-app/src/controller.rs:2740
 msgid "La source « {} » sera supprimée."

@@ -110,9 +110,9 @@ enum Confirm {
     /// Quitter alors qu'une programmation doit encore lancer un
     /// enregistrement.
     QuitWithSchedules,
-    /// Activer le micro, à la demande d'un programme (pilotage) : seule la
+    /// Activer le micro, à la demande de ce programme (pilotage) : seule la
     /// personne devant l'écran peut l'accepter.
-    EnableMicrophone,
+    EnableMicrophone(u64),
 }
 
 /// Fenêtre à montrer dès que l'interface est libre (aucun enregistrement,
@@ -3362,7 +3362,7 @@ impl App {
         if self.report_closing() {
             return;
         }
-        if matches!(*self.confirm.borrow(), Some(Confirm::EnableMicrophone)) {
+        if matches!(*self.confirm.borrow(), Some(Confirm::EnableMicrophone(_))) {
             log::info!("pilotage : activation du micro refusée");
             self.control.borrow_mut().mic_answer = Some(false);
         }
@@ -3386,7 +3386,7 @@ impl App {
     fn ask(&self, action: Confirm, title: &str, text: &str, button: &str) {
         let danger = !matches!(
             action,
-            Confirm::InstallUpdate | Confirm::ResumeAfterSleep(_) | Confirm::RepairFiles(_) | Confirm::EnableMicrophone
+            Confirm::InstallUpdate | Confirm::ResumeAfterSleep(_) | Confirm::RepairFiles(_) | Confirm::EnableMicrophone(_)
         );
         *self.confirm.borrow_mut() = Some(action);
         self.with_bridge(|b| {
@@ -3406,7 +3406,7 @@ impl App {
             // La scène et la source sont celles de la question : la scène en
             // cours a pu changer entre-temps.
             Some(Confirm::DeleteScene(id)) => self.delete_scene(&id),
-            Some(Confirm::EnableMicrophone) => {
+            Some(Confirm::EnableMicrophone(_)) => {
                 log::info!("pilotage : activation du micro acceptée");
                 self.control.borrow_mut().mic_answer = Some(true);
             }
