@@ -506,10 +506,12 @@ fn encoder_lost_while_finishing_does_not_lose_the_queue() {
     let summaries = stopping.join().expect("arrêt");
     let outputs = &summaries[0].outputs;
     assert_eq!(outputs.len(), 2, "{outputs:?}");
-    // Rien de ce qui attendait n'est perdu, hormis ce que FFmpeg gardait en
-    // mémoire.
+    // Ce qui attendait en file est dans la seconde partie ; seul est perdu
+    // ce que FFmpeg (et le tube) gardaient en mémoire.
     let total = check_parts("Vidée", outputs);
-    assert!(total > elapsed - 2.0 && total <= elapsed + 0.5, "{total} s pour {elapsed} s");
+    let (drained, _) = measure(&outputs[1]);
+    assert!(drained > 1.5, "partie 2 : {drained} s");
+    assert!(total > elapsed - 3.0 && total <= elapsed + 0.5, "{total} s pour {elapsed} s");
     fs::remove_dir_all(root).unwrap();
 }
 
