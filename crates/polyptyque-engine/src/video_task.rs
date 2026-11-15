@@ -132,6 +132,11 @@ impl VideoTask {
                         }
                     }
                 }
+                // Recherche ou ouverture de la capture lente (programmes qui
+                // ne répondent pas, pilote) : ce temps n'est pas une veille.
+                // Le saut de l'horloge se mesure hors de cette étape ; une
+                // vraie veille pendant celle-ci est vue par le fil du son.
+                last_now = Some(platform.now_hns());
             }
 
             let mut lost = false;

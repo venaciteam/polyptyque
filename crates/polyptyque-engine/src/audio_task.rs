@@ -109,7 +109,8 @@ impl AudioTask {
                 capture = None;
                 retry_at = 0;
             }
-            if capture.is_none() && now >= retry_at {
+            let opening = capture.is_none() && now >= retry_at;
+            if opening {
                 if let AudioInput::Microphone(device) = &input {
                     match platform.open_microphone_capture(device.as_deref(), SAMPLE_RATE, CHANNELS) {
                         Ok(c) => {
@@ -144,6 +145,13 @@ impl AudioTask {
                             retry_at = now + RETRY_HNS;
                         }
                     }
+                }
+                // Ouverture lente (casque Bluetooth, pilote qui se
+                // réinitialise) : ce temps n'est pas une veille. Le saut de
+                // l'horloge se mesure autour de la lecture seulement ; une
+                // vraie veille pendant l'ouverture est vue par le fil vidéo.
+                if last_arrival.is_some() {
+                    last_arrival = Some(platform.now_hns());
                 }
             }
 

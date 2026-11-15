@@ -56,7 +56,7 @@ fn window(handle: isize, title: &str) -> WindowInfo {
 impl Platform for SimPlatform {
     fn list_windows(&self) -> Vec<WindowInfo> {
         // Une fenêtre par source : deux sources ne partagent jamais une fenêtre.
-        let mut windows = vec![window(1, "immediate"), window(3, "temoin"), window(4, "seconde")];
+        let mut windows = vec![window(1, "immediate"), window(3, "temoin"), window(4, "seconde"), window(5, "lente")];
         // La deuxième fenêtre n'apparaît qu'après une seconde.
         if self.start.elapsed() > Duration::from_secs(1) {
             windows.push(window(2, "tardive"));
@@ -81,15 +81,21 @@ impl Platform for SimPlatform {
     }
     fn open_video_capture(
         &self,
-        _: WindowHandle,
+        handle: WindowHandle,
         w: u32,
         h: u32,
         _: bool,
         _: polyptyque_core::crop::Crop,
     ) -> Result<Box<dyn VideoCapture>> {
+        if handle == SLOW_WINDOW {
+            thread::sleep(SLOW_OPEN);
+        }
         Ok(Box::new(SimVideo { width: w, height: h, counter: 0 }))
     }
-    fn open_audio_capture(&self, _: u32, sample_rate: u32, channels: u16) -> Result<Box<dyn AudioCapture>> {
+    fn open_audio_capture(&self, pid: u32, sample_rate: u32, channels: u16) -> Result<Box<dyn AudioCapture>> {
+        if pid == SLOW_WINDOW as u32 {
+            thread::sleep(SLOW_OPEN);
+        }
         Ok(Box::new(SimAudio::new(self, sample_rate, channels)))
     }
     fn list_microphones(&self) -> Vec<AudioDevice> {
@@ -116,6 +122,11 @@ impl Platform for SimPlatform {
         Some(u64::MAX)
     }
 }
+
+/// Fenêtre dont l'image et le son mettent plus de 5 s à s'ouvrir (casque
+/// Bluetooth, pilote) : sans veille ni coupure.
+const SLOW_WINDOW: WindowHandle = 5;
+const SLOW_OPEN: Duration = Duration::from_secs(6);
 
 struct SimVideo {
     width: u32,
@@ -499,6 +510,29 @@ fn encoder_lost_while_finishing_does_not_lose_the_queue() {
     // mémoire.
     let total = check_parts("Vidée", outputs);
     assert!(total > elapsed - 2.0 && total <= elapsed + 0.5, "{total} s pour {elapsed} s");
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn slow_capture_opening_is_not_a_sleep() {
+    if !ffmpeg_available() {
+        eprintln!("FFmpeg absent : test ignoré");
+        return;
+    }
+    let Sim { root, platform } = sim();
+    let mut session = Session::start(platform, plan(&root, vec![application("Lente", "lente")])).expect("démarrage");
+    // Image puis son ouverts chacun en 6 s.
+    thread::sleep(Duration::from_secs(14));
+    let status = &session.status()[0];
+    assert_eq!(status.part, 1, "{status:?}");
+    assert_eq!(status.state, SourceState::Connected, "{status:?}");
+    assert!(status.error.is_none(), "{status:?}");
+    let elapsed = session.elapsed().as_secs_f64();
+    let summaries = session.stop();
+    let outputs = &summaries[0].outputs;
+    assert_eq!(outputs.len(), 1, "{outputs:?}");
+    let total = check_parts("Lente", outputs);
+    assert!((total - elapsed).abs() < 0.5, "{total} s pour {elapsed} s");
     fs::remove_dir_all(root).unwrap();
 }
 
