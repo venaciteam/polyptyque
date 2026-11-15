@@ -2677,11 +2677,13 @@ impl App {
     }
 
     fn window_selected(&self, index: i32) {
-        let name = self
-            .windows
-            .borrow()
-            .get(index.max(0) as usize)
-            .map(|w| program_name(&w.exe).map(|n| format::capitalize(&n)).unwrap_or_else(|| w.title.clone()));
+        // Programme illisible : un nom neutre, pas le titre de la fenêtre
+        // (le message « ajoutée » va au journal, où les titres n'ont pas
+        // leur place).
+        let count = self.config.borrow().active_scene().source_ids.len() + 1;
+        let name = self.windows.borrow().get(index.max(0) as usize).map(|w| {
+            program_name(&w.exe).map(|n| format::capitalize(&n)).unwrap_or_else(|| tr!("Application {}", count))
+        });
         if let Some(name) = name {
             self.with_bridge(|b| b.set_new_name(name.into()));
         }
