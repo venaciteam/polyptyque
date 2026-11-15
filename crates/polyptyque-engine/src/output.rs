@@ -53,8 +53,12 @@ const SUPERVISION_INTERVAL: Duration = Duration::from_millis(100);
 /// taille d'un fichier) : un disque qui ne répond plus ne bloque pas
 /// l'encodage des autres parties.
 const DISK_TIMEOUT: Duration = Duration::from_secs(5);
-/// À une coupure, délai accordé au second flux pour atteindre sa marque.
-const CUT_GRACE: Duration = Duration::from_secs(5);
+/// À une coupure, le second flux a tout le temps d'atteindre sa marque
+/// (il peut avoir du retard à rattraper) tant qu'il avance ; la partie est
+/// fermée sans lui après ce délai sans avancer…
+const CUT_STALL: Duration = Duration::from_secs(5);
+/// …ou au-delà de ce plafond.
+const CUT_MAX: Duration = Duration::from_secs(10 * 60);
 /// À l'arrêt, des files vides doivent le rester ce délai pour que la
 /// source soit tenue pour vidée : la capture peut livrer ses dernières
 /// données juste après la demande d'arrêt.
@@ -538,10 +542,16 @@ impl Part {
                 };
             }
             if self.control.cuts.load(Ordering::SeqCst) > 0 && !self.control.cancel.load(Ordering::SeqCst) {
-                // Un flux a atteint sa marque de coupure : l'autre doit la
-                // recevoir sous peu. Sinon, la partie est fermée quand même.
-                if cut_seen.get_or_insert_with(Instant::now).elapsed() >= CUT_GRACE {
-                    log::warn!("coupure : un flux n'a pas reçu sa marque, partie fermée quand même");
+                // Un flux a atteint sa marque de coupure : l'autre y arrive
+                // après ce qu'il a encore en file. S'il n'avance plus, la
+                // partie est fermée quand même.
+                let seen = cut_seen.get_or_insert_with(Instant::now).elapsed();
+                let stuck = self.writers.iter_mut().any(|w| w.stalled(CUT_STALL));
+                if stuck || seen >= CUT_MAX {
+                    log::warn!(
+                        "coupure : un flux n'a pas reçu sa marque ({}), partie fermée quand même",
+                        if stuck { "plus d'avancée" } else { "délai dépassé" }
+                    );
                     self.control.cancel.store(true, Ordering::SeqCst);
                 }
             }
