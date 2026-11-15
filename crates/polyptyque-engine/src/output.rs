@@ -28,6 +28,7 @@ use polyptyque_core::storage;
 use polyptyque_core::timeline::HNS_PER_SEC;
 use tr::tr;
 
+use crate::remux::InProgress;
 use crate::shared::Shared;
 use crate::writer::{self, PartControl, WriterJob};
 
@@ -141,6 +142,10 @@ impl OutputTask {
         // suivantes se recalent à partir de là.
         let mut base = (0u64, 0u64, 0u64);
         let mut after_cut = false;
+        // Fichiers de cette source, choisis avant que FFmpeg ne les crée :
+        // la remise en ordre des restes d'une réparation n'y touche pas tant
+        // que la source enregistre.
+        let mut _recording: Vec<InProgress> = Vec::new();
         loop {
             let output = if part == 1 { plan.first_output.clone() } else { next_part_path(&plan, &shared, part) };
             let positions =
@@ -164,6 +169,7 @@ impl OutputTask {
                     audio_start.saturating_sub(base.1) / (CHANNELS as u64 * 4) / SAMPLE_RATE as u64
                 };
             shared.part.store(part, Ordering::Relaxed);
+            _recording.push(InProgress::mark(&output));
             shared.push_output(output.clone());
             if part > 1 {
                 log::info!(

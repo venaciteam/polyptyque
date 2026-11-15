@@ -182,7 +182,8 @@ fn replace_with(original: &Path, replacement: &Path) -> Result<()> {
 }
 
 /// Suffixes des fichiers de travail : copie inachevée, copie réparée
-/// vérifiée, original mis de côté pendant son remplacement.
+/// vérifiée, original mis de côté pendant son remplacement. Les mêmes
+/// rendent un nom pris pour `naming::unique_path`.
 const PARTIAL_SUFFIX: &str = ".partiel";
 const REPAIRED_SUFFIX: &str = ".reparation";
 const BACKUP_SUFFIX: &str = ".avant-reparation";
@@ -205,15 +206,16 @@ fn rename_retrying(from: &Path, to: &Path) -> std::io::Result<()> {
     }
 }
 
-/// Noms (en minuscules) des fichiers en cours de conversion ou de
-/// réparation dans ce processus : [`recover_leftovers`] n'y touche jamais.
+/// Noms (en minuscules) des fichiers en cours de conversion, de
+/// réparation ou d'enregistrement dans ce processus : [`recover_leftovers`]
+/// n'y touche jamais.
 static IN_PROGRESS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 /// Inscrit un fichier parmi ceux en cours, jusqu'à la fin de la portée.
-struct InProgress(String);
+pub(crate) struct InProgress(String);
 
 impl InProgress {
-    fn mark(path: &Path) -> Self {
+    pub(crate) fn mark(path: &Path) -> Self {
         let name = lowercase_name(path);
         IN_PROGRESS.lock().unwrap_or_else(|e| e.into_inner()).push(name.clone());
         Self(name)
