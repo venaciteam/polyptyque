@@ -169,6 +169,7 @@ impl VideoTask {
             }
             shared.frames_total.store(next_index, Ordering::Relaxed);
             shared.video_backlog.store(queue.len() as u64, Ordering::Relaxed);
+            shared.check_backlog(&source.name, queue.len() as f32 / fps.max(1) as f32);
 
             if stop_at.is_some_and(|stop| now >= stop) || shared.has_failed() {
                 break;

@@ -77,7 +77,8 @@ pub struct SourceStatus {
     /// Niveau crête depuis le dernier appel (0 à 1).
     pub audio_level: f32,
     pub audio_recent: bool,
-    /// Retard de l'encodeur, en secondes d'images en attente.
+    /// Retard de l'encodeur, en secondes d'image ou de son en attente (le
+    /// plus grand des deux).
     pub backlog_seconds: f32,
     /// Partie de fichier en cours : plus de 1 après une relance de
     /// l'encodeur.
@@ -187,7 +188,9 @@ impl SourceRuntime {
             frames_dropped: shared.frames_dropped.load(Ordering::Relaxed),
             audio_level: shared.take_peak(),
             audio_recent: last_sound != 0 && now.saturating_sub(last_sound) < RECENT_SOUND_HNS,
-            backlog_seconds: shared.video_backlog.load(Ordering::Relaxed) as f32 / fps,
+            // Le plus en retard de l'image et du son.
+            backlog_seconds: (shared.video_backlog.load(Ordering::Relaxed) as f32 / fps)
+                .max(shared.audio_backlog_seconds()),
             part: shared.part.load(Ordering::Relaxed),
             output: outputs.last().cloned().unwrap_or_default(),
             file_size: shared.file_size.load(Ordering::Relaxed),

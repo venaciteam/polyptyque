@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use polyptyque_core::config::{CHANNELS, SAMPLE_RATE};
 use polyptyque_core::platform::{WindowHandle, WindowInfo};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,6 +71,9 @@ pub(crate) struct Shared {
     /// Images en attente d'encodage : un retard qui grandit signale un
     /// encodeur qui ne suit pas.
     pub video_backlog: AtomicU64,
+    /// Octets de son mis en file depuis le départ : moins `audio_position`,
+    /// le son en attente d'encodage.
+    pub audio_queued: AtomicU64,
     /// Octets transmis à l'encodeur (sert à vérifier qu'il avance encore).
     pub bytes_sent: AtomicU64,
     /// Position dans chaque flux depuis le départ de la source : images
@@ -112,6 +116,7 @@ impl Shared {
             frames_new: AtomicU64::new(0),
             frames_dropped: AtomicU64::new(0),
             video_backlog: AtomicU64::new(0),
+            audio_queued: AtomicU64::new(0),
             bytes_sent: AtomicU64::new(0),
             video_position: Arc::new(AtomicU64::new(0)),
             audio_position: Arc::new(AtomicU64::new(0)),
@@ -238,6 +243,31 @@ impl Shared {
         self.failed.load(Ordering::SeqCst)
     }
 
+    /// Son en attente d'encodage, en secondes.
+    pub fn audio_backlog_seconds(&self) -> f32 {
+        let queued = self.audio_queued.load(Ordering::Relaxed);
+        let pending = queued.saturating_sub(self.audio_position.load(Ordering::Relaxed));
+        pending as f32 / (CHANNELS as u64 * 4 * SAMPLE_RATE as u64) as f32
+    }
+
+    /// Retard de l'encodeur (image ou son) au-delà de [`MAX_BACKLOG_SECONDS`] :
+    /// il ne rattrapera pas. Plutôt que d'accumuler sans fin (mémoire, puis
+    /// finalisation interminable), la source s'arrête ; ce qui est déjà
+    /// capturé est encodé et le fichier fermé proprement. Renvoie vrai si la
+    /// source vient de passer en erreur.
+    pub fn check_backlog(&self, name: &str, seconds: f32) -> bool {
+        if seconds < MAX_BACKLOG_SECONDS as f32 || self.has_failed() || self.stop_at().is_some() {
+            return false;
+        }
+        log::error!("[{name}] l'encodeur ne suit plus : {seconds:.0} s de retard, source arrêtée");
+        self.fail(tr::tr!(
+            "L'encodeur ne suit plus ({} min de retard) : enregistrement de cette source arrêté, fichier conservé. \
+             Réduire la définition, la cadence ou le débit",
+            MAX_BACKLOG_SECONDS / 60
+        ));
+        true
+    }
+
     /// Problème non bloquant, affiché à l'utilisateur.
     pub fn note_error(&self, message: String) {
         if !self.has_failed() {
@@ -317,6 +347,9 @@ impl WindowClaims {
         lock(&self.claims).remove(&run);
     }
 }
+
+/// Retard d'encodage (image ou son) au-delà duquel la source s'arrête.
+pub(crate) const MAX_BACKLOG_SECONDS: u64 = 300;
 
 /// Relances d'un fil de capture après une erreur interne, au-delà
 /// desquelles la source passe en erreur.
@@ -404,6 +437,24 @@ mod tests {
         });
         assert_eq!(runs, MAX_TASK_RESTARTS + 1);
         assert!(shared.has_failed());
+    }
+
+    #[test]
+    fn endless_backlog_stops_the_source() {
+        let second = CHANNELS as u64 * 4 * SAMPLE_RATE as u64;
+        let shared = Shared::new();
+        shared.audio_queued.store(10 * second, Ordering::Relaxed);
+        shared.audio_position.store(4 * second, Ordering::Relaxed);
+        assert_eq!(shared.audio_backlog_seconds(), 6.0);
+        assert!(!shared.check_backlog("essai", shared.audio_backlog_seconds()));
+        // Arrêt demandé : la file se vide, rien ne s'arrête plus.
+        let stopping = Shared::new();
+        stopping.request_stop(1);
+        assert!(!stopping.check_backlog("essai", 1_000.0));
+        shared.audio_queued.store((MAX_BACKLOG_SECONDS + 10) * second, Ordering::Relaxed);
+        assert!(shared.check_backlog("essai", shared.audio_backlog_seconds()));
+        assert!(shared.has_failed());
+        assert!(shared.error().is_some_and(|e| e.contains("ne suit plus")));
     }
 
     #[test]

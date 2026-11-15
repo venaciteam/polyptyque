@@ -74,6 +74,7 @@ impl AudioTask {
                     timeline.finish(stop, &mut out);
                     if !out.is_empty() {
                         *sent = timeline.written_frames();
+                        shared.audio_queued.fetch_add(out.len() as u64, Ordering::Relaxed);
                         let _ = queue.send(std::mem::take(&mut out));
                     }
                     break;
@@ -175,9 +176,11 @@ impl AudioTask {
 
             if !out.is_empty() {
                 *sent = timeline.written_frames();
+                shared.audio_queued.fetch_add(out.len() as u64, Ordering::Relaxed);
                 if queue.send(std::mem::take(&mut out)).is_err() {
                     return;
                 }
+                shared.check_backlog(name, shared.audio_backlog_seconds());
             }
         }
 

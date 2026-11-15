@@ -234,8 +234,10 @@ impl OutputTask {
     }
 }
 
+/// Arrêt demandé, capture abandonnée ou source en erreur : plus rien ne
+/// viendra après ce qui est déjà en file, inutile de relancer l'encodeur.
 fn stopping(shared: &Shared) -> bool {
-    shared.stop_at().is_some() || shared.capture_abandoned()
+    shared.stop_at().is_some() || shared.capture_abandoned() || shared.has_failed()
 }
 
 /// Flux à brancher sur une nouvelle partie, et point de reprise.
