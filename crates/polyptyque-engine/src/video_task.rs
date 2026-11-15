@@ -35,6 +35,42 @@ pub(crate) struct VideoTask {
     pub run: usize,
 }
 
+/// Repère les sauts de l'horloge commune dus à une vraie mise en veille
+/// (voir `Platform::suspended_hns`), vus par un fil de capture.
+#[derive(Default)]
+pub(crate) struct JumpWatch {
+    /// Instant du dernier relevé, et temps de veille à cet instant.
+    last: Option<(u64, Option<u64>)>,
+}
+
+impl JumpWatch {
+    /// Relevé à l'instant `now` : renvoie l'instant du relevé précédent si
+    /// l'horloge a avancé de plus de [`CLOCK_JUMP_HNS`] depuis, et si ce
+    /// temps a été passé en veille quand le système sait le mesurer. Un fil
+    /// bloqué (capture lente, pilote, périphérique qui se réinitialise)
+    /// n'est pas une veille : ce temps est comblé comme d'habitude.
+    pub fn check(&mut self, now: u64, suspended: Option<u64>) -> Option<u64> {
+        let (prev, prev_suspended) = self.last.replace((now, suspended))?;
+        if now.saturating_sub(prev) <= CLOCK_JUMP_HNS {
+            return None;
+        }
+        match (prev_suspended, suspended) {
+            (Some(before), Some(after)) => (after.saturating_sub(before) >= CLOCK_JUMP_HNS).then_some(prev),
+            _ => Some(prev),
+        }
+    }
+
+    /// Fin d'une étape qui peut être lente (recherche de la fenêtre,
+    /// ouverture d'une capture). Sans mesure de la veille, son temps n'est
+    /// pas compté dans le prochain saut ; avec, rien à faire : une veille
+    /// pendant l'étape reste vue.
+    pub fn slow_step_done(&mut self, now: u64) {
+        if let Some((prev, None)) = &mut self.last {
+            *prev = now;
+        }
+    }
+}
+
 /// Libère la fenêtre suivie et la réservation de la source à la sortie du
 /// fil, même sur une erreur interne.
 struct ClaimGuard<'a>(&'a WindowClaims, usize);
@@ -71,7 +107,7 @@ impl VideoTask {
         // Au-delà d'une seconde d'avance, l'encodeur ne suit plus : on
         // répète l'image précédente plutôt que d'accumuler de la mémoire.
         let max_backlog = fps as usize;
-        let mut last_now: Option<u64> = None;
+        let mut jumps = JumpWatch::default();
         // Une relance après une erreur interne ne refait pas une coupure
         // déjà traitée.
         let mut seen_cut = shared.cut_generation();
@@ -80,16 +116,15 @@ impl VideoTask {
             let now = platform.now_hns();
             let stop_at = shared.stop_at();
 
-            // Saut de l'horloge (veille non signalée, programme figé) : pas
-            // de rattrapage en images figées, la suite part dans une
-            // nouvelle partie.
-            let jumped = last_now.filter(|&prev| stop_at.is_none() && now.saturating_sub(prev) > CLOCK_JUMP_HNS);
+            // Saut de l'horloge pendant une veille non signalée : pas de
+            // rattrapage en images figées, la suite part dans une nouvelle
+            // partie.
+            let jumped = jumps.check(now, platform.suspended_hns()).filter(|_| stop_at.is_none());
             if let Some(prev) = jumped {
                 let seconds = (now - prev) / HNS_PER_SEC;
                 log::warn!("[{}] horloge en avance de {seconds} s d'un coup : coupure", source.name);
                 shared.request_cut(prev, now, t0_hns);
             }
-            last_now = Some(now);
             if let Some(cut) = shared.pending_cut(seen_cut) {
                 seen_cut = cut.generation;
                 if queue.send(video_cut_marker()).is_err() {
@@ -134,9 +169,7 @@ impl VideoTask {
                 }
                 // Recherche ou ouverture de la capture lente (programmes qui
                 // ne répondent pas, pilote) : ce temps n'est pas une veille.
-                // Le saut de l'horloge se mesure hors de cette étape ; une
-                // vraie veille pendant celle-ci est vue par le fil du son.
-                last_now = Some(platform.now_hns());
+                jumps.slow_step_done(platform.now_hns());
             }
 
             let mut lost = false;
@@ -213,5 +246,34 @@ impl VideoTask {
             }
         }
         shared.set_state(SourceState::Finished);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const S: u64 = HNS_PER_SEC;
+
+    #[test]
+    fn only_a_real_sleep_is_a_jump() {
+        // Le système mesure la veille.
+        let mut watch = JumpWatch::default();
+        assert_eq!(watch.check(100 * S, Some(0)), None);
+        // Fil bloqué 8 s sans veille : pas un saut.
+        assert_eq!(watch.check(108 * S, Some(0)), None);
+        // Une heure de veille.
+        assert_eq!(watch.check(3_708 * S, Some(3_600 * S)), Some(108 * S));
+        // Étape lente : une veille pendant celle-ci reste vue.
+        watch.slow_step_done(3_709 * S);
+        assert_eq!(watch.check(3_720 * S, Some(3_610 * S)), Some(3_708 * S));
+
+        // Sans mesure de la veille : tout saut compte, hors étape lente.
+        let mut watch = JumpWatch::default();
+        assert_eq!(watch.check(100 * S, None), None);
+        assert_eq!(watch.check(104 * S, None), None);
+        assert_eq!(watch.check(110 * S, None), Some(104 * S));
+        watch.slow_step_done(117 * S);
+        assert_eq!(watch.check(118 * S, None), None);
     }
 }

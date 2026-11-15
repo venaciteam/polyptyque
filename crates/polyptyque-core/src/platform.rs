@@ -126,6 +126,14 @@ pub trait Platform: Send + Sync {
     /// Horloge commune, en centaines de nanosecondes.
     fn now_hns(&self) -> u64;
 
+    /// Temps passé en veille depuis le démarrage de l'ordinateur, en
+    /// centaines de nanosecondes, si le système sait le mesurer : un saut de
+    /// l'horloge commune n'est une mise en veille que si ce temps a avancé
+    /// d'autant. `None` : tout saut est tenu pour une veille.
+    fn suspended_hns(&self) -> Option<u64> {
+        None
+    }
+
     /// Capture de la partie `crop` de la fenêtre, mise à l'échelle dans
     /// `width` × `height` (proportions conservées, bandes noires). À appeler
     /// sur le fil qui utilisera la capture.

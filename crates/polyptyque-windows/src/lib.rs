@@ -103,6 +103,10 @@ impl Platform for WindowsPlatform {
         system::now_hns()
     }
 
+    fn suspended_hns(&self) -> Option<u64> {
+        Some(system::suspended_hns())
+    }
+
     fn open_video_capture(
         &self,
         handle: WindowHandle,

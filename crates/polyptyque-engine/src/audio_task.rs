@@ -11,11 +11,10 @@ use crossbeam_channel::Sender;
 use polyptyque_core::config::{CHANNELS, SAMPLE_RATE};
 use polyptyque_core::level::{peak_of, SOUND_THRESHOLD};
 use polyptyque_core::platform::{AudioCapture, AudioPacket, Platform};
-use polyptyque_core::timeline::{
-    approximate_times, cut_resume_point, AudioTimeline, PacketTime, CLOCK_JUMP_HNS, HNS_PER_SEC,
-};
+use polyptyque_core::timeline::{approximate_times, cut_resume_point, AudioTimeline, PacketTime, HNS_PER_SEC};
 
 use crate::shared::{run_protected, Shared, SourceState};
+use crate::video_task::JumpWatch;
 
 const READ_TIMEOUT_MS: u32 = 20;
 const RETRY_HNS: u64 = 2 * HNS_PER_SEC;
@@ -76,7 +75,7 @@ impl AudioTask {
         let mut warned_skew = false;
         let mut packets: Vec<AudioPacket> = Vec::new();
         let mut out: Vec<u8> = Vec::new();
-        let mut last_arrival: Option<u64> = None;
+        let mut jumps = JumpWatch::default();
         // Une relance après une erreur interne ne refait pas une coupure
         // déjà traitée.
         let mut seen_cut = shared.cut_generation();
@@ -147,12 +146,8 @@ impl AudioTask {
                     }
                 }
                 // Ouverture lente (casque Bluetooth, pilote qui se
-                // réinitialise) : ce temps n'est pas une veille. Le saut de
-                // l'horloge se mesure autour de la lecture seulement ; une
-                // vraie veille pendant l'ouverture est vue par le fil vidéo.
-                if last_arrival.is_some() {
-                    last_arrival = Some(platform.now_hns());
-                }
+                // réinitialise) : ce temps n'est pas une veille.
+                jumps.slow_step_done(platform.now_hns());
             }
 
             packets.clear();
@@ -171,17 +166,15 @@ impl AudioTask {
             }
 
             let arrival = platform.now_hns();
-            // Saut de l'horloge (veille non signalée, programme figé), le plus
+            // Saut de l'horloge pendant une veille non signalée, le plus
             // souvent pendant la lecture : vu avant de placer les paquets.
             // L'interruption n'est pas comblée de silence, la suite part dans
-            // une nouvelle partie.
-            let jumped = last_arrival
-                .filter(|&prev| shared.stop_at().is_none() && arrival.saturating_sub(prev) > CLOCK_JUMP_HNS);
+            // une nouvelle partie. Une lecture simplement bloquée (USB) l'est.
+            let jumped = jumps.check(arrival, platform.suspended_hns()).filter(|_| shared.stop_at().is_none());
             if let Some(prev) = jumped {
                 log::warn!("[{name}] horloge en avance de {} s d'un coup : coupure", (arrival - prev) / HNS_PER_SEC);
                 shared.request_cut(prev, arrival, self.t0_hns);
             }
-            last_arrival = Some(arrival);
             if let Some(cut) = shared.pending_cut(seen_cut) {
                 seen_cut = cut.generation;
                 // Son dû jusqu'au début de l'interruption, puis la marque de

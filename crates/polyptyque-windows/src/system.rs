@@ -10,6 +10,7 @@ use windows::Win32::Media::{timeBeginPeriod, timeEndPeriod};
 use windows::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;
 use windows::Win32::System::Performance::{QueryPerformanceCounter, QueryPerformanceFrequency};
 use windows::Win32::System::Power::{SetThreadExecutionState, ES_CONTINUOUS, ES_DISPLAY_REQUIRED, ES_SYSTEM_REQUIRED};
+use windows::Win32::System::WindowsProgramming::{QueryInterruptTime, QueryUnbiasedInterruptTime};
 
 /// Horloge haute précision (QPC) en centaines de nanosecondes : c'est la
 /// même base de temps que les horodatages audio de WASAPI.
@@ -27,6 +28,19 @@ pub fn now_hns() -> u64 {
         let _ = QueryPerformanceCounter(&mut counter);
     }
     (counter as u128 * 10_000_000 / frequency as u128) as u64
+}
+
+/// Temps passé en veille ou en veille prolongée depuis le démarrage, en
+/// centaines de nanosecondes : le temps d'interruption compte la veille,
+/// sa version « sans biais » non. Un fil simplement bloqué ne le fait pas
+/// avancer.
+pub fn suspended_hns() -> u64 {
+    let mut unbiased = 0u64;
+    unsafe {
+        let interrupt = QueryInterruptTime();
+        let _ = QueryUnbiasedInterruptTime(&mut unbiased);
+        interrupt.saturating_sub(unbiased)
+    }
 }
 
 /// Demande à Windows de rester éveillé (système et écran). L'état
