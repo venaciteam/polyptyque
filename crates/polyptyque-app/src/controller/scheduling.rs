@@ -27,9 +27,8 @@ pub(super) enum Prompt {
 
 thread_local! {
     /// Démarrage programmé annulé pendant sa préparation (sa programmation
-    /// supprimée, désactivée, ou sans créneau en cours) : le message à
-    /// afficher. La préparation ne s'interrompt pas, l'enregistrement est
-    /// donc arrêté dès qu'il démarre.
+    /// supprimée, désactivée, ou sans créneau en cours) : le message déjà
+    /// affiché. La préparation va à son terme, puis rien ne démarre.
     static CANCELLED_START: RefCell<Option<String>> = const { RefCell::new(None) };
 }
 
@@ -141,11 +140,6 @@ impl App {
     /// programme qui l'a demandé l'a déjà choisi (`auto_stop`).
     pub(super) fn recording_started(&self, message: &str, tone: i32, auto_stop: Option<bool>) {
         let now = Utc::now();
-        if let Some(reason) = CANCELLED_START.with(|c| c.borrow_mut().take()) {
-            log::info!("enregistrement programmé annulé pendant sa préparation : arrêté dès son démarrage");
-            self.stop_recording(Some(reason));
-            return;
-        }
         if let Some(slot) = self.scheduled_start.borrow_mut().take() {
             self.toast(
                 &format!(
@@ -196,6 +190,13 @@ impl App {
         if matches!(*self.prompt.borrow(), Some(Prompt::KeepAutoStop { .. })) {
             self.close_prompt();
         }
+    }
+
+    /// Démarrage programmé annulé pendant sa préparation (voir
+    /// [`App::schedule_was_changed`]) : à vérifier avant de démarrer quoi que
+    /// ce soit. Renvoie le message déjà affiché, une seule fois.
+    pub(super) fn take_cancelled_start(&self) -> Option<String> {
+        CANCELLED_START.with(|c| c.borrow_mut().take())
     }
 
     /// Le démarrage d'un enregistrement a échoué.

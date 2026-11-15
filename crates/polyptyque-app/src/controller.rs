@@ -1290,6 +1290,15 @@ impl App {
                 return;
             }
         };
+        if let Some(reason) = self.take_cancelled_start() {
+            // Programmation supprimée, désactivée ou déplacée pendant la
+            // préparation : rien ne démarre, aucun fichier n'est créé.
+            log::info!("enregistrement programmé annulé pendant sa préparation : non démarré ({reason})");
+            self.recording_start_failed();
+            self.flush_pending_repairs();
+            self.show_next_deferred();
+            return;
+        }
         let (date, time) = naming::now_parts();
         let mut settings = config.settings.clone();
         settings.output_dir = prepared.output_dir.clone();
