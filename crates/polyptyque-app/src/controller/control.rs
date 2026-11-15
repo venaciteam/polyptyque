@@ -23,7 +23,7 @@ use serde_json::{json, Value};
 use slint::{Timer, TimerMode};
 use tr::tr;
 
-use super::{post, with_app, App};
+use super::{post, with_app, App, Confirm};
 use crate::preview::PreviewState;
 
 /// Messages affichés gardés pour les réponses (ceux affichés pendant une
@@ -214,7 +214,7 @@ fn serve(id: u64, mut connection: Box<dyn Connection>, peer: Peer, stop: Arc<Ato
             match line {
                 Ok(line) => post(move |app| app.control_request(id, line)),
                 Err(error) => {
-                    let mut line = protocol::failure(None, &error);
+                    let mut line = protocol::failure_with_code(None, &error, protocol::PARSE_ERROR);
                     line.push('\n');
                     let _ = connection.write_all(line.as_bytes());
                     break 'connection;
@@ -278,8 +278,26 @@ impl App {
         };
         drop(pending);
         // Attend la fin des fils (au plus quelques dixièmes de seconde).
+        // Les requêtes qu'ils ont déjà transmises au fil de l'interface
+        // arrivent ensuite : `control_request` les ignore (client inconnu).
         drop(server);
+        // Plus personne pour recevoir la réponse à la question du micro.
+        if self.mic_question_for(None) {
+            log::info!("pilotage : canal fermé, question du micro fermée");
+            self.close_sheet();
+            self.control.borrow_mut().mic_answer = None;
+        }
         self.refresh_control_pill();
+    }
+
+    /// La question du micro est affichée pour ce programme (`None` : pour
+    /// n'importe lequel).
+    fn mic_question_for(&self, client: Option<u64>) -> bool {
+        let asked = matches!(
+            *self.confirm.borrow(),
+            Some(Confirm::EnableMicrophone(asker)) if client.is_none_or(|id| id == asker)
+        );
+        asked && self.with_bridge_value(|b| b.get_sheet() == "confirm")
     }
 
     fn control_connected(&self, id: u64, peer: Peer, outgoing: Sender<String>) {
@@ -307,6 +325,20 @@ impl App {
         };
         if let Some(client) = removed {
             log::info!("pilotage : programme déconnecté ({})", label(&client));
+            // Sa question du micro n'a plus de destinataire : un accord
+            // tardif ne servirait à rien.
+            if self.mic_question_for(Some(id)) {
+                log::info!("pilotage : question du micro fermée, son demandeur est déconnecté");
+                self.close_sheet();
+                self.control.borrow_mut().mic_answer = None;
+                self.toast(
+                    &tr!(
+                        "Question du micro fermée : la connexion de « {} » a pris fin. Le micro n'a pas été activé.",
+                        label(&client)
+                    ),
+                    2,
+                );
+            }
             self.refresh_control_pill();
         }
     }
@@ -314,6 +346,17 @@ impl App {
     /// Nom du programme connecté, pour les messages et le journal.
     pub(super) fn control_client_name(&self, id: u64) -> String {
         self.control.borrow().clients.get(&id).map(label).unwrap_or_else(|| tr!("un programme"))
+    }
+
+    /// Le programme connecté pour la question du micro : le nom qu'il
+    /// annonce (`hello`, invérifiable) et l'exécutable relevé par
+    /// Polyptyque.
+    pub(super) fn control_client_identity(&self, id: u64) -> String {
+        let control = self.control.borrow();
+        let client = control.clients.get(&id);
+        let name = client.and_then(|c| c.name.clone());
+        let program = client.and_then(|c| c.peer.program.clone());
+        identity_text(name, program)
     }
 
     pub(super) fn set_control_client_name(&self, id: u64, name: &str) {
@@ -367,10 +410,15 @@ impl App {
     // ----- Requêtes -------------------------------------------------------------
 
     fn control_request(&self, client: u64, line: String) {
+        // Ligne transmise par le fil de sa connexion avant que le pilotage
+        // soit désactivé, ou que le programme soit déconnecté : ignorée.
+        if !self.control.borrow().clients.contains_key(&client) {
+            return;
+        }
         let request = match protocol::parse_request(&line) {
             Incoming::Request(request) => request,
-            Incoming::Invalid { id, error } => {
-                self.control_send(client, protocol::failure(id.as_ref(), &error));
+            Incoming::Invalid { id, error, code } => {
+                self.control_send(client, protocol::failure_with_code(id.as_ref(), &error, code));
                 return;
             }
         };
@@ -380,7 +428,10 @@ impl App {
                 "Commande inconnue : « {} ». La liste est donnée par « polyptyque-cli commands ».",
                 request.method
             ));
-            self.control_answer(client, request.id, &request.method, Err(error), since);
+            log::info!("pilotage : {} refusé ({}) : commande inconnue", request.method, error.reason.as_str());
+            if let Some(id) = &request.id {
+                self.control_send(client, protocol::failure_with_code(Some(id), &error, protocol::METHOD_NOT_FOUND));
+            }
             return;
         };
         if let Err(error) = command.check_params(&request.params) {
@@ -526,6 +577,18 @@ fn label(client: &Client) -> String {
     client.name.clone().or_else(|| client.peer.program.clone()).unwrap_or_else(|| tr!("un programme"))
 }
 
+/// Qui demande, pour la question du micro : le nom annoncé ne prouve rien,
+/// l'exécutable relevé par Polyptyque l'accompagne.
+fn identity_text(name: Option<String>, program: Option<String>) -> String {
+    match (name, program) {
+        (Some(name), Some(program)) if name.eq_ignore_ascii_case(&program) => tr!("« {} »", program),
+        (Some(name), Some(program)) => tr!("« {} » (programme : {})", name, program),
+        (Some(name), None) => tr!("« {} » (programme non identifié)", name),
+        (None, Some(program)) => tr!("« {} »", program),
+        (None, None) => tr!("Un programme non identifié"),
+    }
+}
+
 /// Une connexion figure dans la pastille si elle est abonnée à l'état en
 /// direct ou ouverte depuis au moins `PILL_DELAY`.
 fn shown_in_pill(client: &Client, now: Instant) -> bool {
@@ -558,6 +621,17 @@ mod tests {
         assert!(shown_in_pill(&client(false, now), now + PILL_DELAY));
         // Abonné à l'état en direct : affiché tout de suite.
         assert!(shown_in_pill(&client(true, now), now));
+    }
+
+    #[test]
+    fn question_du_micro_avec_l_executable() {
+        let text = identity_text(Some("Stream Deck".into()), Some("polyptyque-cli.exe".into()));
+        assert!(text.contains("Stream Deck") && text.contains("polyptyque-cli.exe"), "{text}");
+        let text = identity_text(Some("Claude".into()), None);
+        assert!(text.contains("Claude") && text != identity_text(Some("Claude".into()), Some("Claude".into())), "{text}");
+        let text = identity_text(None, Some("claude.exe".into()));
+        assert!(text.contains("claude.exe"), "{text}");
+        assert!(!identity_text(None, None).is_empty());
     }
 
     #[test]

@@ -39,8 +39,9 @@ pub enum ConversionEvent {
         input: PathBuf,
         result: Result<PathBuf, String>,
     },
-    /// File vide, y compris après une annulation.
-    Idle,
+    /// File vide, y compris après une annulation, une fois traité le fichier
+    /// numéro `last_job` : périmé si d'autres ont été demandés depuis.
+    Idle { last_job: u64 },
 }
 
 pub struct Converter {
@@ -91,6 +92,11 @@ impl Converter {
         Self { jobs: Some(jobs), last_job: Cell::new(0), control, worker }
     }
 
+    /// Numéro du dernier fichier demandé.
+    pub fn last_job(&self) -> u64 {
+        self.last_job.get()
+    }
+
     pub fn enqueue(&self, file: PathBuf, kind: JobKind) {
         if let Some(jobs) = &self.jobs {
             let job = self.last_job.get() + 1;
@@ -123,9 +129,11 @@ fn run(
     control: Arc<CancelControl>,
     on_event: impl Fn(ConversionEvent),
 ) {
+    let mut last_job = 0;
     while let Ok(first) = queue.recv() {
         let mut next = Some(first);
         while let Some((job, input, kind)) = next {
+            last_job = job;
             if control.begin(job) {
                 on_event(ConversionEvent::Started { input: input.clone(), kind });
                 let result = convert_one(platform.as_ref(), &input, kind, &control.current, &on_event)
@@ -134,7 +142,7 @@ fn run(
             }
             next = queue.try_recv().ok();
         }
-        on_event(ConversionEvent::Idle);
+        on_event(ConversionEvent::Idle { last_job });
     }
 }
 

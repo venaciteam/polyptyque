@@ -12,6 +12,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -58,6 +59,12 @@ use scheduling::Prompt;
 const LAUNCH_WAIT: Duration = Duration::from_secs(30);
 const DISK_STOP_THRESHOLD: u64 = 1_000_000_000;
 const DISK_WARNING_THRESHOLD: u64 = 10_000_000_000;
+/// Mesure de l'espace libre sans réponse depuis ce délai (dossier réseau
+/// figé) : abandonnée, une autre peut partir.
+const DISK_CHECK_STALE: Duration = Duration::from_secs(30);
+/// Fils de mesure bloqués tolérés : au-delà, plus aucune mesure n'est
+/// lancée avant le retour de l'un d'eux.
+const DISK_CHECK_MAX_THREADS: usize = 3;
 const BACKLOG_WARNING_SECONDS: f32 = 2.0;
 /// Fenêtre perdue pendant l'enregistrement : délai avant de rouvrir le
 /// programme automatiquement (le temps qu'il redémarre seul, après une mise
@@ -91,8 +98,10 @@ const HARDWARE: [HardwarePreference; 3] = [HardwarePreference::Auto, HardwarePre
 /// Actions qui demandent une confirmation.
 #[derive(Clone)]
 enum Confirm {
-    DeleteScene,
-    RemoveSource(String),
+    /// Supprimer cette scène.
+    DeleteScene(String),
+    /// Retirer cette source (premier identifiant) de cette scène.
+    RemoveSource(String, String),
     QuitWhileRecording,
     QuitWhileConverting,
     CancelConversion,
@@ -108,9 +117,9 @@ enum Confirm {
     /// Quitter alors qu'une programmation doit encore lancer un
     /// enregistrement.
     QuitWithSchedules,
-    /// Activer le micro, à la demande d'un programme (pilotage) : seule la
+    /// Activer le micro, à la demande de ce programme (pilotage) : seule la
     /// personne devant l'écran peut l'accepter.
-    EnableMicrophone,
+    EnableMicrophone(u64),
 }
 
 /// Fenêtre à montrer dès que l'interface est libre (aucun enregistrement,
@@ -186,10 +195,20 @@ pub struct App {
     browsers: RefCell<Vec<BrowserInstall>>,
     windows: RefCell<Vec<WindowInfo>>,
     confirm: RefCell<Option<Confirm>>,
+    /// Scène visée par la fenêtre de saisie ouverte (renommer, dupliquer,
+    /// ajouter une source) : celle en cours à son ouverture.
+    sheet_scene: RefCell<String>,
+    /// Boîte de choix de fichier ou de dossier de Windows ouverte.
+    #[cfg_attr(not(windows), allow(dead_code))]
+    file_dialog_open: Cell<bool>,
     toast_timer: Timer,
     free_space: Cell<Option<u64>>,
     last_disk_check: Cell<Option<Instant>>,
-    disk_check_running: Cell<bool>,
+    /// Mesure de l'espace libre en cours : son numéro et son début.
+    disk_check: Cell<Option<(u64, Instant)>>,
+    disk_check_number: Cell<u64>,
+    /// Fils de mesure pas encore revenus (dossier réseau figé…).
+    disk_check_threads: Arc<AtomicUsize>,
     quitting: Cell<bool>,
     /// Windows ferme la session (arrêt, redémarrage, déconnexion) : il ferme
     /// lui-même les navigateurs.
@@ -370,10 +389,14 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
         browsers: RefCell::new(Vec::new()),
         windows: RefCell::new(Vec::new()),
         confirm: RefCell::new(None),
+        sheet_scene: RefCell::new(String::new()),
+        file_dialog_open: Cell::new(false),
         toast_timer: Timer::default(),
         free_space: Cell::new(None),
         last_disk_check: Cell::new(None),
-        disk_check_running: Cell::new(false),
+        disk_check: Cell::new(None),
+        disk_check_number: Cell::new(0),
+        disk_check_threads: Arc::new(AtomicUsize::new(0)),
         quitting: Cell::new(false),
         session_ending: Cell::new(false),
         joining: RefCell::new(HashSet::new()),
@@ -893,11 +916,21 @@ impl App {
     /// réseau lent ne doit pas la figer.
     fn refresh_disk(&self, force: bool) {
         let due = self.last_disk_check.get().is_none_or(|t| t.elapsed() >= Duration::from_secs(10));
-        if (!force && !due) || self.disk_check_running.get() {
+        if !force && !due {
             return;
         }
+        // Mesure précédente sans réponse : attendue un moment, puis
+        // abandonnée (dossier réseau figé) pour en lancer une autre, sans
+        // accumuler les fils bloqués.
+        if self.disk_check.get().is_some_and(|(_, started)| started.elapsed() < DISK_CHECK_STALE)
+            || self.disk_check_threads.load(Ordering::SeqCst) >= DISK_CHECK_MAX_THREADS
+        {
+            return;
+        }
+        let number = self.disk_check_number.get() + 1;
+        self.disk_check_number.set(number);
         self.last_disk_check.set(Some(Instant::now()));
-        self.disk_check_running.set(true);
+        self.disk_check.set(Some((number, Instant::now())));
         // Pendant un enregistrement : le dossier réellement utilisé (celui de
         // secours si le dossier choisi est devenu inaccessible).
         let recording = self
@@ -918,14 +951,21 @@ impl App {
             }
         };
         let platform = self.platform.clone();
+        let threads = self.disk_check_threads.clone();
+        threads.fetch_add(1, Ordering::SeqCst);
         thread::spawn(move || {
             let free = platform.free_disk_space(&dir);
-            post(move |app| app.apply_disk(free, per_hour));
+            threads.fetch_sub(1, Ordering::SeqCst);
+            post(move |app| app.apply_disk(number, free, per_hour));
         });
     }
 
-    fn apply_disk(&self, free: Option<u64>, per_hour: u64) {
-        self.disk_check_running.set(false);
+    fn apply_disk(&self, number: u64, free: Option<u64>, per_hour: u64) {
+        // Résultat d'une mesure abandonnée : périmé.
+        if self.disk_check.get().is_none_or(|(current, _)| current != number) {
+            return;
+        }
+        self.disk_check.set(None);
         self.free_space.set(free);
         let (text, warning) = match free {
             Some(free) => {
@@ -2109,7 +2149,56 @@ impl App {
 
     fn convert_files(&self) {
         let dir = self.config.borrow().settings.output_dir.clone();
-        let mut files = self.pick_mkv_files(&dir);
+        #[cfg(windows)]
+        {
+            let Some(ui) = self.ui.upgrade() else {
+                return;
+            };
+            let mut dialog = rfd::AsyncFileDialog::new()
+                .set_title(tr!("Fichiers à convertir en MP4"))
+                .add_filter(tr!("Enregistrements Polyptyque (MKV, MKA)"), &["mkv", "mka"])
+                .set_parent(&ui.window().window_handle());
+            if dir.exists() {
+                dialog = dialog.set_directory(&dir);
+            }
+            self.run_file_dialog(dialog.pick_files(), |app, files| {
+                app.convert_picked(files.unwrap_or_default().iter().map(|f| f.path().to_path_buf()).collect());
+            });
+        }
+        #[cfg(not(windows))]
+        self.convert_picked(self.pick_mkv_files(&dir));
+    }
+
+    /// Boîte de choix de Windows (fichiers, dossier) sans bloquer le fil de
+    /// l'interface : rfd l'ouvre sur un fil à part, modale pour la fenêtre
+    /// principale (sa propriétaire, désactivée tant qu'elle est ouverte). Les
+    /// minuteurs (fin de créneau, disque plein) et le pilotage continuent ;
+    /// `done` reçoit le choix sur le fil de l'interface.
+    #[cfg(windows)]
+    fn run_file_dialog<T: 'static>(
+        &self,
+        dialog: impl std::future::Future<Output = Option<T>> + 'static,
+        done: impl FnOnce(&Rc<App>, Option<T>) + 'static,
+    ) {
+        // Une seule à la fois (double clic avant qu'elle n'apparaisse).
+        if self.file_dialog_open.replace(true) {
+            return;
+        }
+        let spawned = slint::spawn_local(async move {
+            let choice = dialog.await;
+            with_app(|app| {
+                app.file_dialog_open.set(false);
+                done(app, choice);
+            });
+        });
+        if let Err(e) = spawned {
+            log::warn!("boîte de choix de fichier : {e}");
+            self.file_dialog_open.set(false);
+        }
+    }
+
+    /// Fichiers choisis pour la conversion MP4.
+    fn convert_picked(&self, mut files: Vec<PathBuf>) {
         // Un fichier encore en cours d'écriture donnerait une copie tronquée.
         let in_progress = self.session.borrow().as_ref().map(|s| s.files_in_progress()).unwrap_or_default();
         let before = files.len();
@@ -2136,21 +2225,6 @@ impl App {
                 2,
             ),
         }
-    }
-
-    #[cfg(windows)]
-    fn pick_mkv_files(&self, dir: &std::path::Path) -> Vec<PathBuf> {
-        let Some(ui) = self.ui.upgrade() else {
-            return Vec::new();
-        };
-        let mut dialog = rfd::FileDialog::new()
-            .set_title(tr!("Fichiers à convertir en MP4"))
-            .add_filter(tr!("Enregistrements Polyptyque (MKV, MKA)"), &["mkv", "mka"])
-            .set_parent(&ui.window().window_handle());
-        if dir.exists() {
-            dialog = dialog.set_directory(dir);
-        }
-        dialog.pick_files().unwrap_or_default()
     }
 
     /// Hors Windows (mode démonstration) : tous les MKV du dossier qui
@@ -2238,7 +2312,13 @@ impl App {
                     }
                 }
             }
-            ConversionEvent::Idle => {
+            ConversionEvent::Idle { last_job } => {
+                // Des fichiers ont été demandés après le dernier traité : la
+                // file n'est déjà plus vide, le bilan attend sa vraie fin.
+                let requested = self.converter.borrow().as_ref().map_or(0, Converter::last_job);
+                if last_job < requested {
+                    return;
+                }
                 let progress = std::mem::take(&mut *self.conversion.borrow_mut());
                 self.with_bridge(|b| {
                     b.set_converting(false);
@@ -2327,6 +2407,7 @@ impl App {
 
     fn open_scene_sheet(&self, new: bool) {
         let current = self.config.borrow().active_scene().name.clone();
+        self.remember_sheet_scene();
         self.with_bridge(|b| {
             b.set_scene_name_input(if new { SharedString::new() } else { current.into() });
             b.set_sheet(if new { "scene-new" } else { "scene-rename" }.into());
@@ -2335,6 +2416,7 @@ impl App {
 
     fn open_scene_sheet_duplicate(&self) {
         let name = tr!("{} (copie)", self.config.borrow().active_scene().name);
+        self.remember_sheet_scene();
         self.with_bridge(|b| {
             b.set_scene_name_input(name.into());
             b.set_sheet("scene-duplicate".into());
@@ -2355,17 +2437,39 @@ impl App {
             return;
         }
         let mode = bridge.get_sheet();
-        bridge.set_sheet("".into());
-        let active = self.config.borrow().active_scene.clone();
-        match mode.as_str() {
-            "scene-new" => {
-                self.create_scene(&name, true);
-            }
-            "scene-duplicate" => {
-                self.duplicate_scene(&active, &name);
-            }
-            _ => self.rename_scene(&active, &name),
+        if mode == "scene-new" {
+            bridge.set_sheet("".into());
+            self.create_scene(&name, true);
+            return;
         }
+        let Some(scene) = self.sheet_scene_id() else {
+            return;
+        };
+        bridge.set_sheet("".into());
+        if mode == "scene-duplicate" {
+            self.duplicate_scene(&scene, &name);
+        } else {
+            self.rename_scene(&scene, &name);
+        }
+    }
+
+    /// Mémorise la scène en cours, visée par la fenêtre de saisie qui
+    /// s'ouvre.
+    fn remember_sheet_scene(&self) {
+        *self.sheet_scene.borrow_mut() = self.config.borrow().active_scene.clone();
+    }
+
+    /// Scène visée par la fenêtre de saisie ouverte (la scène en cours a pu
+    /// changer entre-temps). Disparue : la fenêtre se ferme, avec un
+    /// message.
+    fn sheet_scene_id(&self) -> Option<String> {
+        let id = self.sheet_scene.borrow().clone();
+        if self.config.borrow().scene(&id).is_some() {
+            return Some(id);
+        }
+        self.close_sheet();
+        self.toast(&tr!("Cette scène n'existe plus."), 3);
+        None
     }
 
     /// Nouvelle scène, vide (interface, pilotage). Renvoie son identifiant.
@@ -2403,9 +2507,16 @@ impl App {
     /// Supprime une scène (jamais la dernière), ses programmations et les
     /// sources qui ne sont dans aucune autre.
     fn delete_scene(&self, id: &str) {
+        let schedules: Vec<String> =
+            self.config.borrow().schedules.iter().filter(|s| s.scene_id == id).map(|s| s.id.clone()).collect();
         if !self.config.borrow_mut().delete_scene(id) {
             return;
         }
+        let now = chrono::Utc::now();
+        for schedule in &schedules {
+            self.schedule_was_changed(schedule, now);
+        }
+        self.save_planner();
         self.save();
         self.refresh_all();
         self.restart_previews();
@@ -2427,7 +2538,7 @@ impl App {
     fn request_delete_scene(&self) {
         let id = self.config.borrow().active_scene.clone();
         self.ask(
-            Confirm::DeleteScene,
+            Confirm::DeleteScene(id.clone()),
             &tr!("Supprimer la scène"),
             &self.delete_scene_text(&id),
             &tr!("Bouton : supprimer une scène" => "Supprimer"),
@@ -2476,6 +2587,7 @@ impl App {
             .map(|b| format!("{} {count}", b.name.split_whitespace().last().unwrap_or(&b.name)))
             .unwrap_or_else(|| tr!("Navigateur {}", count));
         *self.browsers.borrow_mut() = browsers;
+        self.remember_sheet_scene();
         self.with_bridge(|b| {
             b.set_browser_choices(ModelRc::new(VecModel::from(choices)));
             b.set_browser_index(0);
@@ -2516,8 +2628,10 @@ impl App {
         }
         let url = bridge.get_new_url().to_string();
         let open_now = bridge.get_open_now();
+        let Some(scene) = self.sheet_scene_id() else {
+            return;
+        };
         bridge.set_sheet("".into());
-        let scene = self.config.borrow().active_scene.clone();
         self.add_browser_source(&bridge.get_new_name(), browser, Some(url.as_str()), open_now, &scene);
     }
 
@@ -2580,6 +2694,7 @@ impl App {
 
     fn open_application_sheet(&self) {
         self.refresh_windows();
+        self.remember_sheet_scene();
         self.with_bridge(|b| {
             b.set_window_index(-1);
             b.set_new_name("".into());
@@ -2607,11 +2722,13 @@ impl App {
     }
 
     fn window_selected(&self, index: i32) {
-        let name = self
-            .windows
-            .borrow()
-            .get(index.max(0) as usize)
-            .map(|w| program_name(&w.exe).map(|n| format::capitalize(&n)).unwrap_or_else(|| w.title.clone()));
+        // Programme illisible : un nom neutre, pas le titre de la fenêtre
+        // (le message « ajoutée » va au journal, où les titres n'ont pas
+        // leur place).
+        let count = self.config.borrow().active_scene().source_ids.len() + 1;
+        let name = self.windows.borrow().get(index.max(0) as usize).map(|w| {
+            program_name(&w.exe).map(|n| format::capitalize(&n)).unwrap_or_else(|| tr!("Application {}", count))
+        });
         if let Some(name) = name {
             self.with_bridge(|b| b.set_new_name(name.into()));
         }
@@ -2633,8 +2750,10 @@ impl App {
             self.toast(&tr!("Nom de source manquant."), 2);
             return;
         }
+        let Some(scene) = self.sheet_scene_id() else {
+            return;
+        };
         bridge.set_sheet("".into());
-        let scene = self.config.borrow().active_scene.clone();
         self.add_application_source(
             &bridge.get_new_name(),
             &window,
@@ -2681,7 +2800,7 @@ impl App {
         };
         let scene = self.config.borrow().active_scene.clone();
         self.ask(
-            Confirm::RemoveSource(source.id.clone()),
+            Confirm::RemoveSource(source.id.clone(), scene.clone()),
             &tr!("Supprimer la source"),
             &self.remove_source_text(&source, &scene),
             &tr!("Bouton : retirer une source" => "Supprimer"),
@@ -3104,15 +3223,19 @@ impl App {
                 return;
             };
             let current = Some(ui.global::<Bridge>().get_output_dir().to_string());
-            let mut dialog = rfd::FileDialog::new()
+            let mut dialog = rfd::AsyncFileDialog::new()
                 .set_title(tr!("Dossier des enregistrements"))
                 .set_parent(&ui.window().window_handle());
             if let Some(dir) = current.filter(|d| std::path::Path::new(d).exists()) {
                 dialog = dialog.set_directory(dir);
             }
-            if let Some(folder) = dialog.pick_folder() {
-                self.with_bridge(|b| b.set_output_dir(folder.display().to_string().into()));
-            }
+            self.run_file_dialog(dialog.pick_folder(), |app, folder| {
+                // Les réglages ont pu se fermer entre-temps (démarrage
+                // programmé) : le choix n'a alors plus de destination.
+                if let Some(folder) = folder.filter(|_| app.with_bridge_value(|b| b.get_sheet() == "settings")) {
+                    app.with_bridge(|b| b.set_output_dir(folder.path().display().to_string().into()));
+                }
+            });
         }
     }
 
@@ -3326,7 +3449,7 @@ impl App {
         if self.report_closing() {
             return;
         }
-        if matches!(*self.confirm.borrow(), Some(Confirm::EnableMicrophone)) {
+        if matches!(*self.confirm.borrow(), Some(Confirm::EnableMicrophone(_))) {
             log::info!("pilotage : activation du micro refusée");
             self.control.borrow_mut().mic_answer = Some(false);
         }
@@ -3350,7 +3473,7 @@ impl App {
     fn ask(&self, action: Confirm, title: &str, text: &str, button: &str) {
         let danger = !matches!(
             action,
-            Confirm::InstallUpdate | Confirm::ResumeAfterSleep(_) | Confirm::RepairFiles(_) | Confirm::EnableMicrophone
+            Confirm::InstallUpdate | Confirm::ResumeAfterSleep(_) | Confirm::RepairFiles(_) | Confirm::EnableMicrophone(_)
         );
         *self.confirm.borrow_mut() = Some(action);
         self.with_bridge(|b| {
@@ -3366,20 +3489,17 @@ impl App {
         let action = self.confirm.borrow_mut().take();
         self.with_bridge(|b| b.set_sheet("".into()));
         match action {
-            Some(Confirm::DeleteScene) | Some(Confirm::RemoveSource(_)) if self.locked() => {}
-            Some(Confirm::DeleteScene) => {
-                let id = self.config.borrow().active_scene.clone();
-                self.delete_scene(&id);
-            }
-            Some(Confirm::EnableMicrophone) => {
+            Some(Confirm::DeleteScene(_)) | Some(Confirm::RemoveSource(..)) if self.locked() => {}
+            // La scène et la source sont celles de la question : la scène en
+            // cours a pu changer entre-temps.
+            Some(Confirm::DeleteScene(id)) => self.delete_scene(&id),
+            Some(Confirm::EnableMicrophone(_)) => {
                 log::info!("pilotage : activation du micro acceptée");
                 self.control.borrow_mut().mic_answer = Some(true);
             }
-            Some(Confirm::RemoveSource(id)) => {
-                self.config.borrow_mut().remove_source(&id);
-                self.save();
-                self.refresh_all();
-                self.restart_previews();
+            Some(Confirm::RemoveSource(id, scene)) => {
+                self.config.borrow_mut().remove_source_from(&scene, &id);
+                self.after_source_change(&scene);
             }
             Some(Confirm::InstallUpdate) => self.download_update(),
             Some(Confirm::RepairFiles(files)) => self.enqueue_jobs(files, JobKind::Repair),
