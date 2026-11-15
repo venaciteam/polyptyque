@@ -13,12 +13,16 @@ use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, bail, Result};
 use polyptyque_core::platform::Platform;
+use polyptyque_core::storage;
 use polyptyque_engine::{probe, remux};
 use tr::tr;
 
 /// Marge d'espace disque gardée libre en plus de la taille du fichier.
 const DISK_MARGIN: u64 = 1_000_000_000;
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
+/// Délai accordé à la remise en ordre des restes d'un dossier : un dossier
+/// qui ne répond pas (partage réseau injoignable) ne retient pas la file.
+const LEFTOVERS_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Ce qu'il faut faire d'un fichier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -138,7 +142,9 @@ impl Drop for Converter {
 /// sur un fil à part, avant que la file ne commence : rien ne court avec une
 /// conversion demandée dès l'ouverture. Faux si Polyptyque se ferme entre-
 /// temps : un dossier qui ne répond pas (lecteur réseau) ne retient pas sa
-/// fermeture, le fil de remise en ordre est alors abandonné.
+/// fermeture, le fil de remise en ordre est alors abandonné. Chaque dossier
+/// a [`LEFTOVERS_TIMEOUT`] : passé ce délai, la file commence quand même
+/// (sa remise en ordre finit seule, plus tard).
 fn recover_leftovers(dirs: Vec<PathBuf>, control: &CancelControl) -> bool {
     let mut dirs = dirs;
     dirs.dedup();
@@ -147,10 +153,17 @@ fn recover_leftovers(dirs: Vec<PathBuf>, control: &CancelControl) -> bool {
     }
     let (done, finished) = mpsc::channel::<()>();
     let started = thread::Builder::new().name("restes-conversion".into()).spawn(move || {
-        for dir in &dirs {
-            let count = remux::recover_leftovers(dir);
-            if count > 0 {
-                log::info!("{count} reste(s) de conversion ou de réparation remis en ordre dans {}", dir.display());
+        for dir in dirs {
+            let shown = dir.display().to_string();
+            match storage::within(LEFTOVERS_TIMEOUT, move || remux::recover_leftovers(&dir)) {
+                Some(0) => {}
+                Some(count) => {
+                    log::info!("{count} reste(s) de conversion ou de réparation remis en ordre dans {shown}")
+                }
+                None => log::warn!(
+                    "restes des conversions interrompues : {shown} ne répond pas en {} s, file démarrée sans attendre",
+                    LEFTOVERS_TIMEOUT.as_secs()
+                ),
             }
         }
         let _ = done.send(());
