@@ -27,7 +27,7 @@ use polyptyque_core::encoder::{bytes_per_hour, EncoderChoice};
 use polyptyque_core::hotkeys;
 use polyptyque_core::naming;
 use polyptyque_core::paths;
-use polyptyque_core::platform::{BrowserInstall, Platform, WindowInfo};
+use polyptyque_core::platform::{BrowserInstall, Platform, WindowHandle, WindowInfo};
 use polyptyque_core::recovery::SessionRecord;
 use polyptyque_core::storage;
 use polyptyque_engine::remux;
@@ -39,6 +39,7 @@ use tr::tr;
 
 use polyptyque_core::schedule::{self, Planner, Slot};
 
+use crate::claims::TrackedWindows;
 use crate::convert::{ConversionEvent, Converter, JobKind};
 use crate::format;
 use crate::meter::{MicMeter, SourceMeters};
@@ -183,6 +184,9 @@ pub struct App {
     stop_thread: RefCell<Option<thread::JoinHandle<()>>>,
     busy: Cell<bool>,
     previews: RefCell<PreviewManager>,
+    /// Fenêtres que suit l'enregistrement en cours, pour que les aperçus et
+    /// les vumètres montrent les mêmes (voir [`crate::claims`]).
+    tracked_windows: TrackedWindows,
     /// Niveau sonore des sources que le moteur n'écoute pas.
     meters: RefCell<SourceMeters>,
     /// Test du micro, pendant que les réglages sont ouverts.
@@ -381,6 +385,7 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
         stop_thread: RefCell::new(None),
         busy: Cell::new(false),
         previews: RefCell::new(PreviewManager::default()),
+        tracked_windows: TrackedWindows::default(),
         meters: RefCell::new(SourceMeters::default()),
         mic_meter: RefCell::new(None),
         preview_size: Cell::new(preview::default_size()),
@@ -1028,7 +1033,12 @@ impl App {
             // En arrière-plan, personne ne les regarde : ils reprennent
             // quand la fenêtre revient.
             if config.settings.previews && !self.in_background.get() {
-                *previews = PreviewManager::start(&self.platform, &config.active_sources(), self.preview_size.get());
+                *previews = PreviewManager::start(
+                    &self.platform,
+                    &config.active_sources(),
+                    self.preview_size.get(),
+                    &self.tracked_windows,
+                );
             }
         }
         // Les vumètres suivent les mêmes sources, même aperçus coupés.
@@ -1044,7 +1054,9 @@ impl App {
         if self.in_background.get() {
             return;
         }
-        *meters = SourceMeters::start(&self.platform, &config.active_sources(), |id| self.engine_listens(id));
+        *meters = SourceMeters::start(&self.platform, &config.active_sources(), &self.tracked_windows, |id| {
+            self.engine_listens(id)
+        });
     }
 
     /// Le moteur écoute déjà le son de cette source (enregistrement,
@@ -1613,6 +1625,7 @@ impl App {
             let Some(session) = session.as_mut() else {
                 // Emprunt rendu avant : la mesure du disque relit la session.
                 drop(session);
+                self.set_tracked_windows(HashMap::new());
                 self.refresh_disk(false);
                 self.tick_meters(&[]);
                 return;
@@ -1622,7 +1635,13 @@ impl App {
             if let Some(micro) = session.microphone_status() {
                 self.show_microphone(&micro);
             }
-            (session.status(), session.outputs())
+            let statuses = session.status();
+            let tracked = statuses
+                .iter()
+                .filter_map(|status| session.tracked_window(&status.id).map(|handle| (status.id.clone(), handle)))
+                .collect();
+            self.set_tracked_windows(tracked);
+            (statuses, session.outputs())
         };
         let (statuses, outputs) = statuses;
         self.control.borrow_mut().statuses = statuses.clone();
@@ -1690,6 +1709,18 @@ impl App {
         self.tick_meters(&statuses);
     }
 
+    /// Fenêtres que suit l'enregistrement, pour les aperçus et les vumètres.
+    fn set_tracked_windows(&self, tracked: HashMap<String, WindowHandle>) {
+        *self.tracked_windows.lock().unwrap_or_else(|e| e.into_inner()) = tracked;
+    }
+
+    /// Fenêtres que les autres sources de la scène que `source` suivent
+    /// pendant l'enregistrement : elles ne lui reviennent jamais.
+    fn taken_by_others(&self, source: &Source) -> HashSet<WindowHandle> {
+        let tracked = self.tracked_windows.lock().unwrap_or_else(|e| e.into_inner());
+        tracked.iter().filter(|(id, _)| **id != source.id).map(|(_, handle)| *handle).collect()
+    }
+
     /// Rouvre le programme d'une source dont la fenêtre a disparu pendant
     /// l'enregistrement (fermée par erreur, plantée), si la source l'autorise :
     /// toujours pour un navigateur, sur option pour une application.
@@ -1726,11 +1757,15 @@ impl App {
                 entry.last_try = Some(now);
             }
             // Hors du fil de l'interface : la recherche des fenêtres interroge
-            // chaque processus.
+            // chaque processus. Mêmes règles que le moteur : la fenêtre d'une
+            // autre source du même programme ne compte pas.
             let platform = self.platform.clone();
+            let sources = self.config.borrow().active_sources();
+            let taken = self.taken_by_others(&source);
             thread::spawn(move || {
                 let windows = platform.list_windows();
-                if resolve::find_window(platform.as_ref(), &source, &windows).is_some() {
+                let exclusions = resolve::Exclusions::among(&source, &sources, taken, &windows);
+                if resolve::find_window_excluding(platform.as_ref(), &source, &windows, &exclusions).is_some() {
                     // La fenêtre existe (capture refusée, par exemple) : la
                     // relancer en ouvrirait une seconde.
                     return;
@@ -3054,15 +3089,19 @@ impl App {
         };
         // Pendant l'enregistrement : la fenêtre suivie par le moteur. Sinon,
         // parmi celles qui correspondent, une fenêtre réduite d'abord.
+        // Jamais la fenêtre d'une autre source du même programme.
         let tracked = self.session.borrow().as_ref().and_then(|s| s.tracked_window(&source.id));
         let platform = self.platform.clone();
+        let sources = self.config.borrow().active_sources();
+        let taken = self.taken_by_others(&source);
         thread::spawn(move || {
             let handle = tracked.or_else(|| {
                 let windows = platform.list_windows();
+                let exclusions = resolve::Exclusions::among(&source, &sources, taken, &windows);
                 let minimized: Vec<WindowInfo> =
                     windows.iter().filter(|w| platform.is_window_minimized(w.handle)).cloned().collect();
-                resolve::find_window(platform.as_ref(), &source, &minimized)
-                    .or_else(|| resolve::find_window(platform.as_ref(), &source, &windows))
+                resolve::find_window_excluding(platform.as_ref(), &source, &minimized, &exclusions)
+                    .or_else(|| resolve::find_window_excluding(platform.as_ref(), &source, &windows, &exclusions))
                     .map(|w| w.handle)
             });
             let result = match handle {

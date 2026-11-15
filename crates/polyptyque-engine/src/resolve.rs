@@ -37,6 +37,16 @@ pub struct Exclusions {
 }
 
 impl Exclusions {
+    /// Ce que `source` ne doit pas prendre parmi les sources `sources` d'une
+    /// scène : les fenêtres `taken` (suivies par les autres), et à défaut de
+    /// son titre exact celles qui correspondent exactement à une autre.
+    pub fn among(source: &Source, sources: &[Source], taken: HashSet<WindowHandle>, windows: &[WindowInfo]) -> Self {
+        let others: Vec<&Source> = sources.iter().filter(|s| s.id != source.id).collect();
+        let mut exclusions = Exclusions { taken, ..Default::default() };
+        exclusions.reserve_for(&others, windows);
+        exclusions
+    }
+
     /// Fenêtres de `windows` qui correspondent exactement à l'une des
     /// sources `others`.
     pub fn reserve_for(&mut self, others: &[&Source], windows: &[WindowInfo]) {
@@ -227,9 +237,7 @@ pub fn prepare_windows(
     // deux sources d'un même programme ne comptent jamais la même fenêtre.
     let mut taken: HashSet<WindowHandle> = HashSet::new();
     let mut find = |source: &Source, windows: &[WindowInfo]| {
-        let others: Vec<&Source> = sources.iter().filter(|s| s.id != source.id).collect();
-        let mut exclusions = Exclusions { taken: taken.clone(), ..Default::default() };
-        exclusions.reserve_for(&others, windows);
+        let exclusions = Exclusions::among(source, sources, taken.clone(), windows);
         let found = find_window_excluding(platform, source, windows, &exclusions);
         if let Some(window) = &found {
             taken.insert(window.handle);
