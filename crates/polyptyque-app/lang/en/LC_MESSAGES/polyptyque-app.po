@@ -1238,11 +1238,11 @@ msgstr "Missing end time."
 msgid "Donner date (une seule fois) ou days (chaque semaine)."
 msgstr "Give date (once) or days (every week)."
 
-#: polyptyque-app/src/controller/commands.rs:1358 polyptyque-app/src/controller/commands.rs:1385 polyptyque-app/src/controller/scheduling.rs:655 polyptyque-app/src/controller/scheduling.rs:788
+#: polyptyque-app/src/controller/commands.rs:1358 polyptyque-app/src/controller/commands.rs:1385 polyptyque-app/src/controller/scheduling.rs:682 polyptyque-app/src/controller/scheduling.rs:815
 msgid "Cette programmation enregistre en ce moment : modifiable une fois son créneau terminé."
 msgstr "This scheduled recording is recording right now: it can be edited once its time slot is over."
 
-#: polyptyque-app/src/controller/commands.rs:1399 polyptyque-app/src/controller/scheduling.rs:895
+#: polyptyque-app/src/controller/commands.rs:1399 polyptyque-app/src/controller/scheduling.rs:922
 msgid "Cette programmation enregistre en ce moment : supprimable une fois son créneau terminé."
 msgstr "This scheduled recording is recording right now: it can be deleted once its time slot is over."
 
@@ -1394,223 +1394,227 @@ msgstr "{} (portable)"
 msgid "{} (installée)"
 msgstr "{} (installed)"
 
-#: polyptyque-app/src/controller/scheduling.rs:95
+#: polyptyque-app/src/controller/scheduling.rs:105
 msgid "Fin du créneau programmé."
 msgstr "End of the scheduled time slot."
 
-#: polyptyque-app/src/controller/scheduling.rs:105
+#: polyptyque-app/src/controller/scheduling.rs:115
 msgid "sa scène n'existe plus"
 msgstr "its scene no longer exists"
 
-#: polyptyque-app/src/controller/scheduling.rs:106
+#: polyptyque-app/src/controller/scheduling.rs:116
 msgid "la scène « {} » n'a aucune source"
 msgstr "scene “{}” has no sources"
 
-#: polyptyque-app/src/controller/scheduling.rs:107
+#: polyptyque-app/src/controller/scheduling.rs:117
 msgid "un enregistrement est déjà en cours"
 msgstr "a recording is already in progress"
 
-#: polyptyque-app/src/controller/scheduling.rs:113
+#: polyptyque-app/src/controller/scheduling.rs:123
 msgid "Enregistrement programmé impossible : {}."
 msgstr "The scheduled recording couldn’t start: {}."
 
-#: polyptyque-app/src/controller/scheduling.rs:138
+#: polyptyque-app/src/controller/scheduling.rs:153
 msgid "Enregistrement programmé : arrêt prévu à {}."
 msgstr "Scheduled recording: stops at {}."
 
-#: polyptyque-app/src/controller/scheduling.rs:160 polyptyque-app/src/controller/scheduling.rs:363
+#: polyptyque-app/src/controller/scheduling.rs:175 polyptyque-app/src/controller/scheduling.rs:390
 msgid "L'enregistrement s'arrêtera à {}."
 msgstr "Recording will stop at {}."
 
-#: polyptyque-app/src/controller/scheduling.rs:162 polyptyque-app/src/controller/scheduling.rs:383
+#: polyptyque-app/src/controller/scheduling.rs:177 polyptyque-app/src/controller/scheduling.rs:410
 msgid "L'enregistrement continuera après {}."
 msgstr "Recording will continue past {}."
 
-#: polyptyque-app/src/controller/scheduling.rs:239
+#: polyptyque-app/src/controller/scheduling.rs:248
+msgid "Programmation modifiée pendant la préparation : l'enregistrement programmé est annulé."
+msgstr "Scheduled recording changed while getting ready: the recording is canceled."
+
+#: polyptyque-app/src/controller/scheduling.rs:266
 msgid "Enregistrement programmé"
 msgstr "Scheduled recording"
 
-#: polyptyque-app/src/controller/scheduling.rs:240
+#: polyptyque-app/src/controller/scheduling.rs:267
 msgid "Le créneau « {} » a commencé à {} sans que Polyptyque puisse le lancer (fermé, ou ordinateur en veille). Lancer l'enregistrement maintenant, jusqu'à {} ?"
 msgstr "The “{}” time slot started at {}, but Polyptyque couldn’t start it (it was closed, or the computer was asleep). Start recording now, until {}?"
 
-#: polyptyque-app/src/controller/scheduling.rs:246
+#: polyptyque-app/src/controller/scheduling.rs:273
 msgid "Enregistrer maintenant"
 msgstr "Record now"
 
-#: polyptyque-app/src/controller/scheduling.rs:247
+#: polyptyque-app/src/controller/scheduling.rs:274
 msgid "Ne pas enregistrer"
 msgstr "Don’t record"
 
-#: polyptyque-app/src/controller/scheduling.rs:253
+#: polyptyque-app/src/controller/scheduling.rs:280
 msgid "Créneau programmé en cours"
 msgstr "Scheduled time slot in progress"
 
-#: polyptyque-app/src/controller/scheduling.rs:254
+#: polyptyque-app/src/controller/scheduling.rs:281
 msgid "Le créneau d'enregistrement « {} » est en cours et se termine à {end}. Arrêter automatiquement cet enregistrement à {end} ?"
 msgstr "The “{}” recording time slot is in progress and ends at {end}. Stop this recording automatically at {end}?"
 
-#: polyptyque-app/src/controller/scheduling.rs:259
+#: polyptyque-app/src/controller/scheduling.rs:286
 msgid "Arrêter à {}"
 msgstr "Stop at {}"
 
-#: polyptyque-app/src/controller/scheduling.rs:260
+#: polyptyque-app/src/controller/scheduling.rs:287
 msgid "Ne pas l'arrêter"
 msgstr "Don’t stop it"
 
-#: polyptyque-app/src/controller/scheduling.rs:265
+#: polyptyque-app/src/controller/scheduling.rs:292
 msgid "Créneau programmé"
 msgstr "Scheduled time slot"
 
-#: polyptyque-app/src/controller/scheduling.rs:267
+#: polyptyque-app/src/controller/scheduling.rs:294
 msgid "Compris"
 msgstr "OK"
 
-#: polyptyque-app/src/controller/scheduling.rs:284
+#: polyptyque-app/src/controller/scheduling.rs:311
 msgid "Le créneau « {} » commence, mais un enregistrement est déjà en cours : il continue tel quel. La programmation ne lance rien et ne l'arrêtera pas à {}."
 msgstr "The “{}” time slot is starting, but a recording is already in progress: it continues as is. The scheduled recording won’t start anything, and won’t stop it at {}."
 
-#: polyptyque-app/src/controller/scheduling.rs:294
+#: polyptyque-app/src/controller/scheduling.rs:321
 msgid "Sans réponse, l'enregistrement démarre dans {}."
 msgstr "Without an answer, recording starts in {}."
 
-#: polyptyque-app/src/controller/scheduling.rs:296
+#: polyptyque-app/src/controller/scheduling.rs:323
 msgid "Sans réponse dans {}, il continuera après {}."
 msgstr "Without an answer within {}, it will continue past {}."
 
-#: polyptyque-app/src/controller/scheduling.rs:379
+#: polyptyque-app/src/controller/scheduling.rs:406
 msgid "Enregistrement programmé annulé pour ce créneau. Les suivants restent prévus."
 msgstr "Scheduled recording canceled for this time slot. The next ones are still planned."
 
-#: polyptyque-app/src/controller/scheduling.rs:400
+#: polyptyque-app/src/controller/scheduling.rs:427
 msgid "Créneau d'enregistrement en cours"
 msgstr "Recording time slot in progress"
 
-#: polyptyque-app/src/controller/scheduling.rs:402
+#: polyptyque-app/src/controller/scheduling.rs:429
 msgid "Arrêter"
 msgstr "Stop"
 
-#: polyptyque-app/src/controller/scheduling.rs:411
+#: polyptyque-app/src/controller/scheduling.rs:438
 msgid "Un créneau d'enregistrement programmé est en cours (« {} », jusqu'à {}). L'arrêter quand même ? Il ne sera pas relancé avant le prochain créneau."
 msgstr "A scheduled recording time slot is in progress (“{}”, until {}). Stop it anyway? It won’t restart before the next time slot."
 
-#: polyptyque-app/src/controller/scheduling.rs:437
+#: polyptyque-app/src/controller/scheduling.rs:464
 msgid "« {} » est programmé {} : Polyptyque doit rester ouvert pour le lancer. Quitter quand même ?"
 msgstr "“{}” is scheduled {}: Polyptyque must stay open to start it. Quit anyway?"
 
-#: polyptyque-app/src/controller/scheduling.rs:510
+#: polyptyque-app/src/controller/scheduling.rs:537
 msgid "Lancement au démarrage de Windows : {}"
 msgstr "Starting with Windows: {}"
 
-#: polyptyque-app/src/controller/scheduling.rs:528
+#: polyptyque-app/src/controller/scheduling.rs:555
 msgid "Windows empêche ce lancement (désactivé dans Paramètres > Applications > Démarrage) : le réactiver là-bas, ou couper puis remettre cette option."
 msgstr "Windows is blocking this (turned off in Settings > Apps > Startup): turn it back on there, or turn this option off and on again."
 
-#: polyptyque-app/src/controller/scheduling.rs:531
+#: polyptyque-app/src/controller/scheduling.rs:558
 msgid "Version portable : ce lancement est inscrit dans Windows. Couper l'option avant d'emporter le dossier sur un autre PC."
 msgstr "Portable version: this is registered in Windows. Turn the option off before taking the folder to another PC."
 
-#: polyptyque-app/src/controller/scheduling.rs:545
+#: polyptyque-app/src/controller/scheduling.rs:572
 msgid "scène supprimée"
 msgstr "deleted scene"
 
-#: polyptyque-app/src/controller/scheduling.rs:561
+#: polyptyque-app/src/controller/scheduling.rs:588
 msgid "Arrêt programmé à {}"
 msgstr "Scheduled stop at {}"
 
-#: polyptyque-app/src/controller/scheduling.rs:575
+#: polyptyque-app/src/controller/scheduling.rs:602
 msgid "{} · créneau jusqu'à {}"
 msgstr "{} · time slot until {}"
 
-#: polyptyque-app/src/controller/scheduling.rs:608
+#: polyptyque-app/src/controller/scheduling.rs:635
 msgid "Enregistre jusqu'à {}"
 msgstr "Recording until {}"
 
-#: polyptyque-app/src/controller/scheduling.rs:610
+#: polyptyque-app/src/controller/scheduling.rs:637
 msgid "Désactivée"
 msgstr "Off"
 
-#: polyptyque-app/src/controller/scheduling.rs:613
+#: polyptyque-app/src/controller/scheduling.rs:640
 msgid "Créneau en cours, sans enregistrement programmé (jusqu'à {})"
 msgstr "Time slot in progress, without a scheduled recording (until {})"
 
-#: polyptyque-app/src/controller/scheduling.rs:618
+#: polyptyque-app/src/controller/scheduling.rs:645
 msgid "Créneau en cours"
 msgstr "Time slot in progress"
 
-#: polyptyque-app/src/controller/scheduling.rs:621
+#: polyptyque-app/src/controller/scheduling.rs:648
 msgid "Prochain : {}"
 msgstr "Next: {}"
 
-#: polyptyque-app/src/controller/scheduling.rs:623 polyptyque-app/src/controller.rs:1690
+#: polyptyque-app/src/controller/scheduling.rs:650 polyptyque-app/src/controller.rs:1690
 msgid "Terminée"
 msgstr "Finished"
 
-#: polyptyque-app/src/controller/scheduling.rs:735
+#: polyptyque-app/src/controller/scheduling.rs:762
 msgid "Le créneau commence un {}."
 msgstr "The time slot starts on a {}."
 
-#: polyptyque-app/src/controller/scheduling.rs:762
+#: polyptyque-app/src/controller/scheduling.rs:789
 msgid "Se termine le lendemain."
 msgstr "Ends the next day."
 
-#: polyptyque-app/src/controller/scheduling.rs:794
+#: polyptyque-app/src/controller/scheduling.rs:821
 msgid "Aucune scène choisie."
 msgstr "No scene selected."
 
-#: polyptyque-app/src/controller/scheduling.rs:798
+#: polyptyque-app/src/controller/scheduling.rs:825
 msgid "Heure de début invalide (exemple : {})."
 msgstr "Invalid start time (example: {})."
 
-#: polyptyque-app/src/controller/scheduling.rs:802
+#: polyptyque-app/src/controller/scheduling.rs:829
 msgid "Heure de fin invalide (exemple : {})."
 msgstr "Invalid end time (example: {})."
 
-#: polyptyque-app/src/controller/scheduling.rs:850
+#: polyptyque-app/src/controller/scheduling.rs:877
 msgid "Programmation enregistrée : son créneau a déjà commencé."
 msgstr "Scheduled recording saved: its time slot has already started."
 
-#: polyptyque-app/src/controller/scheduling.rs:851
+#: polyptyque-app/src/controller/scheduling.rs:878
 msgid "Programmation enregistrée : prochain créneau {}."
 msgstr "Scheduled recording saved: next time slot {}."
 
-#: polyptyque-app/src/controller/scheduling.rs:852
+#: polyptyque-app/src/controller/scheduling.rs:879
 msgid "Programmation enregistrée."
 msgstr "Scheduled recording saved."
 
-#: polyptyque-app/src/controller/scheduling.rs:879
+#: polyptyque-app/src/controller/scheduling.rs:906
 msgid "Impossible de l'activer : {}"
 msgstr "Couldn’t turn it on: {}"
 
-#: polyptyque-app/src/controller/scheduling.rs:905
+#: polyptyque-app/src/controller/scheduling.rs:932
 msgid "Programmation supprimée."
 msgstr "Scheduled recording deleted."
 
-#: polyptyque-app/src/controller/scheduling.rs:916
+#: polyptyque-app/src/controller/scheduling.rs:943
 msgid "l'heure de fin doit être différente de l'heure de début."
 msgstr "the end time must differ from the start time."
 
-#: polyptyque-app/src/controller/scheduling.rs:917
+#: polyptyque-app/src/controller/scheduling.rs:944
 msgid "aucun jour choisi."
 msgstr "no day selected."
 
-#: polyptyque-app/src/controller/scheduling.rs:918
+#: polyptyque-app/src/controller/scheduling.rs:945
 msgid "ce créneau est déjà passé : choisir une autre date ou une autre heure."
 msgstr "this time slot is already over: choose another date or time."
 
-#: polyptyque-app/src/controller/scheduling.rs:922
+#: polyptyque-app/src/controller/scheduling.rs:949
 msgid "ce créneau chevauche la programmation « {} » ({}, {}) : un seul enregistrement à la fois."
 msgstr "this time slot overlaps the “{}” scheduled recording ({}, {}): only one recording at a time."
 
-#: polyptyque-app/src/controller/scheduling.rs:928
+#: polyptyque-app/src/controller/scheduling.rs:955
 msgid "ce créneau chevauche une autre programmation : un seul enregistrement à la fois."
 msgstr "this time slot overlaps another scheduled recording: only one recording at a time."
 
-#: polyptyque-app/src/controller/scheduling.rs:950
+#: polyptyque-app/src/controller/scheduling.rs:977
 msgid "{} min {} s"
 msgstr "{} min {} s"
 
-#: polyptyque-app/src/controller/scheduling.rs:952
+#: polyptyque-app/src/controller/scheduling.rs:979
 msgid "{} s"
 msgstr "{} s"
 
@@ -3360,67 +3364,67 @@ msgstr "mic capture"
 msgid "son indisponible : {}"
 msgstr "sound unavailable: {}"
 
-#: polyptyque-engine/src/output.rs:119
+#: polyptyque-engine/src/output.rs:127
 msgid "l'encodeur s'est arrêté (détail dans le journal)"
 msgstr "the encoder stopped (details in the log)"
 
-#: polyptyque-engine/src/output.rs:173
+#: polyptyque-engine/src/output.rs:181
 msgid "FFmpeg a disparu ({}) : un antivirus l'a peut-être mis en quarantaine ; le restaurer, ou réinstaller Polyptyque ({})"
 msgstr "FFmpeg is missing ({}): an antivirus may have quarantined it; restore it, or reinstall Polyptyque ({})"
 
-#: polyptyque-engine/src/output.rs:180
+#: polyptyque-engine/src/output.rs:188
 msgid "démarrage de l'encodeur impossible : {}"
 msgstr "couldn’t start the encoder: {}"
 
-#: polyptyque-engine/src/output.rs:220
+#: polyptyque-engine/src/output.rs:227
 msgid "Interruption de {} (mise en veille ou ordinateur figé) : la suite est dans la partie {}"
 msgstr "Interrupted for {} (computer asleep or frozen): recording continues in part {}"
 
-#: polyptyque-engine/src/output.rs:246
+#: polyptyque-engine/src/output.rs:269
 msgid "Windows refuse à FFmpeg l'écriture dans {} : l'« Accès contrôlé aux dossiers » de Sécurité Windows bloque peut-être {}. L'autoriser, ou choisir un autre dossier d'enregistrement"
 msgstr "Windows won’t let FFmpeg write to {}: Windows Security’s “Controlled folder access” may be blocking {}. Allow it, or choose another recordings folder"
 
-#: polyptyque-engine/src/output.rs:262
+#: polyptyque-engine/src/output.rs:285
 msgid "Limite d'encodages simultanés de la carte NVIDIA atteinte (autres logiciels compris) : cette source passe sur le processeur"
 msgstr "The NVIDIA card’s limit on simultaneous encodes was reached (other software included): this source switches to the CPU"
 
-#: polyptyque-engine/src/output.rs:265
+#: polyptyque-engine/src/output.rs:288
 msgid "{} ne démarre pas : cette source passe sur le processeur"
 msgstr "{} won’t start: this source switches to the CPU"
 
-#: polyptyque-engine/src/output.rs:271
+#: polyptyque-engine/src/output.rs:294
 msgid "{}. Suite dans la partie {}"
 msgstr "{}. Continues in part {}"
 
-#: polyptyque-engine/src/output.rs:274
+#: polyptyque-engine/src/output.rs:297
 msgid "l'encodeur s'arrête dès son démarrage : {}"
 msgstr "the encoder stops as soon as it starts: {}"
 
-#: polyptyque-engine/src/output.rs:279
+#: polyptyque-engine/src/output.rs:302
 msgid "Encodeur relancé : la suite est dans la partie {}"
 msgstr "Encoder restarted: recording continues in part {}"
 
-#: polyptyque-engine/src/output.rs:370
+#: polyptyque-engine/src/output.rs:414
 msgid "{} · partie {} (reprise à {})"
 msgstr "{} · part {} (resumed at {})"
 
-#: polyptyque-engine/src/output.rs:401
+#: polyptyque-engine/src/output.rs:445
 msgid "ouverture de {}"
 msgstr "opening {}"
 
-#: polyptyque-engine/src/output.rs:407 polyptyque-engine/src/remux.rs:59 polyptyque-engine/src/remux.rs:61 polyptyque-engine/src/remux.rs:349 polyptyque-engine/src/resolve.rs:419
+#: polyptyque-engine/src/output.rs:451 polyptyque-engine/src/remux.rs:59 polyptyque-engine/src/remux.rs:61 polyptyque-engine/src/remux.rs:349 polyptyque-engine/src/resolve.rs:419
 msgid "lancement de {}"
 msgstr "launching {}"
 
-#: polyptyque-engine/src/output.rs:484
+#: polyptyque-engine/src/output.rs:530
 msgid "l'encodeur ne répondait plus"
 msgstr "the encoder stopped responding"
 
-#: polyptyque-engine/src/output.rs:562
+#: polyptyque-engine/src/output.rs:622
 msgid "Dossier {} inaccessible : la suite est enregistrée dans {}"
 msgstr "Folder {} unavailable: recording continues in {}"
 
-#: polyptyque-engine/src/output.rs:571
+#: polyptyque-engine/src/output.rs:631
 msgid "{}_partie{}"
 msgstr "{}_part{}"
 
