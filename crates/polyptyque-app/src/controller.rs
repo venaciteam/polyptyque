@@ -446,8 +446,12 @@ pub fn run(platform: Arc<dyn Platform>, paths: Paths, initial: Option<Config>, a
         plugin: RefCell::new(plugin::PluginState::new()),
     });
     APP.with(|a| *a.borrow_mut() = Some(app.clone()));
+    // Restes d'une conversion ou d'une réparation interrompue (Polyptyque
+    // fermé ou planté) : remis en ordre par le fil de conversion, avant le
+    // premier fichier demandé.
+    let leftover_dirs = vec![app.config.borrow().settings.output_dir.clone(), paths::default_output_dir()];
     *app.converter.borrow_mut() =
-        Some(Converter::start(app.platform.clone(), |event| post(move |app| app.on_conversion(event))));
+        Some(Converter::start(app.platform.clone(), leftover_dirs, |event| post(move |app| app.on_conversion(event))));
 
     install_callbacks(&ui);
     let bridge = ui.global::<Bridge>();

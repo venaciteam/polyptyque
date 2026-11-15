@@ -80,13 +80,24 @@ impl CancelControl {
 }
 
 impl Converter {
-    pub fn start(platform: Arc<dyn Platform>, on_event: impl Fn(ConversionEvent) + Send + 'static) -> Self {
+    /// `leftover_dirs` : dossiers où remettre en ordre les restes d'une
+    /// conversion ou d'une réparation interrompue, avant le premier fichier
+    /// de la file (voir [`remux::recover_leftovers`]).
+    pub fn start(
+        platform: Arc<dyn Platform>,
+        leftover_dirs: Vec<PathBuf>,
+        on_event: impl Fn(ConversionEvent) + Send + 'static,
+    ) -> Self {
         let (jobs, queue) = mpsc::channel();
         let control = Arc::new(CancelControl::default());
         let worker_control = control.clone();
         let worker = thread::Builder::new()
             .name("conversion-mp4".into())
-            .spawn(move || run(platform, queue, worker_control, on_event))
+            .spawn(move || {
+                if recover_leftovers(leftover_dirs, &worker_control) {
+                    run(platform, queue, worker_control, on_event);
+                }
+            })
             .map_err(|e| log::error!("conversion MP4 indisponible : {e}"))
             .ok();
         Self { jobs: Some(jobs), last_job: Cell::new(0), control, worker }
@@ -119,6 +130,42 @@ impl Drop for Converter {
         self.jobs.take();
         if let Some(worker) = self.worker.take() {
             let _ = worker.join();
+        }
+    }
+}
+
+/// Remet en ordre les restes des conversions et réparations interrompues,
+/// sur un fil à part, avant que la file ne commence : rien ne court avec une
+/// conversion demandée dès l'ouverture. Faux si Polyptyque se ferme entre-
+/// temps : un dossier qui ne répond pas (lecteur réseau) ne retient pas sa
+/// fermeture, le fil de remise en ordre est alors abandonné.
+fn recover_leftovers(dirs: Vec<PathBuf>, control: &CancelControl) -> bool {
+    let mut dirs = dirs;
+    dirs.dedup();
+    if dirs.is_empty() {
+        return true;
+    }
+    let (done, finished) = mpsc::channel::<()>();
+    let started = thread::Builder::new().name("restes-conversion".into()).spawn(move || {
+        for dir in &dirs {
+            let count = remux::recover_leftovers(dir);
+            if count > 0 {
+                log::info!("{count} reste(s) de conversion ou de réparation remis en ordre dans {}", dir.display());
+            }
+        }
+        let _ = done.send(());
+    });
+    if let Err(e) = started {
+        log::warn!("restes des conversions interrompues non traités : {e}");
+        return true;
+    }
+    loop {
+        match finished.recv_timeout(Duration::from_millis(100)) {
+            Ok(()) => return true,
+            // Fil arrêté (panique) : la file peut commencer.
+            Err(mpsc::RecvTimeoutError::Disconnected) => return true,
+            Err(mpsc::RecvTimeoutError::Timeout) if *lock(&control.up_to) == u64::MAX => return false,
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
         }
     }
 }
