@@ -944,7 +944,8 @@ Le plugin Windows utilise `polyptyque-cli.exe` livré avec Polyptyque (bêta.9 o
 > - [x] Interface et pilotage : fenêtres liées à leur scène, refus pendant une saisie, boîtes de fichier sans blocage, question du micro liée au programme, questions de programmation périmées, codes JSON-RPC, bilan de conversion
 > - [x] Réglages et programmation : fichiers verrouillés, illisibles ou plus récents, chevauchements lointains, heure sautée loin de UTC, état réécrit ; appel MCP annulé
 > - [x] Aperçus et niveaux sonores avec les règles de l'enregistrement ; restes des conversions remis en ordre au lancement
-> - [ ] Vérifié sur la machine de référence (deux sources d'un même programme, application du Store, copie administrateur, installateur pendant un enregistrement, disque réseau débranché)
+> - [x] Vérifié sur la machine de référence le 2026-11-15 (version portable, pilotée par polyptyque-cli) : deux sources d'un même programme (fenêtre de l'une fermée en cours : image noire, l'autre garde sa fenêtre, fichiers de même durée) ; application du Store (Calculatrice, reconnue comme CalculatorApp.exe, image juste) ; Polyptyque tué pendant un enregistrement (FFmpeg finalise, fichiers complets, enregistrement interrompu signalé au lancement) ; Polyptyque tué pendant une conversion (FFmpeg arrêté avec lui, `.partiel` effacé au lancement suivant passé deux minutes) ; programmation supprimée pendant la préparation (annulée avec message, aucun fichier) ; copie portable avec lancement au démarrage activé sans prendre l'inscription de la version installée
+> - [ ] Reste à vérifier : copie administrateur, installateur pendant un enregistrement, disque réseau débranché
 
 > [!info] Plus tard
 > - Rognage par le pilotage (CLI, Stream Deck)
