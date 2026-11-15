@@ -292,7 +292,7 @@ impl Shared {
         log::error!("[{name}] l'encodeur ne suit plus : {seconds:.0} s de retard, source arrêtée");
         self.fail(tr::tr!(
             "L'encodeur ne suit plus ({} min de retard) : enregistrement de cette source arrêté, fichier conservé. \
-             Réduire la définition, la cadence ou le débit",
+             Réduire la résolution, les images par seconde ou le débit vidéo",
             MAX_BACKLOG_SECONDS / 60
         ));
         true

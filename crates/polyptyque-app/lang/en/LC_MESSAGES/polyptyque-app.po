@@ -3332,6 +3332,14 @@ msgstr "FFmpeg is missing ({}): an antivirus may have quarantined it; restore it
 msgid "démarrage de l'encodeur impossible : {}"
 msgstr "couldn’t start the encoder: {}"
 
+#: polyptyque-engine/src/output.rs:220
+msgid "Interruption de {} (mise en veille ou ordinateur figé) : la suite est dans la partie {}"
+msgstr "Interrupted for {} (computer asleep or frozen): recording continues in part {}"
+
+#: polyptyque-engine/src/output.rs:246
+msgid "Windows refuse à FFmpeg l'écriture dans {} : l'« Accès contrôlé aux dossiers » de Sécurité Windows bloque peut-être {}. L'autoriser, ou choisir un autre dossier d'enregistrement"
+msgstr "Windows won’t let FFmpeg write to {}: Windows Security’s “Controlled folder access” may be blocking {}. Allow it, or choose another recordings folder"
+
 #: polyptyque-engine/src/output.rs:193
 msgid "Limite d'encodages simultanés de la carte NVIDIA atteinte (autres logiciels compris) : cette source passe sur le processeur"
 msgstr "The NVIDIA card’s limit on simultaneous encodes was reached (other software included): this source switches to the CPU"
@@ -3396,6 +3404,10 @@ msgstr "incomplete repaired copy ({} of {} bytes): the original is kept as is"
 msgid "le fichier d'origine est utilisé par un autre programme"
 msgstr "the original file is in use by another program"
 
+#: polyptyque-engine/src/remux.rs:171
+msgid "remplacement du fichier d'origine : l'original est conservé sous {}"
+msgstr "replacing the original file: the original is kept as {}"
+
 #: polyptyque-engine/src/remux.rs:156
 msgid "remplacement du fichier d'origine"
 msgstr "replacing the original file"
@@ -3432,6 +3444,10 @@ msgstr "unreadable duration after conversion"
 msgid "création du profil {}"
 msgstr "creating profile {}"
 
+#: polyptyque-engine/src/session.rs:158
+msgid "L'encodage ne répondait plus à l'arrêt : le fichier est peut-être incomplet (détail dans le journal)"
+msgstr "Encoding stopped responding while stopping: the file may be incomplete (details in the log)"
+
 #: polyptyque-engine/src/session.rs:256
 msgid "« {} » enregistre déjà"
 msgstr "“{}” is already recording"
@@ -3447,6 +3463,10 @@ msgstr "video thread: {}"
 #: polyptyque-engine/src/session.rs:426
 msgid "fil son : {}"
 msgstr "audio thread: {}"
+
+#: polyptyque-engine/src/shared.rs:293
+msgid "L'encodeur ne suit plus ({} min de retard) : enregistrement de cette source arrêté, fichier conservé. Réduire la résolution, les images par seconde ou le débit vidéo"
+msgstr "The encoder can’t keep up ({} min behind): this source stopped recording and its file is kept. Lower the resolution, frame rate or video bitrate"
 
 #: polyptyque-engine/src/shared.rs:269
 msgid "[{}] erreur interne répétée dans {} (voir le journal)"
