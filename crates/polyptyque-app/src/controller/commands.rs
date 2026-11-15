@@ -18,6 +18,7 @@ use polyptyque_core::control::protocol::{CommandError, Reason, PROTOCOL_VERSION}
 use polyptyque_core::encoder::{bytes_per_hour, EncoderChoice, EncoderKind};
 use polyptyque_core::hotkeys;
 use polyptyque_core::paths;
+use polyptyque_core::platform::WindowInfo;
 use polyptyque_core::schedule::{self, Repeat, Schedule, Slot, TimeOfDay};
 use polyptyque_engine::{probe, remux, SourceState};
 use serde_json::{json, Value};
@@ -129,6 +130,14 @@ fn family_name(family: BrowserFamily) -> &'static str {
 
 fn file_name(path: &Path) -> String {
     path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+}
+
+/// Une autre fenêtre ouverte appartient au même programme : son titre est
+/// alors nécessaire pour les distinguer. Un exécutable illisible (chemin
+/// vide) ne fait jamais « le même programme ».
+fn shares_program(windows: &[WindowInfo], window: &WindowInfo) -> bool {
+    !window.exe.as_os_str().is_empty()
+        && windows.iter().any(|other| other.handle != window.handle && other.exe == window.exe)
 }
 
 impl App {
@@ -600,14 +609,13 @@ impl App {
         let items: Vec<Value> = windows
             .iter()
             .map(|w| {
-                let same_program = windows.iter().filter(|o| o.exe == w.exe).count();
                 let mut item = json!({
                     "id": w.handle.to_string(),
                     "program": program_name(&w.exe).map(|n| format::capitalize(&n)).unwrap_or_default(),
                     "executable": file_name(&w.exe),
                     "browser": classify_executable(&w.exe).is_some(),
                 });
-                if same_program > 1 {
+                if shares_program(&windows, w) {
                     item["title"] = json!(w.title);
                 }
                 item
@@ -662,7 +670,11 @@ impl App {
         let name = match text(params, "name").map(str::trim) {
             Some("") => return Err(CommandError::invalid(tr!("Nom de source manquant."))),
             Some(name) => name.to_string(),
-            None => program_name(&window.exe).map(|n| format::capitalize(&n)).unwrap_or_else(|| window.title.clone()),
+            // Programme illisible : un nom neutre, jamais le titre (il serait
+            // renvoyé au programme et écrit au journal).
+            None => program_name(&window.exe)
+                .map(|n| format::capitalize(&n))
+                .unwrap_or_else(|| tr!("Application {}", scene.source_ids.len() + 1)),
         };
         let id = self.add_application_source(
             &name,
@@ -1656,5 +1668,28 @@ impl App {
                 .flatten(),
             "control_clients": control.client_count(),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn window(handle: isize, exe: &str) -> WindowInfo {
+        WindowInfo { handle, pid: 1, title: format!("titre {handle}"), class: String::new(), exe: PathBuf::from(exe) }
+    }
+
+    #[test]
+    fn titres_seulement_entre_fenetres_d_un_meme_programme() {
+        let windows = vec![
+            window(1, r"C:\Programmes\Discord\Discord.exe"),
+            window(2, r"C:\Programmes\Discord\Discord.exe"),
+            window(3, r"C:\Programmes\OBS\obs64.exe"),
+            // Exécutables illisibles : jamais regroupés.
+            window(4, ""),
+            window(5, ""),
+        ];
+        let shared: Vec<bool> = windows.iter().map(|w| shares_program(&windows, w)).collect();
+        assert_eq!(shared, [true, true, false, false, false]);
     }
 }
