@@ -2649,6 +2649,14 @@ msgstr "{weekday}, {month} {day}, {year}"
 msgid "Scène principale"
 msgstr "Main scene"
 
+#: polyptyque-core/src/config.rs:84
+msgid "Réglages enregistrés par une version plus récente de Polyptyque : certains peuvent être ignorés."
+msgstr "Settings saved by a newer version of Polyptyque: some may be ignored."
+
+#: polyptyque-core/src/config.rs:89 polyptyque-core/src/config.rs:111
+msgid "Une copie a été gardée dans {}."
+msgstr "A copy was kept in {}."
+
 #: polyptyque-core/src/config.rs:75
 msgid "Réglages abîmés (détail dans le journal). Une copie a été gardée dans {}."
 msgstr "Damaged settings (details in the log). A copy was kept in {}."
