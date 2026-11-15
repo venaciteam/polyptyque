@@ -2274,7 +2274,13 @@ impl App {
                     }
                 }
             }
-            ConversionEvent::Idle => {
+            ConversionEvent::Idle { last_job } => {
+                // Des fichiers ont été demandés après le dernier traité : la
+                // file n'est déjà plus vide, le bilan attend sa vraie fin.
+                let requested = self.converter.borrow().as_ref().map_or(0, Converter::last_job);
+                if last_job < requested {
+                    return;
+                }
                 let progress = std::mem::take(&mut *self.conversion.borrow_mut());
                 self.with_bridge(|b| {
                     b.set_converting(false);
